@@ -82,12 +82,12 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </Reveal>
 
         <Reveal delay={200}>
-          {/* Typography updated for better mobile fit */}
-          <h1 className="font-display font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-[0.9] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm max-w-full">
+          {/* Typography - responsive sizing for all screens */}
+          <h1 className="font-display font-black text-[2.5rem] sm:text-5xl md:text-7xl lg:text-8xl leading-[0.95] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm max-w-full px-2">
             MARKETING <br/>
-            {/* High Contrast Gradient Text with Stroke Effect - ON AUTOPILOT on same line */}
-            <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
-               <span className="absolute inset-0 translate-x-[3px] translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none" aria-hidden="true">ON AUTOPILOT.</span>
+            {/* Gradient Text - scales to fit on mobile */}
+            <span className="relative inline-block mt-1 md:mt-2">
+               <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none" aria-hidden="true">ON AUTOPILOT.</span>
                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
             </span>
           </h1>
