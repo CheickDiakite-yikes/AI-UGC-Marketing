@@ -114,3 +114,10 @@ export const assetsRelations = relations(assets, ({ one }) => ({
     references: [boards.id],
   }),
 }));
+
+export const generatedItemsRelations = relations(generatedItems, ({ one }) => ({
+  board: one(boards, {
+    fields: [generatedItems.boardId],
+    references: [boards.id],
+  }),
+}));
