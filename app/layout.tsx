@@ -14,7 +14,7 @@ const syne = Syne({
     display: 'swap',
 })
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://predi.ai'
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),

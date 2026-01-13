@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://predi.ai'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
     const currentDate = new Date()
     
     return [

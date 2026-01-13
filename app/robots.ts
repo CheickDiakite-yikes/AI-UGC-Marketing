@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://predi.ai'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
     
     return {
         rules: [
