@@ -47,7 +47,19 @@ export async function GET(
       );
     }
     
-    const buffer = value instanceof Uint8Array ? value : new Uint8Array(value as ArrayBuffer);
+    // Handle different buffer types returned by object storage
+    let buffer: Uint8Array;
+    if (value instanceof Uint8Array) {
+      buffer = value;
+    } else if (Buffer.isBuffer(value)) {
+      buffer = new Uint8Array(value);
+    } else if (Array.isArray(value) && value.length > 0 && Buffer.isBuffer(value[0])) {
+      buffer = new Uint8Array(Buffer.concat(value));
+    } else if (value instanceof ArrayBuffer) {
+      buffer = new Uint8Array(value);
+    } else {
+      buffer = new Uint8Array(value as unknown as ArrayBuffer);
+    }
     const contentType = detectMimeType(buffer);
     
     console.log(`[STORAGE] Serving ${storageKey} as ${contentType} (${buffer.length} bytes)`);
