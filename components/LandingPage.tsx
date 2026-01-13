@@ -73,7 +73,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
       </nav>
 
       {/* Hero Section */}
-      <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-4 md:px-12 max-w-7xl mx-auto flex flex-col items-center text-center">
+      <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-6 md:px-16 lg:px-24 max-w-7xl mx-auto flex flex-col items-center text-center">
         
         <Reveal delay={100}>
           <div className="inline-block bg-neo-lime border-2 border-black px-4 py-1.5 md:px-6 md:py-2 font-bold text-xs md:text-sm uppercase tracking-widest mb-6 md:mb-8 shadow-neo hover:rotate-2 transition-transform cursor-default">
@@ -82,11 +82,11 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </Reveal>
 
         <Reveal delay={200}>
-          {/* Typography updated for better mobile fit (text-4xl on minimal screens) */}
-          <h1 className="font-display font-black text-4xl sm:text-6xl md:text-8xl lg:text-9xl leading-[0.9] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm break-words max-w-full">
+          {/* Typography updated for better mobile fit */}
+          <h1 className="font-display font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl leading-[0.9] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm max-w-full">
             MARKETING <br/>
-            {/* High Contrast Gradient Text with Stroke Effect Simulation via Shadow */}
-            <span className="relative inline-block mt-1 md:mt-2">
+            {/* High Contrast Gradient Text with Stroke Effect - ON AUTOPILOT on same line */}
+            <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
                <span className="absolute inset-0 translate-x-[3px] translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none" aria-hidden="true">ON AUTOPILOT.</span>
                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
             </span>
