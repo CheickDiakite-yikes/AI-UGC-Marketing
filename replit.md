@@ -97,7 +97,22 @@ The app uses email/password authentication with JWT sessions stored in cookies.
 - `app/actions/authActions.ts` - Server actions for signup, login, logout, getSession
 - `services/authService.ts` - Password hashing and JWT token utilities
 
+## Object Storage
+
+Media files (logos, images, avatars) are stored in Replit Object Storage instead of base64 in the database for better performance and scalability.
+
+### How It Works
+- When uploading media assets, files are stored in object storage with a key like `boards/{boardId}/assets/{assetId}.{ext}`
+- The `assets` table stores a `storage_key` column referencing the object storage location
+- Assets are served via the `/api/storage/[key]` API route
+
+### Files
+- `services/objectStorageService.ts` - Upload/download/delete helpers
+- `app/api/storage/[key]/route.ts` - API route to serve stored files
+
 ## Recent Changes
+- Added Replit Object Storage for media files (January 2026)
+- Added rename and delete campaign functionality (January 2026)
 - Added email/password authentication with signup and login modals (January 2026)
 - Added Database Management REST API with full CRUD + table management (January 2026)
 - Set up PostgreSQL database with Drizzle ORM (January 2026)

@@ -68,7 +68,7 @@ export async function downloadAsset(storageKey: string): Promise<{ success: bool
       return { success: false, error: error?.message || 'Download failed' };
     }
     
-    return { success: true, data: Buffer.from(value) };
+    return { success: true, data: value as Buffer };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }

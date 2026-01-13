@@ -3,7 +3,8 @@ export interface ProjectAsset {
   id: string;
   type: 'logo' | 'image' | 'pdf' | 'text' | 'link' | 'avatar';
   name: string;
-  content: string; // Base64 or Text
+  content: string; // Base64, Text, or URL from object storage
+  storageKey?: string | null; // Object storage key for media files
   mimeType?: string;
   status?: 'digesting' | 'ready';
 }

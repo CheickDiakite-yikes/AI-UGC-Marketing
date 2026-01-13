@@ -38,7 +38,8 @@ export const assets = pgTable('assets', {
   boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }),
   type: assetTypeEnum('type').notNull(),
   name: text('name').notNull(),
-  content: text('content').notNull(), // Base64 or URL
+  content: text('content'), // Base64 for backwards compatibility or text content
+  storageKey: text('storage_key'), // Object storage key for media files
   mimeType: text('mime_type'),
   status: text('status').default('ready'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

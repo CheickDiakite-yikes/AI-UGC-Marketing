@@ -7,6 +7,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity } from '@/types';
 import { getSession } from './authActions';
+import { uploadAsset } from '@/services/objectStorageService';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -47,19 +48,56 @@ export async function getBoardDetails(boardId: string) {
             avatarIdentity: true,
         }
     });
+    
+    if (board && board.assets) {
+        board.assets = board.assets.map(asset => {
+            if (asset.storageKey && !asset.content) {
+                return {
+                    ...asset,
+                    content: `/api/storage/${encodeURIComponent(asset.storageKey)}`
+                };
+            }
+            return asset;
+        });
+    }
+    
     return board;
 }
 
 export async function saveAsset(boardId: string, asset: ProjectAsset) {
+    const assetId = crypto.randomUUID();
+    const isMediaType = ['logo', 'image', 'avatar'].includes(asset.type) && asset.mimeType?.startsWith('image/');
+    
+    let storageKey: string | null = null;
+    let dbContent: string | null = asset.content;
+    
+    if (isMediaType && asset.content && asset.mimeType) {
+        const uploadResult = await uploadAsset(boardId, assetId, asset.content, asset.mimeType);
+        if (uploadResult.success && uploadResult.storageKey) {
+            storageKey = uploadResult.storageKey;
+            dbContent = null;
+        }
+    }
+    
     const [saved] = await db.insert(assets).values({
+        id: assetId,
         boardId,
         type: asset.type,
         name: asset.name,
-        content: asset.content, // Warning: Storing base64 in DB is not ideal for prod, but OK for MVP
+        content: dbContent,
+        storageKey,
         mimeType: asset.mimeType,
         status: asset.status || 'ready'
     }).returning();
+    
     revalidatePath('/');
+    
+    if (saved.storageKey && !saved.content) {
+        return {
+            ...saved,
+            content: `/api/storage/${encodeURIComponent(saved.storageKey)}`
+        };
+    }
     return saved;
 }
 
