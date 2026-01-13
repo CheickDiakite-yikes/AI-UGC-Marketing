@@ -67,8 +67,13 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
       displayContent = item.carouselUrls[currentSlide];
   }
 
-  // Helper to check if content is ready to display (basic check for data URI or blob)
-  const isContentReady = displayContent && (displayContent.startsWith('data:') || displayContent.startsWith('blob:') || displayContent.startsWith('http'));
+  // Helper to check if content is ready to display
+  const isContentReady = displayContent && (
+    displayContent.startsWith('data:') || 
+    displayContent.startsWith('blob:') || 
+    displayContent.startsWith('http') ||
+    displayContent.startsWith('/api/storage/')
+  );
 
   return (
     <div className="bg-white border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
@@ -79,7 +84,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
           {onDelete && (
             <button
               onClick={handleDelete}
-              className="opacity-0 group-hover/header:opacity-100 transition-opacity p-1 hover:bg-red-500 hover:text-white rounded text-red-600"
+              className={`${isContentReady ? 'opacity-0 group-hover/header:opacity-100' : 'opacity-100'} transition-opacity p-1 hover:bg-red-500 hover:text-white rounded text-red-600`}
               title="Delete item"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
