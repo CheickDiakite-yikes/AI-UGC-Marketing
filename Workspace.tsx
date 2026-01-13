@@ -38,13 +38,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   // Initial Load
   React.useEffect(() => {
-    getBoards().then(bs => {
+    getBoards().then(async (bs) => {
       if (bs.length > 0) {
         setBoards(bs as any);
         setActiveBoardId(bs[0].id);
       } else {
-        // Create default if none exists? Or let user create one. 
-        // For now, let's keep it empty or maybe auto-create one.
+        const newBoard = await createBoard('My First Campaign');
+        setBoards([newBoard as any]);
+        setActiveBoardId(newBoard.id);
       }
     });
   }, []);
