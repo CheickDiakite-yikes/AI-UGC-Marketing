@@ -187,43 +187,15 @@ export async function saveMessageAction(boardId: string, role: 'user' | 'model' 
 
 export async function saveGeneratedItemAction(boardId: string, item: any) {
     const itemId = crypto.randomUUID();
-    const isMediaType = ['image', 'video'].includes(item.type);
-    const isCarousel = item.type === 'carousel';
     
-    let storageKey: string | null = null;
+    // IMPORTANT: Store base64 directly in database - object storage has issues
+    // Keep the original content as-is (base64 or URL)
     let dbContent: string | null = item.content;
     let processedCarouselUrls: string[] | null = null;
     
-    if (isCarousel && item.carouselUrls && Array.isArray(item.carouselUrls)) {
-        const uploadedSlides: string[] = [];
-        for (let i = 0; i < item.carouselUrls.length; i++) {
-            const slideData = item.carouselUrls[i];
-            const isBase64 = slideData.includes('base64') || slideData.includes(',');
-            if (isBase64) {
-                const uploadResult = await uploadCarouselSlide(boardId, itemId, i, slideData);
-                if (uploadResult.success && uploadResult.storageKey) {
-                    uploadedSlides.push(uploadResult.storageKey);
-                } else {
-                    uploadedSlides.push(slideData);
-                }
-            } else {
-                uploadedSlides.push(slideData);
-            }
-        }
-        processedCarouselUrls = uploadedSlides;
-        if (uploadedSlides.length > 0 && !uploadedSlides[0].includes('base64')) {
-            storageKey = uploadedSlides[0];
-            dbContent = null;
-        }
-    } else if (isMediaType && item.content) {
-        const isBase64 = item.content.includes('base64') || item.content.includes(',');
-        if (isBase64) {
-            const uploadResult = await uploadGeneratedItem(boardId, itemId, item.content, item.type);
-            if (uploadResult.success && uploadResult.storageKey) {
-                storageKey = uploadResult.storageKey;
-                dbContent = null;
-            }
-        }
+    // For carousels, keep the base64 URLs directly
+    if (item.type === 'carousel' && item.carouselUrls && Array.isArray(item.carouselUrls)) {
+        processedCarouselUrls = item.carouselUrls;
     }
     
     const [saved] = await db.insert(generatedItems).values({
@@ -231,7 +203,7 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
         boardId,
         type: item.type,
         content: dbContent,
-        storageKey,
+        storageKey: null, // Not using object storage - store base64 in content
         carouselUrls: processedCarouselUrls || item.carouselUrls,
         title: item.title,
         description: item.description,
@@ -255,22 +227,8 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
 
     revalidatePath('/');
     
-    let result: any = { ...saved };
-    
-    if (saved.storageKey && !saved.content) {
-        result.content = `/api/storage/${encodeURIComponent(saved.storageKey)}`;
-    }
-    
-    if (saved.carouselUrls && Array.isArray(saved.carouselUrls)) {
-        result.carouselUrls = saved.carouselUrls.map((url: string) => {
-            if (url && !url.startsWith('data:') && !url.startsWith('http') && !url.startsWith('/api/')) {
-                return `/api/storage/${encodeURIComponent(url)}`;
-            }
-            return url;
-        });
-    }
-    
-    return result;
+    // Return the saved item directly - content is already base64
+    return saved;
 }
 
 export async function getUserUsageAction() {
