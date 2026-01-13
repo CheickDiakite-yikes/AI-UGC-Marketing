@@ -324,10 +324,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       }));
 
     } catch (error: any) {
-      console.error(error);
-      const errMsg = "Strategic conflict detected. Please split your request into Research and Creation.";
-      updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: errMsg }] }));
-      await saveMessageAction(activeBoardId, 'model', errMsg);
+      console.error("Chat error:", error);
+      const errMsg = error?.message || "Something went wrong. Please try again.";
+      updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: `Error: ${errMsg}` }] }));
+      await saveMessageAction(activeBoardId, 'model', `Error: ${errMsg}`);
     } finally { setIsProcessing(false); setProcessingStatus(""); }
   };
 

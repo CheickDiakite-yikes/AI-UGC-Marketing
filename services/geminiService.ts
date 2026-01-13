@@ -200,11 +200,9 @@ export const chatWithMarketingAgent = async (
   });
 
   return {
-    response: {
-      text: () => response.text,
-      candidates: response.candidates,
-      functionCalls: response.functionCalls
-    }
+    text: response.text,
+    candidates: response.candidates,
+    functionCalls: response.functionCalls
   };
 };
 
