@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: ['*.replit.dev', '*.repl.co'],
+  serverActions: {
+    bodySizeLimit: '10mb',
+  },
   async headers() {
     return [
       {
