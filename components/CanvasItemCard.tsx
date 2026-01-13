@@ -5,11 +5,19 @@ import { CanvasItem } from '../types';
 interface Props {
   item: CanvasItem;
   onExpand?: (item: CanvasItem) => void;
+  onDelete?: (itemId: string) => void;
 }
 
-const CanvasItemCard: React.FC<Props> = ({ item, onExpand }) => {
+const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
   const [copied, setCopied] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete "${item.title}"? This action cannot be undone.`)) {
+      onDelete?.(item.id);
+    }
+  };
 
   const copyCaption = () => {
     if (item.meta?.caption) {
@@ -65,13 +73,26 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand }) => {
   return (
     <div className="bg-white border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
       {/* Header */}
-      <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden">
-        <h3 className="font-display font-bold text-sm truncate max-w-[80%] z-10 relative">{item.title}</h3>
-        {item.meta?.archetype && (
-           <div className="text-[9px] uppercase font-bold text-black/60 z-10 relative text-right">
+      <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden group/header">
+        <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
+        <div className="flex items-center gap-2 z-10 relative">
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              className="opacity-0 group-hover/header:opacity-100 transition-opacity p-1 hover:bg-red-500 hover:text-white rounded text-red-600"
+              title="Delete item"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+          {item.meta?.archetype && (
+            <div className="text-[9px] uppercase font-bold text-black/60 text-right">
               {item.meta.archetype}
-           </div>
-        )}
+            </div>
+          )}
+        </div>
         <div className="absolute top-0 right-0 p-1 opacity-10 font-black text-4xl pointer-events-none">
           {item.type === 'video' ? 'VIDEO' : (item.type === 'carousel' ? 'ALBUM' : 'IMG')}
         </div>

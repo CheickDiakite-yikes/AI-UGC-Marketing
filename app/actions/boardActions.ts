@@ -284,6 +284,24 @@ export async function deleteAssetAction(assetId: string) {
     return { success: true };
 }
 
+export async function deleteGeneratedItemAction(itemId: string) {
+    const item = await db.query.generatedItems.findFirst({
+        where: eq(generatedItems.id, itemId)
+    });
+    
+    if (!item) {
+        return { success: false, error: 'Item not found' };
+    }
+    
+    if (item.storageKey) {
+        await deleteFromStorage(item.storageKey);
+    }
+    
+    await db.delete(generatedItems).where(eq(generatedItems.id, itemId));
+    revalidatePath('/');
+    return { success: true };
+}
+
 export async function scrapeWebsiteAction(boardId: string, url: string) {
     try {
         const urlPattern = /^https?:\/\/.+/i;

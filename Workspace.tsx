@@ -25,7 +25,8 @@ import {
   renameBoard,
   deleteBoard,
   getUserUsageAction,
-  deleteAssetAction
+  deleteAssetAction,
+  deleteGeneratedItemAction
 } from './app/actions/boardActions';
 
 
@@ -180,6 +181,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   };
 
+  const handleDeleteItem = async (itemId: string) => {
+    const result = await deleteGeneratedItemAction(itemId);
+    if (result.success) {
+      updateActiveBoard(b => ({
+        ...b,
+        items: b.items.filter(i => i.id !== itemId)
+      }));
+    }
+  };
+
   const handleCameraFinish = async (images: { data: string, label: string }[]) => {
     setIsCameraActive(false);
     setIsAnalyzingLogo(true);
@@ -314,7 +325,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         }
       }
 
-      const modelMsgText = responseText || "Generation confirmed.";
+      let finalMessage = responseText;
+      if (!finalMessage && newItems.length > 0) {
+        const imageCount = newItems.filter(i => i.type === 'image').length;
+        const carouselCount = newItems.filter(i => i.type === 'carousel').length;
+        const videoCount = newItems.filter(i => i.type === 'video').length;
+        const parts: string[] = [];
+        if (imageCount > 0) parts.push(`${imageCount} image${imageCount > 1 ? 's' : ''}`);
+        if (carouselCount > 0) parts.push(`${carouselCount} carousel${carouselCount > 1 ? 's' : ''}`);
+        if (videoCount > 0) parts.push(`${videoCount} video${videoCount > 1 ? 's' : ''}`);
+        finalMessage = `✨ All done! Created ${parts.join(' and ')} for your campaign.`;
+      } else if (!finalMessage) {
+        finalMessage = "Generation confirmed.";
+      }
+      const modelMsgText = finalMessage;
       await saveMessageAction(activeBoardId, 'model', modelMsgText);
 
       updateActiveBoard(b => ({
@@ -448,7 +472,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               <p className="text-sm mt-2 font-medium">Use the agent to generate your first campaign</p>
             </div>
           )}
-          {activeBoard.items.map(item => <CanvasItemCard key={item.id} item={item} onExpand={setSelectedItem} />)}
+          {activeBoard.items.map(item => <CanvasItemCard key={item.id} item={item} onExpand={setSelectedItem} onDelete={handleDeleteItem} />)}
         </div>
       </div>
 
