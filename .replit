@@ -47,6 +47,7 @@ build = ["npm", "run", "build"]
 
 [userenv.shared]
 DB_API_KEY = "7645e25f44dbc9ef00bac024c02a21a56b804627fc827289fa2c0b9af765f0c2"
+NEXT_PUBLIC_SITE_URL = "https://prediai.replit.app"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-8656f96c-00df-45d2-b15f-2e01e8539e77"
