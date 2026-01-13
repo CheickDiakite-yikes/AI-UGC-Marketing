@@ -42,12 +42,40 @@ export async function generateContentServer(model: string, contents: any, config
 
 export async function generateImagesServer(model: string, prompt: string, config: any) {
     if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
-    // Image generation might have different response structure
-    // For now, implement a basic passthrough using the same generic method or specific if SDK differs
-    // The GoogleGenAI SDK V2 usually uses generateContent for images too if using Multimodal, 
-    // but the `gemini-3-pro-image-preview` might separate it.
-    // Let's stick to the generic one for now unless we know the specific SDK method for image gen is different.
-    // Based on previous `geminiService.ts`: `ai.models.generateContent` with `imageConfig`.
-
-    return generateContentServer(model, { parts: [{ text: prompt }] }, config);
+    
+    try {
+        const response = await ai.models.generateContent({
+            model,
+            contents: { parts: [{ text: prompt }] },
+            config
+        });
+        
+        // Extract image data properly for serialization
+        const candidates = response.candidates?.map(candidate => ({
+            content: {
+                parts: candidate.content?.parts?.map(part => {
+                    if (part.inlineData) {
+                        return {
+                            inlineData: {
+                                mimeType: part.inlineData.mimeType,
+                                data: part.inlineData.data
+                            }
+                        };
+                    }
+                    if (part.text) {
+                        return { text: part.text };
+                    }
+                    return part;
+                }) || []
+            }
+        })) || [];
+        
+        return {
+            text: response.text,
+            candidates
+        };
+    } catch (error: any) {
+        console.error("Gemini Image API Error:", error);
+        throw new Error(error.message || "Failed to generate image");
+    }
 }
