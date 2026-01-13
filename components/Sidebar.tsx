@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats } from '../types';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
+import SourcePreviewModal, { getParseStatus, getStatusColor } from './SourcePreviewModal';
 
 interface SidebarProps {
   assets: ProjectAsset[];
@@ -42,6 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [linkUrl, setLinkUrl] = useState('');
   const [isScrapingLink, setIsScrapingLink] = useState(false);
   const [extractingAssets, setExtractingAssets] = useState<Set<string>>(new Set());
+  const [previewAsset, setPreviewAsset] = useState<ProjectAsset | null>(null);
 
   useEffect(() => {
     const checkAndExtractPdfs = async () => {
@@ -303,28 +305,38 @@ const Sidebar: React.FC<SidebarProps> = ({
             {assets.map((asset) => {
               const isExtracting = extractingAssets.has(asset.id);
               const needsExtraction = asset.type === 'pdf' && (!asset.extractedText || asset.extractedText.trim().length === 0);
+              const parseStatus = isExtracting ? 'processing' : getParseStatus(asset);
+              const statusColor = isExtracting ? 'bg-yellow-500' : getStatusColor(parseStatus);
+              const isClickable = asset.type === 'pdf' || asset.type === 'text' || asset.type === 'link';
               
               return (
-                <div key={asset.id} className={`bg-white border-2 border-black p-1.5 shadow-neo-sm flex items-center justify-between group active:scale-[0.98] transition-transform ${needsExtraction && !isExtracting ? 'border-yellow-500' : ''}`}>
+                <div 
+                  key={asset.id} 
+                  className={`bg-white border-2 border-black p-1.5 shadow-neo-sm flex items-center justify-between group active:scale-[0.98] transition-transform ${needsExtraction && !isExtracting ? 'border-yellow-500' : ''} ${isClickable ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                  onClick={() => isClickable && setPreviewAsset(asset)}
+                >
                   <div className="flex items-center gap-2 overflow-hidden flex-1">
-                    <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : (asset.type === 'link' ? 'bg-orange-300' : 'bg-neo-lime'))}`}>
-                      {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : (asset.type === 'link' ? 'LINK' : 'DOC')))}
+                    <div className="relative">
+                      <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : (asset.type === 'link' ? 'bg-orange-300' : 'bg-neo-lime'))}`}>
+                        {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : (asset.type === 'link' ? 'LINK' : 'DOC')))}
+                      </div>
+                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${statusColor} border border-black ${isExtracting ? 'animate-pulse' : ''}`} title={parseStatus === 'ready' ? 'Ready' : parseStatus === 'error' ? 'Parse Failed' : 'Processing'}></div>
                     </div>
                     <div className="flex flex-col overflow-hidden flex-1 pr-1">
                       <span className="truncate text-xs font-bold">{asset.name}</span>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[9px] uppercase text-gray-500 font-bold">{asset.type}</span>
                         {isExtracting ? (
-                          <span className="text-[9px] font-bold text-blue-600 ml-auto animate-pulse flex items-center gap-1">
+                          <span className="text-[9px] font-bold text-yellow-600 ml-auto animate-pulse flex items-center gap-1">
                             <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                             Extracting...
                           </span>
-                        ) : needsExtraction ? (
-                          <span className="text-[9px] font-bold text-yellow-600 ml-auto">⚠️ Needs extraction</span>
-                        ) : asset.status === 'digesting' ? (
+                        ) : parseStatus === 'error' ? (
+                          <span className="text-[9px] font-bold text-red-600 ml-auto">Failed</span>
+                        ) : parseStatus === 'processing' || needsExtraction ? (
                           <span className="text-[9px] font-bold text-yellow-600 ml-auto animate-pulse">Digesting...</span>
                         ) : (
                           <span className="text-[9px] font-bold text-green-600 ml-auto">Ready</span>
@@ -447,6 +459,14 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Source Content Preview Modal */}
+      {previewAsset && (
+        <SourcePreviewModal 
+          asset={previewAsset} 
+          onClose={() => setPreviewAsset(null)} 
+        />
       )}
     </div>
   );
