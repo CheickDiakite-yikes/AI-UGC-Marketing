@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats } from '../types';
 import { logout } from '../app/actions/authActions';
-import { scrapeWebsiteAction } from '../app/actions/boardActions';
+import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
 
 interface SidebarProps {
   assets: ProjectAsset[];
@@ -41,6 +41,45 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [isScrapingLink, setIsScrapingLink] = useState(false);
+  const [extractingAssets, setExtractingAssets] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const checkAndExtractPdfs = async () => {
+      const pdfsNeedingExtraction = assets.filter(
+        asset => asset.type === 'pdf' && (!asset.extractedText || asset.extractedText.trim().length === 0)
+      );
+      
+      for (const asset of pdfsNeedingExtraction) {
+        if (extractingAssets.has(asset.id)) continue;
+        
+        setExtractingAssets(prev => new Set(prev).add(asset.id));
+        
+        try {
+          const result = await reExtractPdfAction(asset.id);
+          if (result.success && result.extractedText) {
+            const updatedAsset: ProjectAsset = {
+              ...asset,
+              extractedText: result.extractedText,
+              status: 'ready'
+            };
+            onAddAsset(updatedAsset);
+          }
+        } catch (error) {
+          console.error(`Failed to re-extract PDF ${asset.name}:`, error);
+        } finally {
+          setExtractingAssets(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(asset.id);
+            return newSet;
+          });
+        }
+      }
+    };
+    
+    if (assets.length > 0) {
+      checkAndExtractPdfs();
+    }
+  }, [assets]);
 
   const ALLOWED_IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/heic,image/heif";
   const ALLOWED_DOC_TYPES = ".pdf,text/plain";
@@ -261,42 +300,57 @@ const Sidebar: React.FC<SidebarProps> = ({
 
 
           <div className="space-y-2">
-            {assets.map((asset) => (
-              <div key={asset.id} className="bg-white border-2 border-black p-1.5 shadow-neo-sm flex items-center justify-between group active:scale-[0.98] transition-transform">
-                <div className="flex items-center gap-2 overflow-hidden flex-1">
-                  <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : (asset.type === 'link' ? 'bg-orange-300' : 'bg-neo-lime'))}`}>
-                    {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : (asset.type === 'link' ? 'LINK' : 'DOC')))}
-                  </div>
-                  <div className="flex flex-col overflow-hidden flex-1 pr-1">
-                    <span className="truncate text-xs font-bold">{asset.name}</span>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] uppercase text-gray-500 font-bold">{asset.type}</span>
-                      {asset.status === 'digesting' ? (
-                        <span className="text-[9px] font-bold text-yellow-600 ml-auto animate-pulse">Digesting...</span>
-                      ) : (
-                        <span className="text-[9px] font-bold text-green-600 ml-auto">Ready</span>
-                      )}
+            {assets.map((asset) => {
+              const isExtracting = extractingAssets.has(asset.id);
+              const needsExtraction = asset.type === 'pdf' && (!asset.extractedText || asset.extractedText.trim().length === 0);
+              
+              return (
+                <div key={asset.id} className={`bg-white border-2 border-black p-1.5 shadow-neo-sm flex items-center justify-between group active:scale-[0.98] transition-transform ${needsExtraction && !isExtracting ? 'border-yellow-500' : ''}`}>
+                  <div className="flex items-center gap-2 overflow-hidden flex-1">
+                    <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : (asset.type === 'link' ? 'bg-orange-300' : 'bg-neo-lime'))}`}>
+                      {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : (asset.type === 'link' ? 'LINK' : 'DOC')))}
+                    </div>
+                    <div className="flex flex-col overflow-hidden flex-1 pr-1">
+                      <span className="truncate text-xs font-bold">{asset.name}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] uppercase text-gray-500 font-bold">{asset.type}</span>
+                        {isExtracting ? (
+                          <span className="text-[9px] font-bold text-blue-600 ml-auto animate-pulse flex items-center gap-1">
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Extracting...
+                          </span>
+                        ) : needsExtraction ? (
+                          <span className="text-[9px] font-bold text-yellow-600 ml-auto">⚠️ Needs extraction</span>
+                        ) : asset.status === 'digesting' ? (
+                          <span className="text-[9px] font-bold text-yellow-600 ml-auto animate-pulse">Digesting...</span>
+                        ) : (
+                          <span className="text-[9px] font-bold text-green-600 ml-auto">Ready</span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {onDeleteAsset && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Remove "${asset.name}" from your context?`)) {
+                          onDeleteAsset(asset.id);
+                        }
+                      }}
+                      className="ml-1 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-all"
+                      title="Remove file"
+                    >
+                      <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
-                {onDeleteAsset && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Remove "${asset.name}" from your context?`)) {
-                        onDeleteAsset(asset.id);
-                      }
-                    }}
-                    className="ml-1 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-all"
-                    title="Remove file"
-                  >
-                    <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

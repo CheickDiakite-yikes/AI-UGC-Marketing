@@ -167,33 +167,59 @@ export const chatWithMarketingAgent = async (
 ) => {
 
   // Build source knowledge from uploaded documents (PDFs, text files, etc.)
-  const sourceAssets = assets.filter(a => a.type === 'pdf' || a.type === 'text' || a.type === 'image');
+  const sourceAssets = assets.filter(a => a.type === 'pdf' || a.type === 'text' || a.type === 'image' || a.type === 'link');
   let sourceKnowledge = "";
+  let hasValidSourceDocs = false;
+  
   if (sourceAssets.length > 0) {
-    sourceKnowledge = `
-    === PRIMARY SOURCE DOCUMENTS (HIGHEST PRIORITY) ===
-    Use this information as the foundation for ALL campaign content, messaging, and strategy:
-    ${sourceAssets.map(a => {
+    const docContents = sourceAssets.map(a => {
       if (a.type === 'pdf') {
-        const text = a.extractedText || 'PDF content not yet extracted';
-        return `
-    [${a.name}] (PDF):
-    ${text.substring(0, 5000)}
+        if (a.extractedText && a.extractedText.trim().length > 0) {
+          hasValidSourceDocs = true;
+          return `
+    [DOCUMENT: ${a.name}] (PDF - CRITICAL SOURCE)
+    ---BEGIN CONTENT---
+    ${a.extractedText.substring(0, 50000)}
+    ---END CONTENT---
     `;
-      } else if (a.type === 'text') {
-        const text = a.content ? atob(a.content) : 'Content not available';
-        return `
-    [${a.name}] (TEXT):
-    ${text.substring(0, 5000)}
+        } else {
+          return `
+    [DOCUMENT: ${a.name}] (PDF - EXTRACTION PENDING)
+    ⚠️ This PDF needs re-extraction. The user should re-upload or click "Re-extract" on this document.
     `;
+        }
+      } else if (a.type === 'text' || a.type === 'link') {
+        const text = a.content || '';
+        if (text.trim().length > 0) {
+          hasValidSourceDocs = true;
+          return `
+    [DOCUMENT: ${a.name}] (${a.type.toUpperCase()} - CRITICAL SOURCE)
+    ---BEGIN CONTENT---
+    ${text.substring(0, 50000)}
+    ---END CONTENT---
+    `;
+        }
+        return '';
       } else {
         return `
     [${a.name}] (${a.type.toUpperCase()}):
     Visual reference uploaded
     `;
       }
-    }).join('\n')}
-    ===
+    }).filter(Boolean).join('\n');
+
+    sourceKnowledge = `
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║                    🚨 MANDATORY SOURCE DOCUMENTS 🚨                          ║
+    ║  YOU MUST READ AND USE THIS INFORMATION FOR ALL CONTENT GENERATION          ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
+    
+    The following documents define EXACTLY what product/service/company you are marketing.
+    Do NOT invent features, industries, or use cases that are not in these documents.
+    
+    ${docContents}
+    
+    ══════════════════════════════════════════════════════════════════════════════
     `;
   }
 
@@ -209,19 +235,30 @@ export const chatWithMarketingAgent = async (
   ` : "";
 
   const systemInstruction = `
-    You are the Chief Creative Officer for a marketing agency.
-    
-    CONTEXT PRIORITY ORDER (follow strictly):
-    1. SOURCE DOCUMENTS - Primary source of truth for company info, products, services, messaging
-    2. BRAND DNA - Use for visual styling (colors, fonts, vibe)
-    3. AVATAR - Only use when generating content that specifically requires a human spokesperson
-    
     ${sourceKnowledge}
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    YOU ARE: The Chief Creative Officer for a marketing agency.
+    
+    🚨 CRITICAL INSTRUCTION - READ THIS FIRST 🚨
+    
+    1. BEFORE generating ANY content, you MUST read the SOURCE DOCUMENTS above completely.
+    2. The SOURCE DOCUMENTS define the EXACT product, service, or company you are marketing.
+    3. You MUST base ALL campaign content, messaging, visuals, and strategy on what is described in the source documents.
+    4. NEVER generate content for a different industry or product than what's in the source documents.
+    5. If the source documents describe a mental health app, you create mental health app marketing.
+    6. If the source documents describe a real estate company, you create real estate marketing.
+    7. ALWAYS extract and use: company name, product features, target audience, value propositions, and key messaging from the source documents.
+    
+    ${hasValidSourceDocs ? '✅ Valid source documents are available above - USE THEM.' : '⚠️ No valid source documents found. Ask the user to upload documents about their product/service.'}
+    
     ${brandInstruction}
     ${avatarInstruction}
     
     CONSTRAINTS:
-    - Base ALL campaign content on the SOURCE DOCUMENTS above
+    - Base ALL campaign content on the SOURCE DOCUMENTS above - this is non-negotiable
+    - Extract the company/product name from source docs and use it in all content
+    - Match the tone, language, and positioning from the source documents
     - Don't use Search and Function Calling in the same turn
     - Video generation is currently unavailable - use ONLY images and carousels
   `;

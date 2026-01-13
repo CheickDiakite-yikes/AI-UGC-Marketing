@@ -115,3 +115,18 @@ export async function deleteAsset(storageKey: string): Promise<{ success: boolea
 export async function getPublicUrl(storageKey: string): Promise<string> {
   return `/api/storage/${encodeURIComponent(storageKey)}`;
 }
+
+export async function getAsset(storageKey: string): Promise<{ success: boolean; data?: string; error?: string }> {
+  try {
+    const { ok, value, error } = await client.downloadAsBytes(storageKey);
+    
+    if (!ok || !value) {
+      return { success: false, error: error?.message || 'Download failed' };
+    }
+    
+    const base64Data = (value as Buffer).toString('base64');
+    return { success: true, data: base64Data };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}

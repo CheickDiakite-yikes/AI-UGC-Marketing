@@ -344,6 +344,54 @@ export async function deleteGeneratedItemAction(itemId: string) {
     return { success: true };
 }
 
+export async function reExtractPdfAction(assetId: string) {
+    try {
+        const asset = await db.query.assets.findFirst({
+            where: eq(assets.id, assetId)
+        });
+        
+        if (!asset) {
+            return { success: false, error: 'Asset not found' };
+        }
+        
+        if (asset.type !== 'pdf') {
+            return { success: false, error: 'Asset is not a PDF' };
+        }
+        
+        let base64Content: string | null = asset.content;
+        
+        if (!base64Content && asset.storageKey) {
+            const { getAsset } = await import('@/services/objectStorageService');
+            const result = await getAsset(asset.storageKey);
+            if (result.success && result.data) {
+                base64Content = result.data;
+            }
+        }
+        
+        if (!base64Content) {
+            return { success: false, error: 'No PDF content available for extraction' };
+        }
+        
+        const { extractTextFromPDF } = await import('@/services/pdfService');
+        const extractedText = await extractTextFromPDF(base64Content);
+        
+        if (!extractedText || extractedText.trim().length === 0) {
+            return { success: false, error: 'Failed to extract text from PDF - document may be image-based or empty' };
+        }
+        
+        await db.update(assets)
+            .set({ extractedText, status: 'ready' })
+            .where(eq(assets.id, assetId));
+        
+        revalidatePath('/');
+        
+        return { success: true, extractedText };
+    } catch (error: any) {
+        console.error('PDF re-extraction error:', error);
+        return { success: false, error: error.message || 'Failed to re-extract PDF' };
+    }
+}
+
 export async function scrapeWebsiteAction(boardId: string, url: string) {
     try {
         const urlPattern = /^https?:\/\/.+/i;
