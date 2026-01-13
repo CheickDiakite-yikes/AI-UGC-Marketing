@@ -3,35 +3,47 @@ import Workspace from './Workspace';
 import LandingPage from './components/LandingPage';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
+import AuthModal from './components/AuthModal';
 
 type ViewState = 'landing' | 'app' | 'privacy' | 'terms';
+type AuthModalMode = 'login' | 'signup' | null;
 
 const App: React.FC = () => {
-  // Manage view state for simple routing
   const [currentView, setCurrentView] = useState<ViewState>('landing');
+  const [authModalMode, setAuthModalMode] = useState<AuthModalMode>(null);
 
-  // App View (Workspace)
+  const handleAuthSuccess = () => {
+    setAuthModalMode(null);
+    setCurrentView('app');
+  };
+
   if (currentView === 'app') {
     return <Workspace onExitApp={() => setCurrentView('landing')} />;
   }
   
-  // Privacy Policy View
   if (currentView === 'privacy') {
      return <PrivacyPage onBack={() => setCurrentView('landing')} />;
   }
 
-  // Terms of Service View
   if (currentView === 'terms') {
      return <TermsPage onBack={() => setCurrentView('landing')} />;
   }
 
-  // Default: Landing Page
   return (
-    <LandingPage 
-        onEnterApp={() => setCurrentView('app')} 
-        onNavigatePrivacy={() => setCurrentView('privacy')}
-        onNavigateTerms={() => setCurrentView('terms')}
-    />
+    <>
+      <LandingPage 
+          onLogin={() => setAuthModalMode('login')}
+          onSignup={() => setAuthModalMode('signup')}
+          onNavigatePrivacy={() => setCurrentView('privacy')}
+          onNavigateTerms={() => setCurrentView('terms')}
+      />
+      <AuthModal
+        isOpen={authModalMode !== null}
+        onClose={() => setAuthModalMode(null)}
+        onSuccess={handleAuthSuccess}
+        initialMode={authModalMode || 'login'}
+      />
+    </>
   );
 };
 

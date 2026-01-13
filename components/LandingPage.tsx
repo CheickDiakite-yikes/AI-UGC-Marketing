@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, ReactNode } from 'react';
 
 interface Props {
-  onEnterApp: () => void;
+  onLogin: () => void;
+  onSignup: () => void;
   onNavigatePrivacy: () => void;
   onNavigateTerms: () => void;
 }
@@ -41,7 +42,7 @@ const Reveal = ({ children, delay = 0, className = "" }: { children?: ReactNode,
   );
 };
 
-const LandingPage: React.FC<Props> = ({ onEnterApp, onNavigatePrivacy, onNavigateTerms }) => {
+const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, onNavigateTerms }) => {
   return (
     <div className="w-full h-screen overflow-y-auto overflow-x-hidden bg-white custom-scrollbar relative selection:bg-neo-pink selection:text-black font-sans text-neo-black">
       
@@ -54,19 +55,19 @@ const LandingPage: React.FC<Props> = ({ onEnterApp, onNavigatePrivacy, onNavigat
 
       {/* Navigation */}
       <nav className="relative z-50 flex items-center justify-between p-4 md:p-6 md:px-12 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2 group cursor-pointer" onClick={onEnterApp}>
+        <div className="flex items-center gap-2 group cursor-pointer">
            <div className="w-10 h-10 md:w-12 md:h-12 bg-neo-black text-neo-yellow flex items-center justify-center font-display font-bold text-xl md:text-2xl border-2 border-transparent shadow-neo group-hover:rotate-12 transition-transform duration-300">
              P
            </div>
            <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight text-neo-black">Predi AI</h1>
         </div>
         <div className="flex gap-4">
-          <button onClick={onEnterApp} className="hidden md:block font-bold hover:underline decoration-neo-pink underline-offset-4 decoration-2 text-neo-black">Log In</button>
+          <button onClick={onLogin} className="hidden md:block font-bold hover:underline decoration-neo-pink underline-offset-4 decoration-2 text-neo-black">Log In</button>
           <button 
-            onClick={onEnterApp}
+            onClick={onSignup}
             className="bg-neo-black text-white px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-bold border-2 border-transparent shadow-neo hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:bg-neo-pink hover:text-black"
           >
-            Launch App
+            Get Started
           </button>
         </div>
       </nav>
@@ -101,7 +102,7 @@ const LandingPage: React.FC<Props> = ({ onEnterApp, onNavigatePrivacy, onNavigat
         <Reveal delay={600}>
           <div className="flex flex-col md:flex-row gap-6 items-center w-full justify-center">
              <button 
-               onClick={onEnterApp}
+               onClick={onSignup}
                className="bg-neo-pink text-black border-4 border-black px-8 py-4 md:px-10 md:py-5 text-lg md:text-xl font-bold shadow-neo-lg hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] hover:bg-neo-cyan transition-all w-full md:w-auto transform hover:-rotate-1"
              >
                Start Creating for Free
@@ -362,7 +363,7 @@ const LandingPage: React.FC<Props> = ({ onEnterApp, onNavigatePrivacy, onNavigat
         <div className="relative z-10 max-w-4xl mx-auto">
            <h2 className="font-display font-black text-4xl md:text-8xl mb-6 md:mb-8">READY TO LAUNCH?</h2>
            <button 
-             onClick={onEnterApp}
+             onClick={onSignup}
              className="bg-white text-black border-4 border-transparent px-8 py-4 md:px-12 md:py-6 text-xl md:text-2xl font-bold hover:scale-110 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]"
            >
              Start Your Free Trial

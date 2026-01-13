@@ -19,16 +19,15 @@ export async function signup(prevState: any, formData: FormData) {
     const referralSource = formData.get('referralSource') as string;
 
     if (!email || !password || !name) {
-        return { error: 'Missing required fields' };
+        return { error: 'Missing required fields', success: false };
     }
 
-    // Check if user exists
     const existingUser = await db.query.users.findFirst({
         where: eq(users.email, email)
     });
 
     if (existingUser) {
-        return { error: 'User already exists' };
+        return { error: 'An account with this email already exists', success: false };
     }
 
     const hashedPassword = await hashPassword(password);
@@ -40,7 +39,7 @@ export async function signup(prevState: any, formData: FormData) {
         company,
         jobTitle,
         referralSource,
-        avatarUrl: `https://api.dicebear.com/7.x/micah/svg?seed=${name}` // Default avatar
+        avatarUrl: `https://api.dicebear.com/7.x/micah/svg?seed=${name}`
     }).returning();
 
     const token = await createSessionToken({ userId: newUser.id, email: newUser.email! });
@@ -50,10 +49,10 @@ export async function signup(prevState: any, formData: FormData) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 7 * 24 * 60 * 60 // 7 days
+        maxAge: 7 * 24 * 60 * 60
     });
 
-    redirect('/');
+    return { success: true, user: { id: newUser.id, name: newUser.name, email: newUser.email } };
 }
 
 export async function login(prevState: any, formData: FormData) {
@@ -61,7 +60,7 @@ export async function login(prevState: any, formData: FormData) {
     const password = formData.get('password') as string;
 
     if (!email || !password) {
-        return { error: 'Missing credentials' };
+        return { error: 'Please enter both email and password', success: false };
     }
 
     const user = await db.query.users.findFirst({
@@ -69,13 +68,13 @@ export async function login(prevState: any, formData: FormData) {
     });
 
     if (!user || !user.passwordHash) {
-        return { error: 'Invalid credentials' };
+        return { error: 'Invalid email or password', success: false };
     }
 
     const isValid = await verifyPassword(password, user.passwordHash);
 
     if (!isValid) {
-        return { error: 'Invalid credentials' };
+        return { error: 'Invalid email or password', success: false };
     }
 
     const token = await createSessionToken({ userId: user.id, email: user.email! });
@@ -86,10 +85,10 @@ export async function login(prevState: any, formData: FormData) {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 7 * 24 * 60 * 60 // 7 days
+        maxAge: 7 * 24 * 60 * 60
     });
 
-    redirect('/');
+    return { success: true, user: { id: user.id, name: user.name, email: user.email } };
 }
 
 export async function logout() {
