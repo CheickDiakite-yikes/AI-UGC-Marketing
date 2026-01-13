@@ -60,6 +60,30 @@ export async function uploadGeneratedItem(
   }
 }
 
+export async function uploadCarouselSlide(
+  boardId: string,
+  itemId: string,
+  slideIndex: number,
+  data: string
+): Promise<UploadResult> {
+  try {
+    const storageKey = `boards/${boardId}/generated/${itemId}_slide${slideIndex}.png`;
+    
+    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const binaryData = Buffer.from(base64Data, 'base64');
+    
+    const { ok, error } = await client.uploadFromBytes(storageKey, binaryData);
+    
+    if (!ok) {
+      return { success: false, error: error?.message || 'Upload failed' };
+    }
+    
+    return { success: true, storageKey };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
 export async function downloadAsset(storageKey: string): Promise<{ success: boolean; data?: Buffer; error?: string }> {
   try {
     const { ok, value, error } = await client.downloadAsBytes(storageKey);

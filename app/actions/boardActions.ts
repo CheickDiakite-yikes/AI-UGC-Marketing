@@ -7,7 +7,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity } from '@/types';
 import { getSession } from './authActions';
-import { uploadAsset, uploadGeneratedItem, deleteAsset as deleteFromStorage } from '@/services/objectStorageService';
+import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage } from '@/services/objectStorageService';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -63,13 +63,22 @@ export async function getBoardDetails(boardId: string) {
     
     if (board && board.generatedItems) {
         board.generatedItems = board.generatedItems.map(item => {
+            let mappedItem = { ...item };
+            
             if (item.storageKey && !item.content) {
-                return {
-                    ...item,
-                    content: `/api/storage/${encodeURIComponent(item.storageKey)}`
-                };
+                mappedItem.content = `/api/storage/${encodeURIComponent(item.storageKey)}`;
             }
-            return item;
+            
+            if (item.carouselUrls && Array.isArray(item.carouselUrls)) {
+                mappedItem.carouselUrls = item.carouselUrls.map((url: string) => {
+                    if (url && !url.startsWith('data:') && !url.startsWith('http') && !url.startsWith('/api/')) {
+                        return `/api/storage/${encodeURIComponent(url)}`;
+                    }
+                    return url;
+                });
+            }
+            
+            return mappedItem;
         });
     }
     
@@ -173,11 +182,34 @@ export async function saveMessageAction(boardId: string, role: 'user' | 'model' 
 export async function saveGeneratedItemAction(boardId: string, item: any) {
     const itemId = crypto.randomUUID();
     const isMediaType = ['image', 'video'].includes(item.type);
+    const isCarousel = item.type === 'carousel';
     
     let storageKey: string | null = null;
     let dbContent: string | null = item.content;
+    let processedCarouselUrls: string[] | null = null;
     
-    if (isMediaType && item.content) {
+    if (isCarousel && item.carouselUrls && Array.isArray(item.carouselUrls)) {
+        const uploadedSlides: string[] = [];
+        for (let i = 0; i < item.carouselUrls.length; i++) {
+            const slideData = item.carouselUrls[i];
+            const isBase64 = slideData.includes('base64') || slideData.includes(',');
+            if (isBase64) {
+                const uploadResult = await uploadCarouselSlide(boardId, itemId, i, slideData);
+                if (uploadResult.success && uploadResult.storageKey) {
+                    uploadedSlides.push(uploadResult.storageKey);
+                } else {
+                    uploadedSlides.push(slideData);
+                }
+            } else {
+                uploadedSlides.push(slideData);
+            }
+        }
+        processedCarouselUrls = uploadedSlides;
+        if (uploadedSlides.length > 0 && !uploadedSlides[0].includes('base64')) {
+            storageKey = uploadedSlides[0];
+            dbContent = null;
+        }
+    } else if (isMediaType && item.content) {
         const isBase64 = item.content.includes('base64') || item.content.includes(',');
         if (isBase64) {
             const uploadResult = await uploadGeneratedItem(boardId, itemId, item.content, item.type);
@@ -194,7 +226,7 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
         type: item.type,
         content: dbContent,
         storageKey,
-        carouselUrls: item.carouselUrls,
+        carouselUrls: processedCarouselUrls || item.carouselUrls,
         title: item.title,
         description: item.description,
         metadata: item.meta,
@@ -217,13 +249,22 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
 
     revalidatePath('/');
     
+    let result: any = { ...saved };
+    
     if (saved.storageKey && !saved.content) {
-        return {
-            ...saved,
-            content: `/api/storage/${encodeURIComponent(saved.storageKey)}`
-        };
+        result.content = `/api/storage/${encodeURIComponent(saved.storageKey)}`;
     }
-    return saved;
+    
+    if (saved.carouselUrls && Array.isArray(saved.carouselUrls)) {
+        result.carouselUrls = saved.carouselUrls.map((url: string) => {
+            if (url && !url.startsWith('data:') && !url.startsWith('http') && !url.startsWith('/api/')) {
+                return `/api/storage/${encodeURIComponent(url)}`;
+            }
+            return url;
+        });
+    }
+    
+    return result;
 }
 
 export async function getUserUsageAction() {
