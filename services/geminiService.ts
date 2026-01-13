@@ -182,6 +182,7 @@ export const chatWithMarketingAgent = async (
     You are the Chief Creative Officer. Use the provided Brand DNA and Avatar Anchor for all creative work.
     Constraints: Don't use Search and Function Calling in the same turn.
     Tools: googleSearch (Research), functionDeclarations (Creation).
+    IMPORTANT: Video generation is currently unavailable. For campaign packs, use ONLY images and carousels (no videos).
   ` + brandInstruction + avatarInstruction;
 
   const model = "gemini-3-pro-preview";
