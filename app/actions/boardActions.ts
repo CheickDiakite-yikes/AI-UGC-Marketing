@@ -283,3 +283,70 @@ export async function deleteAssetAction(assetId: string) {
     revalidatePath('/');
     return { success: true };
 }
+
+export async function scrapeWebsiteAction(boardId: string, url: string) {
+    try {
+        const urlPattern = /^https?:\/\/.+/i;
+        if (!urlPattern.test(url)) {
+            return { success: false, error: 'Invalid URL. Please enter a valid URL starting with http:// or https://' };
+        }
+
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; PrediAI/1.0; +https://prediai.com)'
+            }
+        });
+
+        if (!response.ok) {
+            return { success: false, error: `Failed to fetch URL: ${response.status} ${response.statusText}` };
+        }
+
+        const html = await response.text();
+
+        let text = html
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        text = text.substring(0, 10000);
+
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.replace('www.', '');
+
+        const assetId = crypto.randomUUID();
+        const [saved] = await db.insert(assets).values({
+            id: assetId,
+            boardId,
+            type: 'link',
+            name: hostname,
+            content: text,
+            storageKey: null,
+            mimeType: 'text/plain',
+            status: 'ready'
+        }).returning();
+
+        revalidatePath('/');
+
+        return {
+            success: true,
+            asset: {
+                id: saved.id,
+                type: 'link' as const,
+                name: hostname,
+                content: text,
+                mimeType: 'text/plain',
+                status: 'ready'
+            }
+        };
+    } catch (error: any) {
+        return { success: false, error: error.message || 'Failed to scrape website' };
+    }
+}

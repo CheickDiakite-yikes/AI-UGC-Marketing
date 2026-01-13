@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats } from '../types';
 import { logout } from '../app/actions/authActions';
+import { scrapeWebsiteAction } from '../app/actions/boardActions';
 
 interface SidebarProps {
   assets: ProjectAsset[];
@@ -16,6 +17,7 @@ interface SidebarProps {
   onClose?: () => void;
   onExitApp?: () => void;
   usageStats?: UsageStats;
+  boardId?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -29,11 +31,16 @@ const Sidebar: React.FC<SidebarProps> = ({
   onStartCapture,
   onClose,
   onExitApp,
-  usageStats
+  usageStats,
+  boardId
 }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [isScrapingLink, setIsScrapingLink] = useState(false);
 
   const ALLOWED_IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/heic,image/heif";
   const ALLOWED_DOC_TYPES = ".pdf,text/plain";
@@ -83,6 +90,26 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const handleAddLink = async () => {
+    if (!boardId || !linkUrl.trim()) return;
+    
+    setIsScrapingLink(true);
+    try {
+      const result = await scrapeWebsiteAction(boardId, linkUrl.trim());
+      if (result.success && result.asset) {
+        onAddAsset(result.asset as ProjectAsset);
+        setLinkUrl('');
+        setShowLinkModal(false);
+      } else {
+        alert(result.error || 'Failed to scrape website');
+      }
+    } catch (error) {
+      alert('Failed to scrape website. Please try again.');
+    } finally {
+      setIsScrapingLink(false);
+    }
   };
 
   return (
@@ -193,13 +220,22 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* General Files Section */}
           <div className="mb-4">
             <label className="text-[10px] font-bold tracking-widest mb-1.5 block text-gray-700">SOURCES & DOCS</label>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-white border-2 border-black shadow-neo-sm p-3 font-bold hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center gap-2 text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-              Upload Files
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 bg-white border-2 border-black shadow-neo-sm p-2.5 font-bold hover:translate-y-[1px] hover:shadow-none transition-all flex flex-col items-center gap-0.5 text-xs"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Upload Files
+              </button>
+              <button
+                onClick={() => setShowLinkModal(true)}
+                className="flex-1 bg-white border-2 border-black shadow-neo-sm p-2.5 font-bold hover:translate-y-[1px] hover:shadow-none transition-all flex flex-col items-center gap-0.5 text-xs"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                Add Link
+              </button>
+            </div>
             <input type="file" ref={fileInputRef} className="hidden" accept={`${ALLOWED_IMAGE_TYPES},${ALLOWED_DOC_TYPES}`} onChange={(e) => handleFileUpload(e, 'general')} />
           </div>
 
@@ -208,8 +244,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             {assets.map((asset) => (
               <div key={asset.id} className="bg-white border-2 border-black p-1.5 shadow-neo-sm flex items-center justify-between group active:scale-[0.98] transition-transform">
                 <div className="flex items-center gap-2 overflow-hidden flex-1">
-                  <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : 'bg-neo-lime')}`}>
-                    {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : 'DOC'))}
+                  <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : (asset.type === 'link' ? 'bg-orange-300' : 'bg-neo-lime'))}`}>
+                    {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : (asset.type === 'link' ? 'LINK' : 'DOC')))}
                   </div>
                   <div className="flex flex-col overflow-hidden flex-1 pr-1">
                     <span className="truncate text-xs font-bold">{asset.name}</span>
@@ -296,6 +332,48 @@ const Sidebar: React.FC<SidebarProps> = ({
           Disconnect Session
         </button>
       </div>
+
+      {/* Link URL Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border-4 border-black shadow-neo p-4 w-full max-w-md">
+            <h3 className="font-display font-bold text-lg mb-3">Add Website Link</h3>
+            <p className="text-xs text-gray-600 mb-3">Enter a URL to scrape its content for AI context.</p>
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full border-2 border-black p-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-neo-pink"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && linkUrl.trim()) {
+                  handleAddLink();
+                }
+              }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setLinkUrl('');
+                }}
+                className="flex-1 border-2 border-black py-2 text-sm font-bold hover:bg-gray-100 transition-colors"
+                disabled={isScrapingLink}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddLink}
+                disabled={!linkUrl.trim() || isScrapingLink}
+                className="flex-1 bg-neo-pink border-2 border-black py-2 text-sm font-bold hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isScrapingLink ? 'Scraping...' : 'Add Link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

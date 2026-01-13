@@ -424,6 +424,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           onStartCapture={() => { setIsCameraActive(true); setSidebarOpen(false); }}
           onClose={() => setSidebarOpen(false)}
           onExitApp={onExitApp} usageStats={usage}
+          boardId={activeBoardId}
         />
       </div>
 

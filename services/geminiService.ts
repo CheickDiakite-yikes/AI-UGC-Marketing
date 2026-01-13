@@ -166,24 +166,49 @@ export const chatWithMarketingAgent = async (
   avatarIdentity?: AvatarIdentity | null
 ) => {
 
+  // Build source knowledge from uploaded documents (PDFs, text files, etc.)
+  const sourceAssets = assets.filter(a => a.type === 'pdf' || a.type === 'text' || a.type === 'image');
+  let sourceKnowledge = "";
+  if (sourceAssets.length > 0) {
+    sourceKnowledge = `
+    === PRIMARY SOURCE DOCUMENTS (HIGHEST PRIORITY) ===
+    Use this information as the foundation for ALL campaign content, messaging, and strategy:
+    ${sourceAssets.map(a => `
+    [${a.name}] (${a.type.toUpperCase()}):
+    ${a.type === 'pdf' || a.type === 'text' ? (a.content ? atob(a.content).substring(0, 5000) : 'Content not available') : 'Visual reference uploaded'}
+    `).join('\n')}
+    ===
+    `;
+  }
+
   let brandInstruction = brandIdentity ? `
-    BRAND DNA: Colors: ${brandIdentity.colors.join(", ")}, Fonts: ${brandIdentity.fonts.display}, Vibe: ${brandIdentity.vibe}
+    BRAND VISUAL DNA (for styling only): Colors: ${brandIdentity.colors.join(", ")}, Fonts: ${brandIdentity.fonts.display}, Vibe: ${brandIdentity.vibe}
   ` : "";
 
   let avatarInstruction = avatarIdentity ? `
-    AVATAR SPOKESPERSON (HIGH-FIDELITY ANCHOR):
+    AVATAR/SPOKESPERSON (use ONLY when visuals require a person):
     Name: ${avatarIdentity.name}
     Technical Spec: ${avatarIdentity.description}
-    Anatomy: ${JSON.stringify(avatarIdentity.atomicTraits)}
-    CRITICAL: For every visual generation involving this character, use the "Technical Spec" and "Anatomy" to ensure 100% idiosyncratic consistency. No generic humans allowed.
+    Note: Only use avatar for content that specifically needs a human face/spokesperson.
   ` : "";
 
   const systemInstruction = `
-    You are the Chief Creative Officer. Use the provided Brand DNA and Avatar Anchor for all creative work.
-    Constraints: Don't use Search and Function Calling in the same turn.
-    Tools: googleSearch (Research), functionDeclarations (Creation).
-    IMPORTANT: Video generation is currently unavailable. For campaign packs, use ONLY images and carousels (no videos).
-  ` + brandInstruction + avatarInstruction;
+    You are the Chief Creative Officer for a marketing agency.
+    
+    CONTEXT PRIORITY ORDER (follow strictly):
+    1. SOURCE DOCUMENTS - Primary source of truth for company info, products, services, messaging
+    2. BRAND DNA - Use for visual styling (colors, fonts, vibe)
+    3. AVATAR - Only use when generating content that specifically requires a human spokesperson
+    
+    ${sourceKnowledge}
+    ${brandInstruction}
+    ${avatarInstruction}
+    
+    CONSTRAINTS:
+    - Base ALL campaign content on the SOURCE DOCUMENTS above
+    - Don't use Search and Function Calling in the same turn
+    - Video generation is currently unavailable - use ONLY images and carousels
+  `;
 
   const model = "gemini-3-pro-preview";
 
@@ -192,7 +217,8 @@ export const chatWithMarketingAgent = async (
     { role: "user", parts: [{ text: newMessage }] }
   ];
 
-  const tools = [{ functionDeclarations: [generateImageTool, generateVideoTool, generateCampaignPackTool, generateAvatarTool] }];
+  // Remove video tool to prevent errors
+  const tools = [{ functionDeclarations: [generateImageTool, generateCampaignPackTool, generateAvatarTool] }];
 
   const response: any = await generateContentServer(model, contents, {
     systemInstruction,
