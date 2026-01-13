@@ -1,5 +1,5 @@
 import { ProjectAsset, AspectRatio, ImageSize, VeoConfig, BrandIdentity, AvatarIdentity } from "../types";
-import { generateContentServer, generateImagesServer } from "../app/actions";
+import { generateContentServer, generateImagesServer, generateContentWithSearch } from "../app/actions";
 import { FunctionDeclaration, Type, Part } from "@google/genai";
 
 // --- Tool Definitions ---
@@ -70,6 +70,32 @@ const generateAvatarTool: FunctionDeclaration = {
       traits: { type: Type.ARRAY, items: { type: Type.STRING } }
     },
     required: ["concept", "traits"]
+  }
+};
+
+const trendDiscoveryTool: FunctionDeclaration = {
+  name: "discover_trends",
+  description: "Search the internet for the latest viral trends, hashtags, and content formats for a specific industry or niche. Use this for 'Trend Hijack' or research requests.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      industry: { type: Type.STRING, description: "The industry, niche, or topic to find trends for." },
+      targetAudience: { type: Type.STRING, description: "Optional target audience to refine trend search." }
+    },
+    required: ["industry"]
+  }
+};
+
+const webResearchTool: FunctionDeclaration = {
+  name: "web_research",
+  description: "Search the internet for real-time information, statistics, competitor analysis, or market research. Use this when you need current data beyond what's in the source documents.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      query: { type: Type.STRING, description: "The research query to search for on the web." },
+      context: { type: Type.STRING, description: "Additional context about what information is needed." }
+    },
+    required: ["query"]
   }
 };
 
@@ -270,8 +296,7 @@ export const chatWithMarketingAgent = async (
     { role: "user", parts: [{ text: newMessage }] }
   ];
 
-  // Remove video tool to prevent errors
-  const tools = [{ functionDeclarations: [generateImageTool, generateCampaignPackTool, generateAvatarTool] }];
+  const tools = [{ functionDeclarations: [generateImageTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
 
   const response: any = await generateContentServer(model, contents, {
     systemInstruction,
@@ -305,4 +330,72 @@ export const generateVeoVideo = async (
   config: VeoConfig
 ): Promise<string> => {
   throw new Error("Video generation migration pending: Requires background job setup.");
+};
+
+export const researchWithGoogleSearch = async (
+  query: string,
+  context?: string
+): Promise<{ text: string; sources?: string[] }> => {
+  const prompt = context 
+    ? `${context}\n\nResearch query: ${query}\n\nProvide comprehensive, up-to-date research with specific facts, statistics, and actionable insights.`
+    : `Research query: ${query}\n\nProvide comprehensive, up-to-date research with specific facts, statistics, trends, and actionable marketing insights.`;
+  
+  const response: any = await generateContentWithSearch(prompt, true);
+  
+  let sources: string[] = [];
+  if (response.groundingMetadata?.groundingChunks) {
+    sources = response.groundingMetadata.groundingChunks
+      .filter((chunk: any) => chunk.web?.uri)
+      .map((chunk: any) => chunk.web.uri);
+  }
+  
+  return {
+    text: response.text || 'No research results found.',
+    sources
+  };
+};
+
+export const discoverTrends = async (
+  industry: string,
+  targetAudience?: string
+): Promise<{ text: string; sources?: string[] }> => {
+  const prompt = `You are a trend research specialist. Find the LATEST viral trends, hashtags, and content formats for:
+
+Industry/Niche: ${industry}
+${targetAudience ? `Target Audience: ${targetAudience}` : ''}
+
+Research and provide:
+1. TOP 5 VIRAL TRENDS (last 7 days)
+   - Trend name and description
+   - Platform (TikTok, Instagram, Twitter/X, etc.)
+   - Viral potential score (1-10)
+   - How a brand can participate
+
+2. TRENDING HASHTAGS
+   - List 10 currently trending hashtags relevant to this industry
+   - Include mix of broad and niche hashtags
+
+3. VIRAL CONTENT FORMATS
+   - What video/image formats are performing best right now
+   - Specific hooks and patterns that are working
+
+4. CULTURAL MOMENTS
+   - Upcoming events, holidays, or moments to leverage
+   - Current memes or cultural references that are relevant
+
+Be specific with dates, numbers, and examples. This needs to be actionable for creating marketing content TODAY.`;
+
+  const response: any = await generateContentWithSearch(prompt, true);
+  
+  let sources: string[] = [];
+  if (response.groundingMetadata?.groundingChunks) {
+    sources = response.groundingMetadata.groundingChunks
+      .filter((chunk: any) => chunk.web?.uri)
+      .map((chunk: any) => chunk.web.uri);
+  }
+  
+  return {
+    text: response.text || 'No trends found.',
+    sources
+  };
 };

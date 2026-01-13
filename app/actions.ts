@@ -19,24 +19,70 @@ export async function generateContentServer(model: string, contents: any, config
             contents,
             config
         });
-        // We need to serialize the response to send it back to the client
-        // The raw response might contain non-serializable objects (like functions), so we extract what we need.
-        // However, usually response.text or simple objects are fine.
-        // Let's assume the client needs the text or simple data.
-        // For now, let's return the simplified response structure usually expected.
-
-        // Note: The GoogleGenAI SDK response might have methods. We should return a plain object.
         const text = response.text;
-        // We can also return the full candidates if needed, but we need to ensure it's plain JSON.
         return {
             text,
             candidates: response.candidates,
-            // Add other fields if necessary
         };
 
     } catch (error: any) {
         console.error("Gemini API Error:", error);
         throw new Error(error.message || "Failed to generate content");
+    }
+}
+
+export async function generateContentWithUrlContext(url: string, prompt: string) {
+    if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [`${prompt}\n\nAnalyze and extract information from this URL: ${url}`],
+            config: {
+                tools: [{ urlContext: {} }],
+            },
+        });
+
+        const urlContextMetadata = (response.candidates?.[0] as any)?.urlContextMetadata;
+        const groundingMetadata = (response.candidates?.[0] as any)?.groundingMetadata;
+        
+        return {
+            text: response.text,
+            urlContextMetadata,
+            groundingMetadata,
+            candidates: response.candidates,
+        };
+    } catch (error: any) {
+        console.error("Gemini URL Context API Error:", error);
+        throw new Error(error.message || "Failed to fetch URL content");
+    }
+}
+
+export async function generateContentWithSearch(prompt: string, searchEnabled: boolean = true) {
+    if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
+
+    try {
+        const config: any = {};
+        if (searchEnabled) {
+            config.tools = [{ googleSearch: {} }];
+        }
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [prompt],
+            config,
+        });
+
+        const groundingMetadata = (response.candidates?.[0] as any)?.groundingMetadata;
+        
+        return {
+            text: response.text,
+            groundingMetadata,
+            candidates: response.candidates,
+        };
+    } catch (error: any) {
+        console.error("Gemini Search API Error:", error);
+        throw new Error(error.message || "Failed to search");
     }
 }
 

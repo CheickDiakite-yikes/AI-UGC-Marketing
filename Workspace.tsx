@@ -11,7 +11,7 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats } from './types';
-import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage } from './services/geminiService';
+import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch } from './services/geminiService';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
 import {
   getBoards,
@@ -297,6 +297,30 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             getUserUsageAction().then(setUsage);
           }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
+          
+          if (fc.name === 'discover_trends') {
+            setProcessingStatus(`Searching for latest trends...`);
+            const trendResult = await discoverTrends(
+              fc.args['industry'] as string,
+              fc.args['targetAudience'] as string | undefined
+            );
+            responseText = trendResult.text;
+            if (trendResult.sources && trendResult.sources.length > 0) {
+              responseText += `\n\n📚 **Sources:**\n${trendResult.sources.slice(0, 5).map(s => `- ${s}`).join('\n')}`;
+            }
+          }
+          
+          if (fc.name === 'web_research') {
+            setProcessingStatus(`Researching...`);
+            const researchResult = await researchWithGoogleSearch(
+              fc.args['query'] as string,
+              fc.args['context'] as string | undefined
+            );
+            responseText = researchResult.text;
+            if (researchResult.sources && researchResult.sources.length > 0) {
+              responseText += `\n\n📚 **Sources:**\n${researchResult.sources.slice(0, 5).map(s => `- ${s}`).join('\n')}`;
+            }
+          }
         }
       }
 

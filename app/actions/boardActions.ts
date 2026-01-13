@@ -433,102 +433,124 @@ export async function scrapeWebsiteAction(boardId: string, url: string) {
             return { success: false, error: 'Invalid URL. Please enter a valid URL starting with http:// or https://' };
         }
 
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; PrediAI/1.0; +https://prediai.com)'
-            }
-        });
-
-        if (!response.ok) {
-            return { success: false, error: `Failed to fetch URL: ${response.status} ${response.statusText}` };
-        }
-
-        const html = await response.text();
-
-        let rawText = html
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        rawText = rawText.substring(0, 30000);
-
         const urlObj = new URL(url);
         const hostname = urlObj.hostname.replace('www.', '');
 
-        let extractedText = rawText;
+        let extractedText = '';
         
         try {
-            const { GoogleGenAI } = await import('@google/genai');
-            const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+            const { generateContentWithUrlContext } = await import('@/app/actions');
             
-            if (apiKey) {
-                const ai = new GoogleGenAI({ apiKey });
-                
-                const extractionPrompt = `You are an expert at extracting business and branding information from websites.
+            const extractionPrompt = `You are an expert at extracting business and branding information from websites for marketing purposes.
 
-Analyze this website content and extract the following information in a structured format:
-
-WEBSITE: ${url}
-
-RAW CONTENT:
-${rawText}
-
----
+Analyze the website at the URL provided and extract comprehensive information. Navigate through the main pages if needed.
 
 Please extract and organize the following:
 
 ## COMPANY OVERVIEW
 - Company/Brand Name
-- Tagline/Slogan
+- Tagline/Slogan  
 - Mission Statement
 - What they do (1-2 sentences)
 - Industry/Sector
 
 ## PRODUCTS & SERVICES
-- List main products or services offered
-- Key features or benefits mentioned
+- List ALL main products or services offered
+- Key features or benefits mentioned for each
+- Pricing information if available
 
 ## BRAND VOICE & MESSAGING
 - Tone of voice (professional, casual, playful, etc.)
-- Key marketing messages
+- Key marketing messages and copy
 - Unique value propositions
 - Target audience indicators
 
 ## VISUAL BRAND INDICATORS
-- Colors mentioned or implied
-- Style descriptors (modern, vintage, luxury, etc.)
-- Imagery themes
+- Colors used on the website
+- Style descriptors (modern, vintage, luxury, minimalist, etc.)
+- Imagery themes and photography style
 
 ## KEY CONTENT FOR MARKETING
-- Compelling quotes or statements
-- Social proof (testimonials, stats, achievements)
+- Compelling quotes or statements from the site
+- Social proof (testimonials, reviews, case studies, stats, achievements)
 - Call-to-action phrases used
+- Headlines and hooks used
+
+## TEAM & STORY
+- Founder/team information if available
+- Company origin story or about us content
+- Company values or culture
 
 ## CONTACT & SOCIAL
-- Contact information if available
-- Social media handles if mentioned
+- Contact information (email, phone, address)
+- Social media handles and links
 
-Provide a comprehensive extraction that would help a marketing AI create on-brand content for this company. If information is not available, note it as "Not specified on page."`;
+Provide an extremely comprehensive extraction that would help a marketing AI create perfectly on-brand content for this company. Include direct quotes where impactful.`;
 
-                const geminiResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash-preview-05-20',
-                    contents: { parts: [{ text: extractionPrompt }] }
-                });
+            const response = await generateContentWithUrlContext(url, extractionPrompt);
+            
+            if (response.text) {
+                extractedText = response.text;
                 
-                if (geminiResponse.text) {
-                    extractedText = geminiResponse.text;
+                const sources: string[] = [];
+                
+                if (response.urlContextMetadata) {
+                    const metadata = response.urlContextMetadata as any;
+                    if (metadata.urlMetadata) {
+                        for (const urlData of metadata.urlMetadata) {
+                            sources.push(urlData.retrievedUrl || urlData.url);
+                        }
+                    }
+                }
+                
+                if (response.groundingMetadata) {
+                    const metadata = response.groundingMetadata as any;
+                    if (metadata.groundingChunks) {
+                        for (const chunk of metadata.groundingChunks) {
+                            if (chunk.web?.uri) {
+                                sources.push(chunk.web.uri);
+                            }
+                        }
+                    }
+                }
+                
+                if (sources.length > 0) {
+                    const uniqueSources = [...new Set(sources)];
+                    extractedText += `\n\n---\n## Sources Analyzed\n`;
+                    for (const src of uniqueSources) {
+                        extractedText += `- ${src}\n`;
+                    }
                 }
             }
-        } catch (geminiError) {
-            console.error('Gemini extraction failed, using raw text:', geminiError);
+        } catch (urlContextError: any) {
+            console.error('URL Context extraction failed, falling back to basic fetch:', urlContextError);
+            
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; PrediAI/1.0; +https://prediai.com)'
+                    }
+                });
+
+                if (response.ok) {
+                    const html = await response.text();
+                    let rawText = html
+                        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .replace(/&amp;/g, '&')
+                        .replace(/\s+/g, ' ')
+                        .trim()
+                        .substring(0, 30000);
+                    
+                    extractedText = `## Raw Website Content\n\n${rawText}\n\n(Note: Advanced extraction failed, showing basic content)`;
+                } else {
+                    extractedText = `Failed to fetch website content. Status: ${response.status}`;
+                }
+            } catch (fetchError) {
+                extractedText = `Website extraction failed: ${urlContextError.message}`;
+            }
         }
 
         const assetId = crypto.randomUUID();
