@@ -12,7 +12,11 @@ export const roleEnum = pgEnum('role', ['user', 'model', 'system']);
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: text('email').unique(),
+  passwordHash: text('password_hash'),
   name: text('name'),
+  company: text('company'),
+  jobTitle: text('job_title'),
+  referralSource: text('referral_source'),
   avatarUrl: text('avatar_url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
