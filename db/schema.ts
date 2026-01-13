@@ -18,6 +18,8 @@ export const users = pgTable('users', {
   jobTitle: text('job_title'),
   referralSource: text('referral_source'),
   avatarUrl: text('avatar_url'),
+  imagesGenerated: integer('images_generated').default(0).notNull(),
+  videosGenerated: integer('videos_generated').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

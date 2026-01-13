@@ -2,10 +2,11 @@
 'use server';
 
 import { db } from '@/db';
-import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users } from '@/db/schema';
+import { eq, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity } from '@/types';
+import { getSession } from './authActions';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -131,20 +132,56 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
         x: item.x || 0,
         y: item.y || 0
     }).returning();
+
+    // Increment Usage
+    const session = await getSession();
+    if (session && session.userId) {
+        if (item.type === 'video') {
+            await db.update(users)
+                .set({ videosGenerated: sql`${users.videosGenerated} + 1` })
+                .where(eq(users.id, session.userId as string));
+        } else {
+            await db.update(users)
+                .set({ imagesGenerated: sql`${users.imagesGenerated} + 1` })
+                .where(eq(users.id, session.userId as string));
+        }
+    }
+
     revalidatePath('/');
     return saved;
+}
+
+export async function getUserUsageAction() {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { imagesGenerated: 0, videosGenerated: 0, lastResetDate: Date.now() };
+    }
+
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, session.userId as string),
+        columns: {
+            imagesGenerated: true,
+            videosGenerated: true
+        }
+    });
+
+    return {
+        imagesGenerated: user?.imagesGenerated || 0,
+        videosGenerated: user?.videosGenerated || 0,
+        lastResetDate: Date.now() // We could store this in DB too if needed
+    };
 }
 
 export async function renameBoard(boardId: string, newName: string) {
     if (!newName || newName.trim() === '') {
         return { error: 'Board name cannot be empty', success: false };
     }
-    
+
     const [updated] = await db.update(boards)
         .set({ name: newName.trim(), updatedAt: new Date() })
         .where(eq(boards.id, boardId))
         .returning();
-    
+
     revalidatePath('/');
     return { success: true, board: updated };
 }

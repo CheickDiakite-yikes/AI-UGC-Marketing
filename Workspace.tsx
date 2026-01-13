@@ -23,7 +23,8 @@ import {
   saveMessageAction,
   saveGeneratedItemAction,
   renameBoard,
-  deleteBoard
+  deleteBoard,
+  getUserUsageAction
 } from './app/actions/boardActions';
 
 
@@ -38,8 +39,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [activeBoardId, setActiveBoardId] = useState<string>('');
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
 
-  // Initial Load
+  // Initial Load (Boards + Usage)
   React.useEffect(() => {
+    getUserUsageAction().then(setUsage);
     getBoards().then(async (bs) => {
       if (bs.length > 0) {
         const boardsWithDefaults = bs.map((b: any) => ({
@@ -262,7 +264,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const item: CanvasItem = { id: Math.random().toString(), type: 'image', content: imgData, title: "Custom Asset", meta: { aspectRatio: fc.args['aspectRatio'] as string } };
             newItems.push(item);
             await saveGeneratedItemAction(activeBoardId, item);
-            setUsage(p => ({ ...p, imagesGenerated: p.imagesGenerated + 1 }));
+            getUserUsageAction().then(setUsage);
           }
           if (fc.name === 'generate_video') {
             setProcessingStatus(`Simulating Cinematic Video...`);
@@ -270,7 +272,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const item: CanvasItem = { id: Math.random().toString(), type: 'video', content: videoUrl, title: "Cinematic Clip" };
             newItems.push(item);
             await saveGeneratedItemAction(activeBoardId, item);
-            setUsage(p => ({ ...p, videosGenerated: p.videosGenerated + 1 }));
+            getUserUsageAction().then(setUsage);
           }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
         }
@@ -289,14 +291,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               const carouselItem: CanvasItem = { id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
               newItems.push(carouselItem);
               await saveGeneratedItemAction(activeBoardId, carouselItem);
-              setUsage(p => ({ ...p, imagesGenerated: p.imagesGenerated + slides.length }));
+              getUserUsageAction().then(setUsage);
             } else {
               const res = await (item.type === 'video' ? generateVeoVideo(item.visual_prompt, { resolution: '720p', aspectRatio: item.aspectRatio }) : generateMarketingImage(item.visual_prompt, item.aspectRatio));
               const singleItem: CanvasItem = { id: Math.random().toString(), type: item.type === 'video' ? 'video' : 'image', content: res, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
               newItems.push(singleItem);
               await saveGeneratedItemAction(activeBoardId, singleItem);
-              if (item.type === 'video') setUsage(p => ({ ...p, videosGenerated: p.videosGenerated + 1 }));
-              else setUsage(p => ({ ...p, imagesGenerated: p.imagesGenerated + 1 }));
+              getUserUsageAction().then(setUsage);
             }
           }
         }
