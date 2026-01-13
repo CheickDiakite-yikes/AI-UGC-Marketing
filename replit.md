@@ -132,7 +132,36 @@ Media files (logos, images, avatars) are stored in Replit Object Storage instead
 ### Environment Variables for SEO
 - `NEXT_PUBLIC_SITE_URL` - Production URL for canonical links (defaults to https://predi.ai)
 
+## AI Features
+
+### Gemini Models Used
+- **gemini-3-pro-preview** - Main chat agent for content planning and function calling
+- **gemini-3-pro-image-preview** - Marketing image generation
+- **gemini-2.5-flash** - URL Context (website scraping) and Google Search grounding
+
+### Website Scraping (URL Context)
+When users add website links, the app uses Gemini's URL Context tool to:
+- Navigate and analyze the full website content
+- Extract company info, products, brand voice, and marketing copy
+- Handle JavaScript-rendered content that basic fetch cannot
+
+### Google Search Grounding
+The AI agent has access to real-time web search for:
+- **Trend Discovery** - Finding latest viral trends, hashtags, and content formats
+- **Web Research** - Competitor analysis, market research, and real-time data
+
+### Available AI Tools
+1. `generate_image` - Create high-fidelity marketing images
+2. `generate_campaign_pack` - Generate 5-10 item campaign packs
+3. `generate_avatar_visual` - Design brand mascots/avatars
+4. `discover_trends` - Search for latest trends with Google Search
+5. `web_research` - General web research with citations
+
 ## Recent Changes
+- Upgraded website scraping to use Gemini URL Context tool for better data extraction (January 2026)
+- Added Google Search grounding for trend discovery and web research (January 2026)
+- Fixed data isolation - all board operations verify user ownership (January 2026)
+- Fixed mobile UI chat panel blocking header buttons (January 2026)
 - Added comprehensive SEO, Open Graph, Twitter Cards, and AI search optimization (January 2026)
 - Fixed image persistence - now storing base64 directly in database (January 2026)
 - Added Replit Object Storage for media files (January 2026)
