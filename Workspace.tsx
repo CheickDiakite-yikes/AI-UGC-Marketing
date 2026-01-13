@@ -21,7 +21,9 @@ import {
   saveBrandIdentityAction,
   saveAvatarIdentityAction,
   saveMessageAction,
-  saveGeneratedItemAction
+  saveGeneratedItemAction,
+  renameBoard,
+  deleteBoard
 } from './app/actions/boardActions';
 
 
@@ -325,6 +327,40 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setShowNewBoardModal(false);
   };
 
+  const handleRenameBoard = async (boardId: string, newName: string) => {
+    const result = await renameBoard(boardId, newName);
+    if (result.success) {
+      setBoards(prev => prev.map(b => b.id === boardId ? { ...b, name: newName } : b));
+      if (activeBoard && activeBoard.id === boardId) {
+        setActiveBoard({ ...activeBoard, name: newName });
+      }
+    }
+  };
+
+  const handleDeleteBoard = async (boardId: string) => {
+    await deleteBoard(boardId);
+    setBoards(prev => prev.filter(b => b.id !== boardId));
+    if (activeBoardId === boardId) {
+      const remainingBoards = boards.filter(b => b.id !== boardId);
+      if (remainingBoards.length > 0) {
+        setActiveBoardId(remainingBoards[0].id);
+      } else {
+        const newBoard = await createBoard('My First Campaign');
+        const boardWithDefaults = {
+          ...newBoard,
+          assets: [],
+          items: [],
+          messages: [],
+          brandIdentity: null,
+          avatarIdentity: null,
+          createdAt: newBoard.createdAt ? new Date(newBoard.createdAt).getTime() : Date.now()
+        };
+        setBoards([boardWithDefaults as any]);
+        setActiveBoardId(newBoard.id);
+      }
+    }
+  };
+
   if (!activeBoard) return <div className="flex h-screen items-center justify-center font-display text-xl animate-pulse">Loading Workspace...</div>;
 
   return (
@@ -408,7 +444,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {showBrandModal && pendingScannedIdentity && <BrandIdentityModal initialIdentity={pendingScannedIdentity} logoUrl={pendingLogoAsset?.content || ""} onSave={handleSaveIdentity} onClose={() => setShowBrandModal(false)} />}
       {showAvatarModal && pendingScannedAvatar && <AvatarAnalysisModal initialIdentity={pendingScannedAvatar} onSave={handleSaveAvatar} onClose={() => setShowAvatarModal(false)} />}
       {showNewBoardModal && <NewBoardModal onCreate={handleCreateBoard} onCancel={() => setShowNewBoardModal(false)} />}
-      {showBoardListModal && <BoardListModal boards={boards} activeBoardId={activeBoardId} onSwitch={setActiveBoardId} onClose={() => setShowBoardListModal(false)} onCreateNew={() => setShowNewBoardModal(true)} />}
+      {showBoardListModal && <BoardListModal boards={boards} activeBoardId={activeBoardId} onSwitch={setActiveBoardId} onClose={() => setShowBoardListModal(false)} onCreateNew={() => setShowNewBoardModal(true)} onRename={handleRenameBoard} onDelete={handleDeleteBoard} />}
       {selectedItem && <LightboxModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
     </div>
   );

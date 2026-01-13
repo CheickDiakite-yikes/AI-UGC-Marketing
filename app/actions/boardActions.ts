@@ -135,3 +135,23 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
     return saved;
 }
 
+export async function renameBoard(boardId: string, newName: string) {
+    if (!newName || newName.trim() === '') {
+        return { error: 'Board name cannot be empty', success: false };
+    }
+    
+    const [updated] = await db.update(boards)
+        .set({ name: newName.trim(), updatedAt: new Date() })
+        .where(eq(boards.id, boardId))
+        .returning();
+    
+    revalidatePath('/');
+    return { success: true, board: updated };
+}
+
+export async function deleteBoard(boardId: string) {
+    await db.delete(boards).where(eq(boards.id, boardId));
+    revalidatePath('/');
+    return { success: true };
+}
+
