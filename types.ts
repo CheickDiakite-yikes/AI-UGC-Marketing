@@ -7,6 +7,7 @@ export interface ProjectAsset {
   storageKey?: string | null; // Object storage key for media files
   mimeType?: string;
   status?: 'digesting' | 'ready';
+  extractedText?: string; // For PDFs: extracted readable text content
 }
 
 export interface CanvasItem {

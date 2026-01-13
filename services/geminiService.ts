@@ -173,10 +173,26 @@ export const chatWithMarketingAgent = async (
     sourceKnowledge = `
     === PRIMARY SOURCE DOCUMENTS (HIGHEST PRIORITY) ===
     Use this information as the foundation for ALL campaign content, messaging, and strategy:
-    ${sourceAssets.map(a => `
+    ${sourceAssets.map(a => {
+      if (a.type === 'pdf') {
+        const text = a.extractedText || 'PDF content not yet extracted';
+        return `
+    [${a.name}] (PDF):
+    ${text.substring(0, 5000)}
+    `;
+      } else if (a.type === 'text') {
+        const text = a.content ? atob(a.content) : 'Content not available';
+        return `
+    [${a.name}] (TEXT):
+    ${text.substring(0, 5000)}
+    `;
+      } else {
+        return `
     [${a.name}] (${a.type.toUpperCase()}):
-    ${a.type === 'pdf' || a.type === 'text' ? (a.content ? atob(a.content).substring(0, 5000) : 'Content not available') : 'Visual reference uploaded'}
-    `).join('\n')}
+    Visual reference uploaded
+    `;
+      }
+    }).join('\n')}
     ===
     `;
   }

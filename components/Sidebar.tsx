@@ -59,7 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const totalValue = usageStats ? (usageStats.imagesGenerated * VALUE_PER_IMAGE) + (usageStats.videosGenerated * VALUE_PER_VIDEO) : 0;
   const savings = totalValue - totalCost;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, category: 'logo' | 'avatar' | 'general') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'logo' | 'avatar' | 'general') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -70,7 +70,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = (event.target?.result as string).split(',')[1];
 
       let type: ProjectAsset['type'] = 'pdf';
@@ -79,12 +79,32 @@ const Sidebar: React.FC<SidebarProps> = ({
       else if (file.type.startsWith('image/')) type = 'image';
       else if (file.type === 'text/plain') type = 'text';
 
+      let extractedText: string | undefined;
+      
+      if (file.type === 'application/pdf') {
+        try {
+          const response = await fetch('/api/extract-pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base64Content: base64 })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            extractedText = data.text;
+          }
+        } catch (error) {
+          console.error('Failed to extract PDF text:', error);
+        }
+      }
+
       const newAsset: ProjectAsset = {
         id: Date.now().toString(),
         type: type,
         name: file.name,
         content: base64,
-        mimeType: file.type
+        mimeType: file.type,
+        extractedText
       };
       onAddAsset(newAsset);
     };

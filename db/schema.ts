@@ -42,6 +42,7 @@ export const assets = pgTable('assets', {
   storageKey: text('storage_key'), // Object storage key for media files
   mimeType: text('mime_type'),
   status: text('status').default('ready'),
+  extractedText: text('extracted_text'), // For PDFs: extracted readable text content
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

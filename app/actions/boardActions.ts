@@ -99,7 +99,8 @@ export async function saveAsset(boardId: string, asset: ProjectAsset) {
         content: dbContent,
         storageKey,
         mimeType: asset.mimeType,
-        status: asset.status || 'ready'
+        status: asset.status || 'ready',
+        extractedText: asset.extractedText || null
     }).returning();
     
     revalidatePath('/');
