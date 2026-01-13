@@ -15,12 +15,18 @@ import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as d
 
 export async function getBoards() {
     const allBoards = await db.query.boards.findMany({
-        orderBy: [desc(boards.createdAt)]
+        orderBy: [desc(boards.createdAt)],
+        with: {
+            assets: true,
+            generatedItems: true
+        }
     });
-    // We need to fetch sub-items for the list view if needed, but list usually just needs overview
-    // For now return basic info, but Workspace expects full objects.
-    // Ideally we only fetch full board when active.
-    return allBoards;
+    
+    return allBoards.map(board => ({
+        ...board,
+        assetCount: board.assets?.length || 0,
+        generatedItemCount: board.generatedItems?.length || 0
+    }));
 }
 
 export async function createBoard(name: string) {
@@ -51,7 +57,7 @@ export async function getBoardDetails(boardId: string) {
     
     if (board && board.assets) {
         board.assets = board.assets.map(asset => {
-            if (asset.storageKey && !asset.content) {
+            if (asset.storageKey) {
                 return {
                     ...asset,
                     content: `/api/storage/${encodeURIComponent(asset.storageKey)}`
@@ -65,7 +71,7 @@ export async function getBoardDetails(boardId: string) {
         board.generatedItems = board.generatedItems.map(item => {
             let mappedItem = { ...item };
             
-            if (item.storageKey && !item.content) {
+            if (item.storageKey) {
                 mappedItem.content = `/api/storage/${encodeURIComponent(item.storageKey)}`;
             }
             
