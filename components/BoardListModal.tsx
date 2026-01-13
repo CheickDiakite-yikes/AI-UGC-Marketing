@@ -37,8 +37,8 @@ const BoardListModal: React.FC<Props> = ({ boards, activeBoardId, onSwitch, onCl
               )}
               <h3 className="font-display font-bold text-lg mb-1 truncate pr-12">{board.name}</h3>
               <div className="text-xs font-medium space-y-1 opacity-80">
-                 <p>{board.assets.length} Assets Uploaded</p>
-                 <p>{board.items.length} Canvas Items</p>
+                 <p>{board.assets?.length || 0} Assets Uploaded</p>
+                 <p>{board.items?.length || 0} Canvas Items</p>
                  <p className="text-[10px] uppercase mt-2 pt-2 border-t border-black/10">Created: {new Date(board.createdAt).toLocaleDateString()}</p>
               </div>
             </button>

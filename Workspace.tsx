@@ -40,11 +40,29 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   React.useEffect(() => {
     getBoards().then(async (bs) => {
       if (bs.length > 0) {
-        setBoards(bs as any);
+        const boardsWithDefaults = bs.map((b: any) => ({
+          ...b,
+          assets: b.assets || [],
+          items: b.items || [],
+          messages: b.messages || [],
+          brandIdentity: b.brandIdentity || null,
+          avatarIdentity: b.avatarIdentity || null,
+          createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
+        }));
+        setBoards(boardsWithDefaults);
         setActiveBoardId(bs[0].id);
       } else {
         const newBoard = await createBoard('My First Campaign');
-        setBoards([newBoard as any]);
+        const boardWithDefaults = {
+          ...newBoard,
+          assets: [],
+          items: [],
+          messages: [],
+          brandIdentity: null,
+          avatarIdentity: null,
+          createdAt: newBoard.createdAt ? new Date(newBoard.createdAt).getTime() : Date.now()
+        };
+        setBoards([boardWithDefaults as any]);
         setActiveBoardId(newBoard.id);
       }
     });
