@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/server/db';
+import { validateApiKey } from '../auth';
 
 export async function POST(request: NextRequest) {
+  const authError = validateApiKey(request);
+  if (authError) return authError;
+
   try {
     const { name, columns } = await request.json();
     
@@ -38,6 +42,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const authError = validateApiKey(request);
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const name = searchParams.get('name');

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/server/db';
+import { validateApiKey } from './auth';
 
 export async function GET(request: NextRequest) {
+  const authError = validateApiKey(request);
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');

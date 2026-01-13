@@ -44,8 +44,39 @@ npm run start -- -p 5000 -H 0.0.0.0
 ```
 
 ## Environment Variables
-The project may require a Google Gemini API key for full AI functionality.
+- `GOOGLE_GEMINI_API_KEY` - Google Gemini API key for AI functionality
+- `DATABASE_URL` - PostgreSQL connection string (auto-configured)
+- `DB_API_KEY` - API key for database management endpoints
+
+## Database
+
+### Schema (Drizzle ORM)
+Tables: `users`, `boards`, `assets`, `generated_items`, `messages`, `brand_identities`, `avatar_identities`
+
+### Database Commands
+```bash
+npm run db:push       # Push schema changes to database
+npm run db:studio     # Open Drizzle Studio
+```
+
+### Database Management API
+All endpoints require `x-api-key` header with `DB_API_KEY` value.
+
+**Endpoints:**
+- `GET /api/db` - List all available endpoints
+- `GET /api/db?action=tables` - List all tables
+- `GET /api/db?action=schema&table=tablename` - Get table schema
+- `POST /api/db/query` - Execute SELECT queries
+- `POST /api/db/execute` - Execute INSERT/UPDATE/DELETE/DDL
+- `POST /api/db/table` - Create a new table
+- `DELETE /api/db/table?name=tablename` - Drop a table
+- `GET /api/db/rows?table=tablename` - Get all rows
+- `POST /api/db/rows` - Insert row
+- `PUT /api/db/rows` - Update row
+- `DELETE /api/db/rows?table=tablename&id=rowid` - Delete row
 
 ## Recent Changes
+- Added Database Management REST API with full CRUD + table management (January 2026)
+- Set up PostgreSQL database with Drizzle ORM (January 2026)
 - Initial import to Replit environment (January 2026)
 - Configured Next.js for Replit proxy compatibility
