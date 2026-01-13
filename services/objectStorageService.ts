@@ -67,6 +67,27 @@ export async function uploadAsset(
   }
 }
 
+function detectMimeFromBuffer(buffer: Buffer): string {
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return 'image/png';
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg';
+  if (buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return 'image/webp';
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) return 'image/gif';
+  if (buffer.length >= 8 && buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) return 'video/mp4';
+  return 'application/octet-stream';
+}
+
+function getExtensionFromMime(mimeType: string): string {
+  const mimeToExt: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'video/mp4': 'mp4',
+  };
+  return mimeToExt[mimeType] || 'bin';
+}
+
 export async function uploadGeneratedItem(
   boardId: string,
   itemId: string,
@@ -74,9 +95,6 @@ export async function uploadGeneratedItem(
   type: 'image' | 'video'
 ): Promise<UploadResult> {
   try {
-    const extension = type === 'video' ? 'mp4' : 'png';
-    const storageKey = `boards/${boardId}/generated/${itemId}.${extension}`;
-    
     const base64Data = data.includes(',') ? data.split(',')[1] : data;
     const binaryData = Buffer.from(base64Data, 'base64');
     
@@ -86,14 +104,23 @@ export async function uploadGeneratedItem(
       return { success: false, error: validation.error };
     }
     
+    const detectedMime = detectMimeFromBuffer(binaryData);
+    const extension = type === 'video' ? 'mp4' : getExtensionFromMime(detectedMime);
+    const storageKey = `boards/${boardId}/generated/${itemId}.${extension}`;
+    
+    console.log(`[UPLOAD] Uploading ${type} to ${storageKey} (${binaryData.length} bytes, detected: ${detectedMime})`);
+    
     const { ok, error } = await client.uploadFromBytes(storageKey, binaryData);
     
     if (!ok) {
+      console.error(`[UPLOAD FAILED] ${storageKey}:`, error?.message);
       return { success: false, error: error?.message || 'Upload failed' };
     }
     
+    console.log(`[UPLOAD SUCCESS] ${storageKey}`);
     return { success: true, storageKey };
   } catch (err) {
+    console.error(`[UPLOAD ERROR]`, err);
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
@@ -105,8 +132,6 @@ export async function uploadCarouselSlide(
   data: string
 ): Promise<UploadResult> {
   try {
-    const storageKey = `boards/${boardId}/generated/${itemId}_slide${slideIndex}.png`;
-    
     const base64Data = data.includes(',') ? data.split(',')[1] : data;
     const binaryData = Buffer.from(base64Data, 'base64');
     
@@ -116,14 +141,23 @@ export async function uploadCarouselSlide(
       return { success: false, error: validation.error };
     }
     
+    const detectedMime = detectMimeFromBuffer(binaryData);
+    const extension = getExtensionFromMime(detectedMime);
+    const storageKey = `boards/${boardId}/generated/${itemId}_slide${slideIndex}.${extension}`;
+    
+    console.log(`[UPLOAD] Uploading carousel slide ${slideIndex} to ${storageKey} (${binaryData.length} bytes, detected: ${detectedMime})`);
+    
     const { ok, error } = await client.uploadFromBytes(storageKey, binaryData);
     
     if (!ok) {
+      console.error(`[UPLOAD FAILED] Carousel slide ${slideIndex}:`, error?.message);
       return { success: false, error: error?.message || 'Upload failed' };
     }
     
+    console.log(`[UPLOAD SUCCESS] Carousel slide ${slideIndex}: ${storageKey}`);
     return { success: true, storageKey };
   } catch (err) {
+    console.error(`[UPLOAD ERROR] Carousel slide ${slideIndex}:`, err);
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
