@@ -2,17 +2,16 @@
 
 import { GoogleGenAI } from '@google/genai';
 
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
-    // This will log on the server check, useful for debugging deployment
-    console.warn("Server Warning: GEMINI_API_KEY is not set.");
+    console.warn("Server Warning: GOOGLE_GEMINI_API_KEY is not set.");
 }
 
 const ai = new GoogleGenAI({ apiKey: apiKey || 'dummy-key-to-prevent-crash' });
 
 export async function generateContentServer(model: string, contents: any, config: any) {
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured on the server.");
+    if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
 
     try {
         const response = await ai.models.generateContent({
@@ -42,7 +41,7 @@ export async function generateContentServer(model: string, contents: any, config
 }
 
 export async function generateImagesServer(model: string, prompt: string, config: any) {
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured on the server.");
+    if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
     // Image generation might have different response structure
     // For now, implement a basic passthrough using the same generic method or specific if SDK differs
     // The GoogleGenAI SDK V2 usually uses generateContent for images too if using Multimodal, 
