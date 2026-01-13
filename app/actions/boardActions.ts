@@ -13,8 +13,35 @@ import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as d
 // Note directly returning DB objects, might need mapping if types differ slightly
 // but schema.ts was designed to match types.ts
 
+async function assertBoardOwnership(boardId: string) {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        throw new Error('Unauthorized: No active session');
+    }
+    
+    const board = await db.query.boards.findFirst({
+        where: eq(boards.id, boardId)
+    });
+    
+    if (!board) {
+        throw new Error('Board not found');
+    }
+    
+    if (board.userId !== session.userId) {
+        throw new Error('Unauthorized: You do not own this board');
+    }
+    
+    return board;
+}
+
 export async function getBoards() {
-    const allBoards = await db.query.boards.findMany({
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return [];
+    }
+    
+    const userBoards = await db.query.boards.findMany({
+        where: eq(boards.userId, session.userId as string),
         orderBy: [desc(boards.createdAt)],
         with: {
             assets: true,
@@ -22,7 +49,7 @@ export async function getBoards() {
         }
     });
     
-    return allBoards.map(board => ({
+    return userBoards.map(board => ({
         ...board,
         assetCount: board.assets?.length || 0,
         generatedItemCount: board.generatedItems?.length || 0
@@ -30,7 +57,15 @@ export async function getBoards() {
 }
 
 export async function createBoard(name: string) {
-    const [newBoard] = await db.insert(boards).values({ name }).returning();
+    const session = await getSession();
+    if (!session || !session.userId) {
+        throw new Error('Unauthorized: Must be logged in to create a board');
+    }
+    
+    const [newBoard] = await db.insert(boards).values({ 
+        name, 
+        userId: session.userId as string 
+    }).returning();
 
     // Create initial welcome message
     await db.insert(messages).values({
@@ -44,6 +79,11 @@ export async function createBoard(name: string) {
 }
 
 export async function getBoardDetails(boardId: string) {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return null;
+    }
+    
     const board = await db.query.boards.findFirst({
         where: eq(boards.id, boardId),
         with: {
@@ -54,6 +94,10 @@ export async function getBoardDetails(boardId: string) {
             avatarIdentity: true,
         }
     });
+    
+    if (!board || board.userId !== session.userId) {
+        return null;
+    }
     
     if (board && board.assets) {
         board.assets = board.assets.map(asset => {
@@ -92,6 +136,8 @@ export async function getBoardDetails(boardId: string) {
 }
 
 export async function saveAsset(boardId: string, asset: ProjectAsset) {
+    await assertBoardOwnership(boardId);
+    
     const assetId = crypto.randomUUID();
     const isMediaType = ['logo', 'image', 'avatar'].includes(asset.type) && asset.mimeType?.startsWith('image/');
     
@@ -130,6 +176,8 @@ export async function saveAsset(boardId: string, asset: ProjectAsset) {
 }
 
 export async function saveBrandIdentityAction(boardId: string, identity: BrandIdentity) {
+    await assertBoardOwnership(boardId);
+    
     const [savedIdentity] = await db.insert(brandIdentities).values({
         colors: identity.colors,
         fonts: identity.fonts,
@@ -152,6 +200,8 @@ export async function saveBrandIdentityAction(boardId: string, identity: BrandId
 }
 
 export async function saveAvatarIdentityAction(boardId: string, identity: AvatarIdentity) {
+    await assertBoardOwnership(boardId);
+    
     const [savedIdentity] = await db.insert(avatarIdentities).values({
         name: identity.name,
         description: identity.description,
@@ -176,6 +226,8 @@ export async function saveAvatarIdentityAction(boardId: string, identity: Avatar
 }
 
 export async function saveMessageAction(boardId: string, role: 'user' | 'model' | 'system', text: string) {
+    await assertBoardOwnership(boardId);
+    
     const [msg] = await db.insert(messages).values({
         boardId,
         role,
@@ -186,6 +238,8 @@ export async function saveMessageAction(boardId: string, role: 'user' | 'model' 
 }
 
 export async function saveGeneratedItemAction(boardId: string, item: any) {
+    await assertBoardOwnership(boardId);
+    
     const itemId = crypto.randomUUID();
     
     // IMPORTANT: Store base64 directly in database - object storage has issues
@@ -253,6 +307,8 @@ export async function getUserUsageAction() {
 }
 
 export async function renameBoard(boardId: string, newName: string) {
+    await assertBoardOwnership(boardId);
+    
     if (!newName || newName.trim() === '') {
         return { error: 'Board name cannot be empty', success: false };
     }
@@ -267,6 +323,8 @@ export async function renameBoard(boardId: string, newName: string) {
 }
 
 export async function deleteBoard(boardId: string) {
+    await assertBoardOwnership(boardId);
+    
     await db.delete(boards).where(eq(boards.id, boardId));
     revalidatePath('/');
     return { success: true };
@@ -279,6 +337,11 @@ export async function deleteAssetAction(assetId: string) {
     
     if (!asset) {
         return { success: false, error: 'Asset not found' };
+    }
+    
+    // Verify ownership through the board
+    if (asset.boardId) {
+        await assertBoardOwnership(asset.boardId);
     }
     
     if (asset.storageKey) {
@@ -297,6 +360,11 @@ export async function deleteGeneratedItemAction(itemId: string) {
     
     if (!item) {
         return { success: false, error: 'Item not found' };
+    }
+    
+    // Verify ownership through the board
+    if (item.boardId) {
+        await assertBoardOwnership(item.boardId);
     }
     
     if (item.storageKey) {
@@ -357,6 +425,8 @@ export async function reExtractPdfAction(assetId: string) {
 }
 
 export async function scrapeWebsiteAction(boardId: string, url: string) {
+    await assertBoardOwnership(boardId);
+    
     try {
         const urlPattern = /^https?:\/\/.+/i;
         if (!urlPattern.test(url)) {
