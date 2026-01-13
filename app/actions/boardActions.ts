@@ -411,7 +411,7 @@ export async function scrapeWebsiteAction(boardId: string, url: string) {
 
         const html = await response.text();
 
-        let text = html
+        let rawText = html
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
             .replace(/<[^>]+>/g, ' ')
@@ -424,10 +424,78 @@ export async function scrapeWebsiteAction(boardId: string, url: string) {
             .replace(/\s+/g, ' ')
             .trim();
 
-        text = text.substring(0, 10000);
+        rawText = rawText.substring(0, 30000);
 
         const urlObj = new URL(url);
         const hostname = urlObj.hostname.replace('www.', '');
+
+        let extractedText = rawText;
+        
+        try {
+            const { GoogleGenAI } = await import('@google/genai');
+            const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+            
+            if (apiKey) {
+                const ai = new GoogleGenAI({ apiKey });
+                
+                const extractionPrompt = `You are an expert at extracting business and branding information from websites.
+
+Analyze this website content and extract the following information in a structured format:
+
+WEBSITE: ${url}
+
+RAW CONTENT:
+${rawText}
+
+---
+
+Please extract and organize the following:
+
+## COMPANY OVERVIEW
+- Company/Brand Name
+- Tagline/Slogan
+- Mission Statement
+- What they do (1-2 sentences)
+- Industry/Sector
+
+## PRODUCTS & SERVICES
+- List main products or services offered
+- Key features or benefits mentioned
+
+## BRAND VOICE & MESSAGING
+- Tone of voice (professional, casual, playful, etc.)
+- Key marketing messages
+- Unique value propositions
+- Target audience indicators
+
+## VISUAL BRAND INDICATORS
+- Colors mentioned or implied
+- Style descriptors (modern, vintage, luxury, etc.)
+- Imagery themes
+
+## KEY CONTENT FOR MARKETING
+- Compelling quotes or statements
+- Social proof (testimonials, stats, achievements)
+- Call-to-action phrases used
+
+## CONTACT & SOCIAL
+- Contact information if available
+- Social media handles if mentioned
+
+Provide a comprehensive extraction that would help a marketing AI create on-brand content for this company. If information is not available, note it as "Not specified on page."`;
+
+                const geminiResponse = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash-preview-05-20',
+                    contents: { parts: [{ text: extractionPrompt }] }
+                });
+                
+                if (geminiResponse.text) {
+                    extractedText = geminiResponse.text;
+                }
+            }
+        } catch (geminiError) {
+            console.error('Gemini extraction failed, using raw text:', geminiError);
+        }
 
         const assetId = crypto.randomUUID();
         const [saved] = await db.insert(assets).values({
@@ -435,7 +503,8 @@ export async function scrapeWebsiteAction(boardId: string, url: string) {
             boardId,
             type: 'link',
             name: hostname,
-            content: text,
+            content: url,
+            extractedText: extractedText,
             storageKey: null,
             mimeType: 'text/plain',
             status: 'ready'
@@ -449,7 +518,8 @@ export async function scrapeWebsiteAction(boardId: string, url: string) {
                 id: saved.id,
                 type: 'link' as const,
                 name: hostname,
-                content: text,
+                content: url,
+                extractedText: extractedText,
                 mimeType: 'text/plain',
                 status: 'ready'
             }
