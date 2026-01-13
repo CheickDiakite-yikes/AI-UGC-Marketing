@@ -75,7 +75,30 @@ All endpoints require `x-api-key` header with `DB_API_KEY` value.
 - `PUT /api/db/rows` - Update row
 - `DELETE /api/db/rows?table=tablename&id=rowid` - Delete row
 
+## Authentication
+
+The app uses email/password authentication with JWT sessions stored in cookies.
+
+### Signup Fields
+- Email (required)
+- Password (required, min 6 characters)
+- Full Name (required)
+- Job Title / Role (optional)
+- Company (optional)
+- How did you find us? (optional dropdown)
+
+### Auth Flow
+1. User clicks "Log In" or "Get Started" on landing page
+2. Modal appears with login or signup form
+3. On successful auth, session cookie is set and user enters workspace
+
+### Files
+- `components/AuthModal.tsx` - Login/Signup modal component
+- `app/actions/authActions.ts` - Server actions for signup, login, logout, getSession
+- `services/authService.ts` - Password hashing and JWT token utilities
+
 ## Recent Changes
+- Added email/password authentication with signup and login modals (January 2026)
 - Added Database Management REST API with full CRUD + table management (January 2026)
 - Set up PostgreSQL database with Drizzle ORM (January 2026)
 - Initial import to Replit environment (January 2026)
