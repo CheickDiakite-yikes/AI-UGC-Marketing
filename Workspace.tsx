@@ -13,6 +13,17 @@ import LightboxModal from './components/LightboxModal';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage } from './services/geminiService';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
+import {
+  getBoards,
+  createBoard,
+  getBoardDetails,
+  saveAsset,
+  saveBrandIdentityAction,
+  saveAvatarIdentityAction,
+  saveMessageAction,
+  saveGeneratedItemAction
+} from './app/actions/boardActions';
+
 
 interface WorkspaceProps {
   onExitApp: () => void;
@@ -21,20 +32,56 @@ interface WorkspaceProps {
 const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, lastResetDate: Date.now() });
 
-  const [boards, setBoards] = useState<Board[]>([{
-    id: 'default-board',
-    name: 'First Campaign',
-    assets: [],
-    items: [],
-    messages: [{ id: '1', role: 'model', text: 'Hello! I am your AI Marketing Agent. Let\'s calibrate your brand avatar for perfect consistency.' }],
-    brandIdentity: null,
-    avatarIdentity: null,
-    createdAt: Date.now()
-  }]);
-  const [activeBoardId, setActiveBoardId] = useState<string>('default-board');
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [activeBoardId, setActiveBoardId] = useState<string>('');
+  const [activeBoard, setActiveBoard] = useState<Board | null>(null);
 
-  const activeBoard = boards.find(b => b.id === activeBoardId) || boards[0];
-  const updateActiveBoard = (updater: (board: Board) => Board) => setBoards(prev => prev.map(b => b.id === activeBoard.id ? updater(b) : b));
+  // Initial Load
+  React.useEffect(() => {
+    getBoards().then(bs => {
+      if (bs.length > 0) {
+        setBoards(bs as any);
+        setActiveBoardId(bs[0].id);
+      } else {
+        // Create default if none exists? Or let user create one. 
+        // For now, let's keep it empty or maybe auto-create one.
+      }
+    });
+  }, []);
+
+  // Fetch active board details
+  React.useEffect(() => {
+    if (!activeBoardId) return;
+    getBoardDetails(activeBoardId).then(b => {
+      if (b) {
+        // Map DB structure to Frontend structure
+        const mappedBoard: Board = {
+          ...b,
+          items: b.generatedItems.map((gi: any) => ({
+            id: gi.id,
+            type: gi.type,
+            content: gi.content,
+            carouselUrls: gi.carouselUrls,
+            title: gi.title,
+            description: gi.description,
+            meta: gi.metadata,
+            x: gi.x,
+            y: gi.y
+          })),
+          assets: b.assets as ProjectAsset[],
+          messages: b.messages as ChatMessage[],
+          brandIdentity: b.brandIdentity as BrandIdentity | null,
+          avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
+          createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
+        };
+        setActiveBoard(mappedBoard);
+      }
+    });
+  }, [activeBoardId]);
+
+  const updateActiveBoard = (updater: (board: Board) => Board) => {
+    if (activeBoard) setActiveBoard(updater(activeBoard));
+  };
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>("");
@@ -56,15 +103,24 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [pendingScannedAvatar, setPendingScannedAvatar] = useState<AvatarIdentity | null>(null);
 
   const handleAddAsset = async (asset: ProjectAsset) => {
+    if (!activeBoardId) return;
+
+    // Persist asset first
+    const savedAsset = await saveAsset(activeBoardId, asset);
+    const assetWithId = { ...asset, id: savedAsset.id, status: savedAsset.status as 'digesting' | 'ready' };
+
+    // Optimistic update
+    updateActiveBoard(b => ({ ...b, assets: [...b.assets, assetWithId] }));
+
     if (asset.type === 'logo') {
       setIsAnalyzingLogo(true);
-      setPendingLogoAsset(asset);
+      setPendingLogoAsset(assetWithId);
       try {
         const identity = await analyzeBrandLogo(asset.content);
         setPendingScannedIdentity(identity);
         setShowBrandModal(true);
       } catch (error) {
-        updateActiveBoard(b => ({ ...b, assets: [...b.assets, { ...asset, status: 'ready' }] }));
+        // If analysis fails, allow asset to remain
       } finally { setIsAnalyzingLogo(false); }
       return;
     }
@@ -73,9 +129,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const newRefs = [...pendingAvatarAssets, asset.content];
       setPendingAvatarAssets(newRefs);
 
-      // If we're uploading a file, trigger analysis immediately if it's the first one,
-      // but if we're in "Camera" mode, we'll wait for the onFinish callback.
-      // To differentiate, we'll only auto-trigger on manual file uploads here.
       if (!isCameraActive) {
         setIsAnalyzingLogo(true);
         try {
@@ -89,11 +142,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       return;
     }
 
-    const newAsset: ProjectAsset = { ...asset, status: 'digesting' };
-    updateActiveBoard(b => ({ ...b, assets: [...b.assets, newAsset] }));
-    setTimeout(() => {
-      updateActiveBoard(b => ({ ...b, assets: b.assets.map(a => a.id === newAsset.id ? { ...a, status: 'ready' } : a) }));
-    }, 1500);
+    // Simulate digesting if needed, though DB status is 'ready' by default in schema
+    // If we want digesting state, we'd update DB later. For now, keep it simple.
   };
 
   const handleCameraFinish = async (images: { data: string, label: string }[]) => {
@@ -116,27 +166,59 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   };
 
-  const handleSaveIdentity = (identity: BrandIdentity) => {
-    updateActiveBoard(b => ({
-      ...b, brandIdentity: identity,
-      assets: pendingLogoAsset ? [...b.assets, { ...pendingLogoAsset, status: 'ready' }] : b.assets,
-      messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: `✅ Brand DNA extracted. All visuals will now strictly follow this color palette and vibe.` }]
-    }));
+  const handleSaveIdentity = async (identity: BrandIdentity) => {
+    if (!activeBoardId) return;
+    await saveBrandIdentityAction(activeBoardId, identity);
+    // Refresh board to get updated state
+    const updated = await getBoardDetails(activeBoardId);
+    if (updated) {
+      // Simple re-fetch mapping (duplicated code, should refactor but fine for now)
+      const mappedBoard: Board = {
+        ...updated,
+        items: updated.generatedItems.map((gi: any) => ({
+          id: gi.id, type: gi.type, content: gi.content, carouselUrls: gi.carouselUrls, title: gi.title, description: gi.description, meta: gi.metadata, x: gi.x, y: gi.y
+        })),
+        assets: updated.assets as ProjectAsset[],
+        messages: updated.messages as ChatMessage[],
+        brandIdentity: updated.brandIdentity as BrandIdentity | null,
+        avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
+        createdAt: updated.createdAt ? new Date(updated.createdAt).getTime() : Date.now()
+      };
+      setActiveBoard(mappedBoard);
+    }
     setShowBrandModal(false);
   };
 
-  const handleSaveAvatar = (identity: AvatarIdentity) => {
-    updateActiveBoard(b => ({
-      ...b, avatarIdentity: identity,
-      messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: `👤 **High-Fidelity Calibration Complete.** I have mapped your facial geometry and unique features from all angles. Consistency is now locked.` }]
-    }));
+  const handleSaveAvatar = async (identity: AvatarIdentity) => {
+    if (!activeBoardId) return;
+    await saveAvatarIdentityAction(activeBoardId, identity);
     setShowAvatarModal(false);
     setPendingAvatarAssets([]);
+    // Reload
+    const updated = await getBoardDetails(activeBoardId);
+    if (updated) {
+      const mappedBoard: Board = {
+        ...updated,
+        items: updated.generatedItems.map((gi: any) => ({
+          id: gi.id, type: gi.type, content: gi.content, carouselUrls: gi.carouselUrls, title: gi.title, description: gi.description, meta: gi.metadata, x: gi.x, y: gi.y
+        })),
+        assets: updated.assets as ProjectAsset[],
+        messages: updated.messages as ChatMessage[],
+        brandIdentity: updated.brandIdentity as BrandIdentity | null,
+        avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
+        createdAt: updated.createdAt ? new Date(updated.createdAt).getTime() : Date.now()
+      };
+      setActiveBoard(mappedBoard);
+    }
   };
 
   const handleSendMessage = async (text: string) => {
+    if (!activeBoard || !activeBoardId) return;
+
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text };
     updateActiveBoard(b => ({ ...b, messages: [...b.messages, userMsg] }));
+    await saveMessageAction(activeBoardId, 'user', text);
+
     setIsProcessing(true);
     setProcessingStatus("Reasoning with Context...");
 
@@ -156,24 +238,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           if (fc.name === 'generate_image') {
             setProcessingStatus(`Rendering High-Fi Image...`);
             const imgData = await generateMarketingImage(fc.args['prompt'] as string, fc.args['aspectRatio'] as AspectRatio || AspectRatio.SQUARE);
-            newItems.push({ id: Math.random().toString(), type: 'image', content: imgData, title: "Custom Asset" });
+            const item: CanvasItem = { id: Math.random().toString(), type: 'image', content: imgData, title: "Custom Asset", meta: { aspectRatio: fc.args['aspectRatio'] as string } };
+            newItems.push(item);
+            await saveGeneratedItemAction(activeBoardId, item);
             setUsage(p => ({ ...p, imagesGenerated: p.imagesGenerated + 1 }));
           }
           if (fc.name === 'generate_video') {
             setProcessingStatus(`Simulating Cinematic Video...`);
             const videoUrl = await generateVeoVideo(fc.args['prompt'] as string, { resolution: '720p', aspectRatio: (fc.args['aspectRatio'] as any) || '16:9' });
-            newItems.push({ id: Math.random().toString(), type: 'video', content: videoUrl, title: "Cinematic Clip" });
+            const item: CanvasItem = { id: Math.random().toString(), type: 'video', content: videoUrl, title: "Cinematic Clip" };
+            newItems.push(item);
+            await saveGeneratedItemAction(activeBoardId, item);
             setUsage(p => ({ ...p, videosGenerated: p.videosGenerated + 1 }));
           }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
         }
       }
-
-      updateActiveBoard(b => ({
-        ...b,
-        items: [...newItems, ...b.items],
-        messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: responseText || "Generation confirmed." }]
-      }));
 
       if (packQueue.length > 0) {
         for (const pack of packQueue) {
@@ -185,38 +265,48 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 const slide = await generateMarketingImage(p, item.aspectRatio || AspectRatio.SQUARE);
                 slides.push(slide);
               }
-              updateActiveBoard(b => ({ ...b, items: [{ id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } }, ...b.items] }));
+              const carouselItem: CanvasItem = { id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
+              newItems.push(carouselItem);
+              await saveGeneratedItemAction(activeBoardId, carouselItem);
               setUsage(p => ({ ...p, imagesGenerated: p.imagesGenerated + slides.length }));
             } else {
               const res = await (item.type === 'video' ? generateVeoVideo(item.visual_prompt, { resolution: '720p', aspectRatio: item.aspectRatio }) : generateMarketingImage(item.visual_prompt, item.aspectRatio));
-              updateActiveBoard(b => ({ ...b, items: [{ id: Math.random().toString(), type: item.type === 'video' ? 'video' : 'image', content: res, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } }, ...b.items] }));
+              const singleItem: CanvasItem = { id: Math.random().toString(), type: item.type === 'video' ? 'video' : 'image', content: res, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
+              newItems.push(singleItem);
+              await saveGeneratedItemAction(activeBoardId, singleItem);
               if (item.type === 'video') setUsage(p => ({ ...p, videosGenerated: p.videosGenerated + 1 }));
               else setUsage(p => ({ ...p, imagesGenerated: p.imagesGenerated + 1 }));
             }
           }
         }
       }
+
+      const modelMsgText = responseText || "Generation confirmed.";
+      await saveMessageAction(activeBoardId, 'model', modelMsgText);
+
+      updateActiveBoard(b => ({
+        ...b,
+        items: [...newItems, ...b.items],
+        messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: modelMsgText }]
+      }));
+
     } catch (error: any) {
       console.error(error);
-      updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: "Strategic conflict detected. Please split your request into Research and Creation." }] }));
+      const errMsg = "Strategic conflict detected. Please split your request into Research and Creation.";
+      updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: errMsg }] }));
+      await saveMessageAction(activeBoardId, 'model', errMsg);
     } finally { setIsProcessing(false); setProcessingStatus(""); }
   };
 
-  const handleCreateBoard = (name: string) => {
-    const newBoard: Board = {
-      id: Date.now().toString(),
-      name,
-      assets: [],
-      items: [],
-      messages: [{ id: '1', role: 'model', text: `Campaign "${name}" initialized. How can I help you dominate your market today?` }],
-      brandIdentity: null,
-      avatarIdentity: null,
-      createdAt: Date.now()
-    };
-    setBoards(prev => [...prev, newBoard]);
+  const handleCreateBoard = async (name: string) => {
+    const newBoard = await createBoard(name);
+    // Refresh boards list
+    getBoards().then(bs => setBoards(bs as any));
     setActiveBoardId(newBoard.id);
     setShowNewBoardModal(false);
   };
+
+  if (!activeBoard) return <div className="flex h-screen items-center justify-center font-display text-xl animate-pulse">Loading Workspace...</div>;
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full font-sans text-neo-black relative overflow-hidden bg-gray-50">
