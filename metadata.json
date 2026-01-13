@@ -1,0 +1,7 @@
+{
+  "name": "Predi AI",
+  "description": "An AI-native marketing automation platform featuring Liquid Glassmorphic Neo-Brutalism design. Generates viral campaigns, images, and videos using Gemini 3, Nano Banana Pro, and Veo 3.1.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

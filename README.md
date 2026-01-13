@@ -1,0 +1,96 @@
+# Predi AI: The Autonomous Marketing OS 🚀
+
+![Predi AI Banner](https://via.placeholder.com/1200x400/1A1A1A/FF90E8?text=PREDI+AI+:+THE+MARKETING+OS)
+
+**Predi AI** is an AI-native marketing operating system designed to automate the lifecycle of high-fidelity social media campaigns. It fuses **Liquid Glassmorphic Neo-Brutalism** aesthetics with Google's most advanced multimodal models (`Gemini 3 Pro`, `Nano Banana Pro`, and `Veo 3.1`) to act as an autonomous CMO (Chief Marketing Officer).
+
+---
+
+## 🏛️ System Architecture: The Core Engine
+
+Predi AI is built on a "Context-First" architecture. Unlike generic chat interfaces, Predi grounds every creative decision in a multi-layered brand memory.
+
+### 1. 🧠 Multimodal Context Engine
+*   **Vision-Based Branding**: Upload a logo, and the `Gemini 3 Pro` vision model performs an atomic analysis. It extracts hex codes, suggests font pairings, and defines a "Brand Vibe" that constraints all future generations.
+*   **Avatar Calibration**: The **Selfie-to-Spokesperson** pipeline allows users to capture a photo or upload a character. Predi generates a persistent "Visual Anchor" description to ensure character consistency across Images and Veo Videos.
+*   **Deep Context Digestion**: Feed the agent PDF pitch decks, market research, or raw text. It utilizes a large context window to ground its strategic advice in your specific business logic.
+
+### 2. 🤖 Strategic Reasoning Agent
+*   **Thinking Budgeting**: Uses `thinkingConfig: { thinkingBudget: 2048 }` to perform high-order reasoning before outputting a single word of copy.
+*   **Dynamic Tool Routing**: The agent autonomously switches between:
+    *   **Market Research Mode**: Utilizing `googleSearch` to identify viral trends and competitor hooks.
+    *   **Creative Factory Mode**: Utilizing `functionDeclarations` to trigger image, video, and carousel generation.
+
+### 3. 🎨 Creative Studio (The Canvas)
+*   **Nano Banana Pro (4K)**: Generates ultra-high-fidelity product photography and lifestyle imagery at $0.15/image.
+*   **Veo 3.1 Fast**: Produces 5-7 second cinematic marketing clips at $0.15/second, optimized for TikTok/Reels pacing.
+*   **Dynamic Carousels**: A complex generator that produces multi-slide visual narratives with consistent hooks across slides.
+
+---
+
+## 💎 Design Philosophy: Liquid Neo-Brutalism
+Predi AI rejects the "bland corporate SaaS" look in favor of a high-contrast, high-energy interface:
+*   **Neo-Brutalist Foundations**: Hard black borders (`border-4`), heavy shadows (`shadow-neo`), and a vibrant palette (Pink, Lime, Cyan, Yellow).
+*   **Liquid Glassmorphism**: Translucent, blurred overlays for the chat interface and modals to maintain depth in a flat design world.
+*   **Micro-Animations**: Framer-motion inspired "pop-in" effects and wiggle animations to provide tactile feedback for every AI action.
+
+---
+
+## 🧮 Unit Economics: The ROI Math
+Predi AI provides a "Unit Economics" widget to visualize value generation in real-time.
+
+| Metric | API Cost (Predi) | Agency Equivalent |
+| :--- | :--- | :--- |
+| **Campaign Pack (6 Assets)** | ~$1.70 | ~$500.00+ |
+| **Generation Speed** | ~120 Seconds | 3-5 Business Days |
+| **Total ROI** | **29,411% Savings** | **Standard Market Rate** |
+
+---
+
+## 🚀 The Agentic Swarm Roadmap (20+ Ideas for Expansion)
+
+We are evolving toward a fully autonomous **Swarm Architecture** where sub-agents handle specialized marketing tasks.
+
+### A. Specialized Sub-Agents (The Swarm)
+1.  **The Trend-Hunter Sub-Agent**: A background task that constantly polls Google Search for rising keywords and triggers "Trend Hijack" notifications.
+2.  **The SEO Architect**: Specialized in metadata, alt-text, and keyword density for Google/TikTok search ranking.
+3.  **The Compliance Officer**: Reviews assets against global advertising laws (GDPR, FTC) before they reach the user.
+4.  **The Platform Mimic**: Fine-tuned agents (e.g., "TikTok Gen-Z Agent") that adjust slang and pacing to match platform-specific sub-cultures.
+
+### B. Advanced Tools & Integrations
+5.  **Direct-to-Social API Connectors**: One-click posting to Meta, TikTok, and LinkedIn via function calling.
+6.  **Real-Time Analytics Grounding**: Integration with Google Analytics to adjust creative strategy based on past performance.
+7.  **Dynamic Product Feed (DPF)**: Browsing user Shopify/WooCommerce stores to pull real-time pricing/stock into ads.
+8.  **Competitor Shadowing Tool**: Scraping competitor landing pages via Search Grounding to generate "counter-campaigns."
+
+### C. Multimodal & Creative Expansion
+9.  **Voice Cloning & TTS**: Using `gemini-2.5-flash-preview-tts` for brand-specific voiceovers in Veo videos.
+10. **A/B Batch Generation**: Scientific performance testing with 5 variations of a single ad concept.
+11. **Localized Global Campaigns**: Automatic visual in-painting to swap background elements to match regional demographics.
+12. **Vector Brand Kits**: Outputting SVG/Vector versions of brand assets generated by the AI.
+
+### D. Context & Memory Enhancements
+13. **Long-Term Brand Memory (Vector DB)**: Persistent storage for every interaction, ensuring consistency over months of campaigns.
+14. **Audience Persona Vault**: Storage for target personas that the agent can "interview" to simulate reactions.
+15. **Contextual Calendar Awareness**: Automatic integration with Google Calendar for holiday and industry event triggers.
+
+### E. Advanced UI/UX & Developer Experience
+16. **Live Collaboration Mode**: Multiple team members interacting with the same Agentic Swarm on one Board.
+17. **Agent Logic Tracing**: A "Debug Mode" UI visualizing the Gemini `thinkingProcess` chain of thought.
+18. **Liquid Template Editor**: A visual editor to tweak layers of generated assets while AI maintains layout logic.
+19. **Programmatic Campaign Triggers**: "When Bitcoin hits $100k, generate and post a celebration Reel."
+20. **Self-Correcting Prompt Loops**: Automated loop where the Agent critiques its own image generation and re-prompts for corrections.
+21. **Multimodal Feedback Loops**: Users can draw on a generated image to show the agent exactly where to "add a button" or "change a color."
+
+---
+
+## 🛠️ Technical Setup
+
+Predi AI is a modern React/TypeScript application.
+*   **Environment**: Requires `process.env.API_KEY` with Gemini 3 Pro and Veo access.
+*   **Deployment**: Optimized for low-latency Vercel or Google Cloud Run deployments.
+
+---
+
+## 📄 License
+MIT License. Built with ❤️ for the Google Gemini Developer Competition.

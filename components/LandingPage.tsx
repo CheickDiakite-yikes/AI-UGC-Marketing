@@ -1,0 +1,394 @@
+import React, { useEffect, useRef, useState, ReactNode } from 'react';
+
+interface Props {
+  onEnterApp: () => void;
+  onNavigatePrivacy: () => void;
+  onNavigateTerms: () => void;
+}
+
+// --- Animation Hook ---
+function useOnScreen(ref: React.RefObject<HTMLElement>, rootMargin = "0px") {
+  const [isIntersecting, setIntersecting] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+           setIntersecting(true);
+           observer.disconnect(); 
+        }
+      },
+      { rootMargin }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [ref, rootMargin]);
+  return isIntersecting;
+}
+
+// --- Reveal Component ---
+const Reveal = ({ children, delay = 0, className = "" }: { children?: ReactNode, delay?: number, className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const isVisible = useOnScreen(ref, "-50px");
+
+  return (
+    <div 
+      ref={ref}
+      className={`transition-all duration-1000 ease-out ${className} ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+};
+
+const LandingPage: React.FC<Props> = ({ onEnterApp, onNavigatePrivacy, onNavigateTerms }) => {
+  return (
+    <div className="w-full h-screen overflow-y-auto overflow-x-hidden bg-white custom-scrollbar relative selection:bg-neo-pink selection:text-black font-sans text-neo-black">
+      
+      {/* Background Decor - Scaled down for mobile to avoid crowding */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-30">
+        <div className="absolute -top-20 -left-20 w-64 h-64 md:w-96 md:h-96 bg-neo-pink rounded-full blur-3xl animate-float"></div>
+        <div className="absolute top-1/3 -right-20 w-72 h-72 md:w-[500px] md:h-[500px] bg-neo-cyan rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-0 left-1/3 w-64 h-64 md:w-80 md:h-80 bg-neo-yellow rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }}></div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="relative z-50 flex items-center justify-between p-4 md:p-6 md:px-12 max-w-7xl mx-auto">
+        <div className="flex items-center gap-2 group cursor-pointer" onClick={onEnterApp}>
+           <div className="w-10 h-10 md:w-12 md:h-12 bg-neo-black text-neo-yellow flex items-center justify-center font-display font-bold text-xl md:text-2xl border-2 border-transparent shadow-neo group-hover:rotate-12 transition-transform duration-300">
+             P
+           </div>
+           <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight text-neo-black">Predi AI</h1>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={onEnterApp} className="hidden md:block font-bold hover:underline decoration-neo-pink underline-offset-4 decoration-2 text-neo-black">Log In</button>
+          <button 
+            onClick={onEnterApp}
+            className="bg-neo-black text-white px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-bold border-2 border-transparent shadow-neo hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:bg-neo-pink hover:text-black"
+          >
+            Launch App
+          </button>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-4 md:px-12 max-w-7xl mx-auto flex flex-col items-center text-center">
+        
+        <Reveal delay={100}>
+          <div className="inline-block bg-neo-lime border-2 border-black px-4 py-1.5 md:px-6 md:py-2 font-bold text-xs md:text-sm uppercase tracking-widest mb-6 md:mb-8 shadow-neo hover:rotate-2 transition-transform cursor-default">
+             ⚡ v2.0 Now with Gemini 3 Pro
+          </div>
+        </Reveal>
+
+        <Reveal delay={200}>
+          {/* Typography updated for better mobile fit (text-4xl on minimal screens) */}
+          <h1 className="font-display font-black text-4xl sm:text-6xl md:text-8xl lg:text-9xl leading-[0.9] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm break-words max-w-full">
+            MARKETING <br/>
+            {/* High Contrast Gradient Text with Stroke Effect Simulation via Shadow */}
+            <span className="relative inline-block mt-1 md:mt-2">
+               <span className="absolute inset-0 translate-x-[3px] translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none" aria-hidden="true">ON AUTOPILOT.</span>
+               <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
+            </span>
+          </h1>
+        </Reveal>
+
+        <Reveal delay={400}>
+          <p className="font-sans text-lg md:text-2xl max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed text-gray-900 font-medium px-2">
+            The AI-native OS that turns your brand assets and decks into high-converting UGC, viral Reels, and performance ads for TikTok, Instagram, and beyond in seconds.
+          </p>
+        </Reveal>
+
+        <Reveal delay={600}>
+          <div className="flex flex-col md:flex-row gap-6 items-center w-full justify-center">
+             <button 
+               onClick={onEnterApp}
+               className="bg-neo-pink text-black border-4 border-black px-8 py-4 md:px-10 md:py-5 text-lg md:text-xl font-bold shadow-neo-lg hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] hover:bg-neo-cyan transition-all w-full md:w-auto transform hover:-rotate-1"
+             >
+               Start Creating for Free
+             </button>
+             <div className="flex flex-col items-center md:items-start">
+                <div className="flex -space-x-2 mb-1">
+                   {/* CSS-Only Avatars to prevent load lag */}
+                   {[
+                     { bg: 'bg-neo-pink', text: 'JD' },
+                     { bg: 'bg-neo-cyan', text: 'AS' },
+                     { bg: 'bg-neo-lime', text: 'MK' },
+                     { bg: 'bg-neo-yellow', text: 'ER' }
+                   ].map((user, i) => (
+                     <div 
+                       key={i} 
+                       className={`w-8 h-8 rounded-full border-2 border-white ${user.bg} flex items-center justify-center text-[10px] font-bold`}
+                     >
+                       {user.text}
+                     </div>
+                   ))}
+                </div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-600">Join 10,000+ Marketers</p>
+             </div>
+          </div>
+        </Reveal>
+
+        {/* Hero Visual */}
+        <Reveal delay={800} className="w-full flex justify-center px-0 md:px-4">
+          <div className="mt-12 md:mt-20 w-full max-w-6xl bg-neo-black p-1 md:p-2 rounded-xl transform rotate-1 hover:rotate-0 transition-transform duration-700 ease-out shadow-2xl">
+             <div className="bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-800 relative group aspect-video flex flex-col">
+                {/* Mock UI Header */}
+                <div className="w-full h-6 md:h-8 bg-gray-200 border-b-2 border-gray-300 flex items-center px-3 gap-2 z-10 shrink-0">
+                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-red-400 border border-black/20"></div>
+                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-yellow-400 border border-black/20"></div>
+                   <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-400 border border-black/20"></div>
+                </div>
+                
+                {/* CSS Mockup Dashboard - Loads Instantly */}
+                <div className="flex-1 flex overflow-hidden bg-white">
+                    {/* Mock Sidebar */}
+                    <div className="hidden sm:flex w-1/4 border-r border-gray-200 bg-gray-50 p-3 flex-col gap-3">
+                       <div className="h-4 w-1/2 bg-gray-300 rounded mb-2"></div>
+                       <div className="h-8 w-full bg-neo-pink/20 border border-neo-pink rounded-md"></div>
+                       <div className="h-8 w-full bg-white border border-gray-200 rounded-md"></div>
+                       <div className="h-8 w-full bg-white border border-gray-200 rounded-md"></div>
+                    </div>
+                    {/* Mock Content */}
+                    <div className="flex-1 p-4 md:p-6 overflow-hidden relative">
+                       <div className="flex justify-between items-center mb-6">
+                          <div className="h-6 w-1/3 bg-gray-200 rounded"></div>
+                          <div className="h-8 w-24 bg-neo-black rounded"></div>
+                       </div>
+                       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="aspect-square bg-gray-100 border-2 border-gray-200 rounded-lg p-2 relative overflow-hidden group/card">
+                             <div className="absolute inset-0 bg-neo-yellow/20 flex items-center justify-center text-4xl">👟</div>
+                             <div className="absolute bottom-2 left-2 right-2 h-2 bg-gray-300 rounded"></div>
+                          </div>
+                          <div className="aspect-square bg-gray-100 border-2 border-gray-200 rounded-lg p-2 relative overflow-hidden">
+                             <div className="absolute inset-0 bg-neo-cyan/20 flex items-center justify-center text-4xl">🧴</div>
+                             <div className="absolute bottom-2 left-2 right-2 h-2 bg-gray-300 rounded"></div>
+                          </div>
+                          <div className="hidden lg:block aspect-square bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 relative">
+                             <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-4xl">+</div>
+                          </div>
+                       </div>
+                       
+                       {/* Floating Badge Mockup */}
+                       <div className="absolute bottom-6 right-6 bg-neo-lime border-2 border-black p-2 md:p-3 shadow-neo-sm transform -rotate-3 z-20 hidden md:block">
+                           <div className="text-[10px] md:text-xs font-bold text-black">VIDEO GENERATED ✅</div>
+                       </div>
+                    </div>
+                </div>
+
+                {/* Floating Elements - Re-implemented with CSS */}
+                <div className="absolute top-1/4 -right-5 bg-white border-4 border-black p-4 shadow-neo-lg transform rotate-6 animate-wiggle z-20 hidden lg:block">
+                   <div className="font-display font-bold text-2xl">VIRAL! 🚀</div>
+                </div>
+             </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* Marquee */}
+      <div className="bg-neo-black py-4 md:py-6 overflow-hidden border-y-4 border-black rotate-1 scale-105 mb-16 md:mb-24 relative z-20 shadow-neo-lg">
+         <div className="animate-marquee whitespace-nowrap flex gap-8 md:gap-12">
+            {[...Array(10)].map((_, i) => (
+               <div key={i} className="flex items-center gap-4">
+                  <span className="text-neo-yellow font-display font-black text-2xl md:text-4xl tracking-tighter">
+                    GENERATE CAMPAIGNS
+                  </span>
+                  <span className="text-neo-pink text-2xl md:text-4xl">★</span>
+                  <span className="text-white font-display font-black text-2xl md:text-4xl tracking-tighter stroke-black" style={{ WebkitTextStroke: '1px black' }}>
+                    DOMINATE SOCIAL
+                  </span>
+                  <span className="text-neo-cyan text-2xl md:text-4xl">★</span>
+               </div>
+            ))}
+         </div>
+      </div>
+
+      {/* Features Grid */}
+      <section className="relative z-10 py-16 md:py-20 px-6 md:px-12 max-w-7xl mx-auto">
+         <div className="text-center mb-12 md:mb-16">
+            <h2 className="font-display font-black text-3xl md:text-5xl mb-4 text-neo-black">POWERED BY GEMINI 3</h2>
+            <p className="text-lg md:text-xl font-medium text-gray-600">Multimodal intelligence meets brutalist design.</p>
+         </div>
+         
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Feature 1 */}
+            <Reveal delay={0}>
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col hover:shadow-neo-lg hover:-translate-y-2 transition-all duration-300 group">
+                <div className="w-16 h-16 bg-neo-cyan border-2 border-black flex items-center justify-center text-3xl mb-6 shadow-neo-sm group-hover:rotate-12 transition-transform">
+                  🧬
+                </div>
+                <h3 className="font-display font-bold text-2xl mb-3 text-neo-black">Brand DNA Extraction</h3>
+                <p className="text-gray-900 leading-relaxed font-medium">
+                  Upload your logo and let our vision models extract your hex codes, fonts, and brand "vibe" instantly. Every generated asset is legally compliant with your style guide.
+                </p>
+              </div>
+            </Reveal>
+
+            {/* Feature 2 */}
+            <Reveal delay={150}>
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col hover:shadow-neo-lg hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group">
+                <div className="absolute -right-12 top-4 bg-neo-pink text-black text-xs font-black px-12 py-1 border-2 border-black transform rotate-45 shadow-sm">
+                  NEW VEO 3.1
+                </div>
+                <div className="w-16 h-16 bg-neo-yellow border-2 border-black flex items-center justify-center text-3xl mb-6 shadow-neo-sm group-hover:-rotate-12 transition-transform">
+                  🎥
+                </div>
+                <h3 className="font-display font-bold text-2xl mb-3 text-neo-black">Cinematic Video</h3>
+                <p className="text-gray-900 leading-relaxed font-medium">
+                  Generate broadcast-ready video clips for TikTok and Reels. Describe the scene, camera angle, and lighting—we handle the physics.
+                </p>
+              </div>
+            </Reveal>
+
+            {/* Feature 3 */}
+            <Reveal delay={300}>
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col hover:shadow-neo-lg hover:-translate-y-2 transition-all duration-300 group">
+                <div className="w-16 h-16 bg-neo-pink border-2 border-black flex items-center justify-center text-3xl mb-6 shadow-neo-sm group-hover:scale-110 transition-transform">
+                  🧠
+                </div>
+                <h3 className="font-display font-bold text-2xl mb-3 text-neo-black">Strategic Reasoning</h3>
+                <p className="text-gray-900 leading-relaxed font-medium">
+                  This isn't just a chatbot. It's a CMO. Our agent digests your pitch decks and PDFs to create highly contextual marketing strategies that actually convert.
+                </p>
+              </div>
+            </Reveal>
+         </div>
+      </section>
+
+      {/* Value Prop / ROI */}
+      <section className="py-16 md:py-24 bg-neo-lime border-y-4 border-black relative overflow-hidden">
+         {/* Background Pattern */}
+         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+         
+         <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row gap-12 md:gap-16 items-center relative z-10">
+            <div className="md:w-1/2">
+               <Reveal>
+                 <div className="bg-black text-white inline-block px-4 py-1 font-bold mb-4 transform -rotate-2 text-sm">
+                    ROI CALCULATOR
+                 </div>
+                 <h2 className="font-display font-black text-4xl md:text-7xl mb-6 md:mb-8 leading-tight text-neo-black">
+                   STOP BURNING <br/> CASH.
+                 </h2>
+                 <p className="font-sans text-lg md:text-xl font-bold mb-8 md:mb-10 text-gray-900">
+                   Predi AI acts as your dedicated design, copy, and strategy team, available 24/7 for a fraction of the cost.
+                 </p>
+                 <ul className="space-y-4 font-bold text-base md:text-lg text-neo-black">
+                    <li className="flex items-center gap-4 bg-white/50 p-2 rounded-lg border-2 border-transparent hover:border-black transition-colors">
+                      <span className="bg-black text-white p-1 rounded-sm">✅</span> Unlimited Ideation & Revisions
+                    </li>
+                    <li className="flex items-center gap-4 bg-white/50 p-2 rounded-lg border-2 border-transparent hover:border-black transition-colors">
+                      <span className="bg-black text-white p-1 rounded-sm">✅</span> 100% Commercial Usage Rights
+                    </li>
+                    <li className="flex items-center gap-4 bg-white/50 p-2 rounded-lg border-2 border-transparent hover:border-black transition-colors">
+                      <span className="bg-black text-white p-1 rounded-sm">✅</span> Enterprise-Grade Security
+                    </li>
+                 </ul>
+               </Reveal>
+            </div>
+            
+            <div className="md:w-1/2 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+               <Reveal delay={100} className="w-full">
+                 <div className="bg-white border-4 border-black p-6 shadow-neo text-center hover:scale-105 transition-transform cursor-crosshair">
+                    <div className="font-display font-black text-5xl md:text-6xl text-neo-pink mb-2 drop-shadow-sm">10x</div>
+                    <div className="font-black text-sm uppercase tracking-wider">Faster Production</div>
+                 </div>
+               </Reveal>
+               <Reveal delay={200} className="w-full">
+                 <div className="bg-white border-4 border-black p-6 shadow-neo text-center hover:scale-105 transition-transform cursor-crosshair">
+                    <div className="font-display font-black text-5xl md:text-6xl text-neo-cyan mb-2 drop-shadow-sm">90%</div>
+                    <div className="font-black text-sm uppercase tracking-wider">Cost Reduction</div>
+                 </div>
+               </Reveal>
+               <Reveal delay={300} className="col-span-1 sm:col-span-2 w-full">
+                 <div className="bg-white border-4 border-black p-8 shadow-neo text-center hover:scale-105 transition-transform cursor-crosshair flex flex-col items-center justify-center">
+                    <div className="font-display font-black text-5xl md:text-7xl text-neo-yellow mb-2 drop-shadow-sm" style={{ WebkitTextStroke: '2px black' }}>1M+</div>
+                    <div className="font-black text-sm uppercase tracking-wider">Tokens Context Window</div>
+                 </div>
+               </Reveal>
+            </div>
+         </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-16 md:py-24 px-6 md:px-12 max-w-4xl mx-auto">
+         <h2 className="font-display font-black text-3xl md:text-5xl text-center mb-12 md:mb-16 text-neo-black">FREQUENTLY ASKED</h2>
+         <div className="space-y-4 md:space-y-6">
+            <Reveal delay={0}>
+              <details className="group bg-white border-4 border-black shadow-neo open:shadow-neo-lg transition-all">
+                 <summary className="flex justify-between items-center font-bold text-lg md:text-xl p-4 md:p-6 cursor-pointer list-none hover:bg-gray-50">
+                    <span>Is the content unique?</span>
+                    <span className="transition-transform duration-300 group-open:rotate-180 bg-neo-black text-white rounded-full w-8 h-8 flex items-center justify-center">
+                      ↓
+                    </span>
+                 </summary>
+                 <p className="text-gray-900 px-4 md:px-6 pb-6 md:pb-8 pt-2 text-base md:text-lg leading-relaxed border-t-2 border-black/10">
+                    Yes. Predi AI generates every image, video, and caption from scratch using Generative AI. We do not use templates.
+                 </p>
+              </details>
+            </Reveal>
+            
+            <Reveal delay={100}>
+              <details className="group bg-white border-4 border-black shadow-neo open:shadow-neo-lg transition-all">
+                 <summary className="flex justify-between items-center font-bold text-lg md:text-xl p-4 md:p-6 cursor-pointer list-none hover:bg-gray-50">
+                    <span>What file types can I upload?</span>
+                    <span className="transition-transform duration-300 group-open:rotate-180 bg-neo-black text-white rounded-full w-8 h-8 flex items-center justify-center">
+                      ↓
+                    </span>
+                 </summary>
+                 <p className="text-gray-900 px-4 md:px-6 pb-6 md:pb-8 pt-2 text-base md:text-lg leading-relaxed border-t-2 border-black/10">
+                    You can upload PNG, JPEG, and WEBP for images/logos. For context documents, we accept PDF and plain text files.
+                 </p>
+              </details>
+            </Reveal>
+
+            <Reveal delay={200}>
+              <details className="group bg-white border-4 border-black shadow-neo open:shadow-neo-lg transition-all">
+                 <summary className="flex justify-between items-center font-bold text-lg md:text-xl p-4 md:p-6 cursor-pointer list-none hover:bg-gray-50">
+                    <span>Do I own the intellectual property?</span>
+                    <span className="transition-transform duration-300 group-open:rotate-180 bg-neo-black text-white rounded-full w-8 h-8 flex items-center justify-center">
+                      ↓
+                    </span>
+                 </summary>
+                 <p className="text-gray-900 px-4 md:px-6 pb-6 md:pb-8 pt-2 text-base md:text-lg leading-relaxed border-t-2 border-black/10">
+                    Absolutely. You retain full ownership and intellectual property rights over the content you generate.
+                 </p>
+              </details>
+            </Reveal>
+         </div>
+      </section>
+
+      {/* CTA Footer */}
+      <section className="py-16 md:py-24 px-6 text-center bg-black text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-neo-pink opacity-20 blur-3xl animate-pulse"></div>
+        <div className="relative z-10 max-w-4xl mx-auto">
+           <h2 className="font-display font-black text-4xl md:text-8xl mb-6 md:mb-8">READY TO LAUNCH?</h2>
+           <button 
+             onClick={onEnterApp}
+             className="bg-white text-black border-4 border-transparent px-8 py-4 md:px-12 md:py-6 text-xl md:text-2xl font-bold hover:scale-110 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]"
+           >
+             Start Your Free Trial
+           </button>
+        </div>
+      </section>
+
+      {/* Footer Links */}
+      <footer className="bg-black text-white py-12 border-t border-gray-800">
+         <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="text-center md:text-left">
+               <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
+                 <div className="w-6 h-6 bg-neo-yellow text-black flex items-center justify-center font-bold text-xs">P</div>
+                 <h3 className="font-display font-bold text-xl">Predi AI</h3>
+               </div>
+               <p className="text-gray-500 text-sm">© 2025 Predi Inc. All rights reserved.</p>
+            </div>
+            <div className="flex gap-8 text-sm font-bold text-gray-400">
+               <button onClick={onNavigatePrivacy} className="hover:text-neo-pink transition-colors text-left">Privacy</button>
+               <button onClick={onNavigateTerms} className="hover:text-neo-cyan transition-colors text-left">Terms</button>
+               <a href="#" className="hover:text-neo-yellow transition-colors">Twitter</a>
+            </div>
+         </div>
+      </footer>
+    </div>
+  );
+};
+
+export default LandingPage;
