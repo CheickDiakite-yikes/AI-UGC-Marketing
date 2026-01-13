@@ -93,9 +93,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
 
   return (
     <div className={`
-      fixed z-50 flex flex-col bg-white/30 backdrop-blur-xl border border-white/40 shadow-2xl transition-all duration-300
-      inset-0 
-      md:inset-auto md:bottom-6 md:right-6 md:w-96 md:h-[650px] md:rounded-2xl md:border-2 md:border-white/50
+      fixed z-30 flex flex-col bg-white/30 backdrop-blur-xl border border-white/40 shadow-2xl transition-all duration-300
+      inset-x-0 top-16 bottom-0
+      md:z-50 md:inset-auto md:top-auto md:bottom-6 md:right-6 md:w-96 md:h-[650px] md:rounded-2xl md:border-2 md:border-white/50
     `}>
       
       <div className="bg-white/60 border-b border-white/20 p-4 flex items-center justify-between backdrop-blur-md flex-shrink-0">
