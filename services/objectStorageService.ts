@@ -95,8 +95,24 @@ export async function uploadGeneratedItem(
   type: 'image' | 'video'
 ): Promise<UploadResult> {
   try {
+    if (!data || data.length < 100) {
+      console.error(`[UPLOAD BLOCKED] Empty or too-short data string (${data?.length || 0} chars)`);
+      return { success: false, error: 'No valid image data provided' };
+    }
+    
     const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    
+    if (!base64Data || base64Data.length < 100) {
+      console.error(`[UPLOAD BLOCKED] Base64 data too short after split (${base64Data?.length || 0} chars)`);
+      return { success: false, error: 'Invalid base64 data' };
+    }
+    
     const binaryData = Buffer.from(base64Data, 'base64');
+    
+    if (binaryData.length < 100) {
+      console.error(`[UPLOAD BLOCKED] Binary data too small: ${binaryData.length} bytes (minimum 100 required)`);
+      return { success: false, error: `Buffer too small: ${binaryData.length} bytes` };
+    }
     
     const validation = validateImageBuffer(binaryData, type);
     if (!validation.valid) {
@@ -132,8 +148,24 @@ export async function uploadCarouselSlide(
   data: string
 ): Promise<UploadResult> {
   try {
+    if (!data || data.length < 100) {
+      console.error(`[UPLOAD BLOCKED] Carousel slide ${slideIndex}: Empty or too-short data (${data?.length || 0} chars)`);
+      return { success: false, error: 'No valid image data provided' };
+    }
+    
     const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    
+    if (!base64Data || base64Data.length < 100) {
+      console.error(`[UPLOAD BLOCKED] Carousel slide ${slideIndex}: Base64 too short (${base64Data?.length || 0} chars)`);
+      return { success: false, error: 'Invalid base64 data' };
+    }
+    
     const binaryData = Buffer.from(base64Data, 'base64');
+    
+    if (binaryData.length < 100) {
+      console.error(`[UPLOAD BLOCKED] Carousel slide ${slideIndex}: Binary too small (${binaryData.length} bytes)`);
+      return { success: false, error: `Buffer too small: ${binaryData.length} bytes` };
+    }
     
     const validation = validateImageBuffer(binaryData, 'image');
     if (!validation.valid) {
