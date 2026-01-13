@@ -410,19 +410,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       )}
 
       {/* Mobile Header Bar */}
-      <div className="md:hidden flex items-center justify-between p-3 bg-neo-yellow border-b-4 border-black sticky top-0 z-40">
+      <div className="md:hidden flex items-center justify-between p-3 gap-2 bg-neo-yellow border-b-4 border-black sticky top-0 z-40 h-16">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none"
+          className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none flex-shrink-0"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h2 className="font-display font-black text-lg truncate max-w-[50%]">{activeBoard.name}</h2>
-        <div className="flex gap-2">
-          <button onClick={() => setShowBoardListModal(true)} className="p-2 bg-white border-2 border-black shadow-neo-sm text-xs font-bold">📋</button>
-          <button onClick={() => setShowNewBoardModal(true)} className="p-2 bg-neo-black text-white border-2 border-black shadow-neo-sm text-xs font-bold">+</button>
+        <h2 className="font-display font-black text-base truncate flex-1">{activeBoard.name}</h2>
+        <div className="flex gap-1 flex-shrink-0">
+          <button onClick={() => setShowBoardListModal(true)} className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">📋</button>
+          <button onClick={() => setShowNewBoardModal(true)} className="p-2 bg-neo-black text-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">+</button>
         </div>
       </div>
 
@@ -440,6 +440,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         w-[85%] max-w-[320px] md:w-1/5 md:max-w-none
         transform transition-transform duration-300 ease-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${!sidebarOpen && 'md:pointer-events-auto pointer-events-none'}
         h-full
       `}>
         <Sidebar
@@ -453,7 +454,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 pb-32">
+      <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 pb-32 md:pt-0">
         {/* Desktop Header - Hidden on mobile */}
         <header className="hidden md:flex justify-between items-center mb-12">
           <h2 className="text-5xl font-display font-black tracking-tight">{activeBoard.name}</h2>
