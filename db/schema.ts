@@ -49,7 +49,8 @@ export const generatedItems = pgTable('generated_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }),
   type: itemTypeEnum('type').notNull(),
-  content: text('content').notNull(), // Text or URL
+  content: text('content'), // Text or URL (nullable when using storage)
+  storageKey: text('storage_key'), // Object storage key for media files
   carouselUrls: jsonb('carousel_urls'), // Array of strings
   title: text('title').notNull(),
   description: text('description'),

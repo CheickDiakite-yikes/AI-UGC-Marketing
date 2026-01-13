@@ -7,7 +7,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity } from '@/types';
 import { getSession } from './authActions';
-import { uploadAsset } from '@/services/objectStorageService';
+import { uploadAsset, uploadGeneratedItem } from '@/services/objectStorageService';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -58,6 +58,18 @@ export async function getBoardDetails(boardId: string) {
                 };
             }
             return asset;
+        });
+    }
+    
+    if (board && board.generatedItems) {
+        board.generatedItems = board.generatedItems.map(item => {
+            if (item.storageKey && !item.content) {
+                return {
+                    ...item,
+                    content: `/api/storage/${encodeURIComponent(item.storageKey)}`
+                };
+            }
+            return item;
         });
     }
     
@@ -158,20 +170,37 @@ export async function saveMessageAction(boardId: string, role: 'user' | 'model' 
 }
 
 export async function saveGeneratedItemAction(boardId: string, item: any) {
-    // item matches CanvasItem structure but we need to map to DB
+    const itemId = crypto.randomUUID();
+    const isMediaType = ['image', 'video'].includes(item.type);
+    
+    let storageKey: string | null = null;
+    let dbContent: string | null = item.content;
+    
+    if (isMediaType && item.content) {
+        const isBase64 = item.content.includes('base64') || item.content.includes(',');
+        if (isBase64) {
+            const uploadResult = await uploadGeneratedItem(boardId, itemId, item.content, item.type);
+            if (uploadResult.success && uploadResult.storageKey) {
+                storageKey = uploadResult.storageKey;
+                dbContent = null;
+            }
+        }
+    }
+    
     const [saved] = await db.insert(generatedItems).values({
+        id: itemId,
         boardId,
         type: item.type,
-        content: item.content,
+        content: dbContent,
+        storageKey,
         carouselUrls: item.carouselUrls,
         title: item.title,
         description: item.description,
-        metadata: item.meta, // Assuming item.meta maps to metadata jsonb
+        metadata: item.meta,
         x: item.x || 0,
         y: item.y || 0
     }).returning();
 
-    // Increment Usage
     const session = await getSession();
     if (session && session.userId) {
         if (item.type === 'video') {
@@ -186,6 +215,13 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
     }
 
     revalidatePath('/');
+    
+    if (saved.storageKey && !saved.content) {
+        return {
+            ...saved,
+            content: `/api/storage/${encodeURIComponent(saved.storageKey)}`
+        };
+    }
     return saved;
 }
 
