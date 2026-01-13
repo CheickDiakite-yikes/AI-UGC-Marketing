@@ -24,7 +24,8 @@ import {
   saveGeneratedItemAction,
   renameBoard,
   deleteBoard,
-  getUserUsageAction
+  getUserUsageAction,
+  deleteAssetAction
 } from './app/actions/boardActions';
 
 
@@ -167,6 +168,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
     // Simulate digesting if needed, though DB status is 'ready' by default in schema
     // If we want digesting state, we'd update DB later. For now, keep it simple.
+  };
+
+  const handleDeleteAsset = async (assetId: string) => {
+    const result = await deleteAssetAction(assetId);
+    if (result.success) {
+      updateActiveBoard(b => ({
+        ...b,
+        assets: b.assets.filter(a => a.id !== assetId)
+      }));
+    }
   };
 
   const handleCameraFinish = async (images: { data: string, label: string }[]) => {
@@ -409,7 +420,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       `}>
         <Sidebar
           assets={activeBoard.assets} brandIdentity={activeBoard.brandIdentity} avatarIdentity={activeBoard.avatarIdentity}
-          onAddAsset={handleAddAsset} onEditBrand={() => setShowBrandModal(true)} onEditAvatar={() => setShowAvatarModal(true)}
+          onAddAsset={handleAddAsset} onDeleteAsset={handleDeleteAsset} onEditBrand={() => setShowBrandModal(true)} onEditAvatar={() => setShowAvatarModal(true)}
           onStartCapture={() => { setIsCameraActive(true); setSidebarOpen(false); }}
           onClose={() => setSidebarOpen(false)}
           onExitApp={onExitApp} usageStats={usage}

@@ -7,7 +7,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity } from '@/types';
 import { getSession } from './authActions';
-import { uploadAsset, uploadGeneratedItem } from '@/services/objectStorageService';
+import { uploadAsset, uploadGeneratedItem, deleteAsset as deleteFromStorage } from '@/services/objectStorageService';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -266,3 +266,20 @@ export async function deleteBoard(boardId: string) {
     return { success: true };
 }
 
+export async function deleteAssetAction(assetId: string) {
+    const asset = await db.query.assets.findFirst({
+        where: eq(assets.id, assetId)
+    });
+    
+    if (!asset) {
+        return { success: false, error: 'Asset not found' };
+    }
+    
+    if (asset.storageKey) {
+        await deleteFromStorage(asset.storageKey);
+    }
+    
+    await db.delete(assets).where(eq(assets.id, assetId));
+    revalidatePath('/');
+    return { success: true };
+}

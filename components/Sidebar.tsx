@@ -9,6 +9,7 @@ interface SidebarProps {
   brandIdentity: BrandIdentity | null;
   avatarIdentity: AvatarIdentity | null;
   onAddAsset: (asset: ProjectAsset) => void;
+  onDeleteAsset?: (assetId: string) => void;
   onEditBrand: () => void;
   onEditAvatar: () => void;
   onStartCapture: () => void;
@@ -22,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   brandIdentity,
   avatarIdentity,
   onAddAsset,
+  onDeleteAsset,
   onEditBrand,
   onEditAvatar,
   onStartCapture,
@@ -205,11 +207,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-2">
             {assets.map((asset) => (
               <div key={asset.id} className="bg-white border-2 border-black p-1.5 shadow-neo-sm flex items-center justify-between group active:scale-[0.98] transition-transform">
-                <div className="flex items-center gap-2 overflow-hidden w-full">
+                <div className="flex items-center gap-2 overflow-hidden flex-1">
                   <div className={`w-8 h-8 flex-shrink-0 border-2 border-black flex items-center justify-center font-bold text-[9px] ${asset.type === 'logo' ? 'bg-neo-pink' : (asset.type === 'avatar' ? 'bg-neo-cyan' : 'bg-neo-lime')}`}>
                     {asset.type === 'logo' ? 'LOGO' : (asset.type === 'avatar' ? 'AVTR' : (asset.type === 'image' ? 'IMG' : 'DOC'))}
                   </div>
-                  <div className="flex flex-col overflow-hidden w-full pr-1">
+                  <div className="flex flex-col overflow-hidden flex-1 pr-1">
                     <span className="truncate text-xs font-bold">{asset.name}</span>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[9px] uppercase text-gray-500 font-bold">{asset.type}</span>
@@ -221,6 +223,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                   </div>
                 </div>
+                {onDeleteAsset && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Remove "${asset.name}" from your context?`)) {
+                        onDeleteAsset(asset.id);
+                      }
+                    }}
+                    className="ml-1 p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-all"
+                    title="Remove file"
+                  >
+                    <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
               </div>
             ))}
           </div>
