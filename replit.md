@@ -110,7 +110,31 @@ Media files (logos, images, avatars) are stored in Replit Object Storage instead
 - `services/objectStorageService.ts` - Upload/download/delete helpers
 - `app/api/storage/[key]/route.ts` - API route to serve stored files
 
+## SEO & Social Sharing
+
+### Open Graph & Twitter Cards
+- OG image: `/public/og-image.png` (1200x630)
+- Twitter card: `summary_large_image`
+- Full meta tags in `app/layout.tsx`
+
+### Search Engine Optimization
+- Dynamic robots.txt: `app/robots.ts`
+- Dynamic sitemap: `app/sitemap.ts`
+- JSON-LD structured data (SoftwareApplication, Organization, FAQPage)
+- AI search bot optimization (GPTBot, Claude-Web, PerplexityBot, etc.)
+
+### Files
+- `public/og-image.png` - Social share image
+- `public/icon.svg` - Vector favicon
+- `public/logo.png` - Logo image
+- `public/manifest.json` - PWA manifest
+
+### Environment Variables for SEO
+- `NEXT_PUBLIC_SITE_URL` - Production URL for canonical links (defaults to https://predi.ai)
+
 ## Recent Changes
+- Added comprehensive SEO, Open Graph, Twitter Cards, and AI search optimization (January 2026)
+- Fixed image persistence - now storing base64 directly in database (January 2026)
 - Added Replit Object Storage for media files (January 2026)
 - Added rename and delete campaign functionality (January 2026)
 - Added email/password authentication with signup and login modals (January 2026)
