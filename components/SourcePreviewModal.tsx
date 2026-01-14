@@ -74,11 +74,11 @@ const SourcePreviewModal: React.FC<SourcePreviewModalProps> = ({ asset, onClose 
           <div className="flex gap-4 text-xs font-bold">
             <div className="flex items-center gap-2">
               <span className="text-gray-500">Characters:</span>
-              <span className={charCount > 0 ? 'text-green-600' : 'text-red-600'}>{charCount.toLocaleString()}</span>
+              <span className={charCount > 0 ? 'text-green-600' : 'text-red-600'}>{charCount.toLocaleString('en-US')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-gray-500">Words:</span>
-              <span className={wordCount > 0 ? 'text-green-600' : 'text-red-600'}>{wordCount.toLocaleString()}</span>
+              <span className={wordCount > 0 ? 'text-green-600' : 'text-red-600'}>{wordCount.toLocaleString('en-US')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-gray-500">Status:</span>
@@ -105,7 +105,7 @@ const SourcePreviewModal: React.FC<SourcePreviewModalProps> = ({ asset, onClose 
               {previewContent.slice(0, 3000)}
               {previewContent.length > 3000 && (
                 <span className="text-gray-500 italic">
-                  {'\n\n'}... [{(previewContent.length - 3000).toLocaleString()} more characters]
+                  {'\n\n'}... [{(previewContent.length - 3000).toLocaleString('en-US')} more characters]
                 </span>
               )}
             </div>

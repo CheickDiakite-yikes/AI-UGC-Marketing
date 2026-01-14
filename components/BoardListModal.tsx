@@ -145,7 +145,7 @@ const BoardListModal: React.FC<Props> = ({ boards, activeBoardId, onSwitch, onCl
                     <div className="text-xs font-medium space-y-1 opacity-80">
                       <p>{(board as any).assetCount ?? board.assets?.length ?? 0} Assets Uploaded</p>
                       <p>{(board as any).generatedItemCount ?? board.items?.length ?? 0} Canvas Items</p>
-                      <p className="text-[10px] uppercase mt-2 pt-2 border-t border-black/10">Created: {new Date(board.createdAt).toLocaleDateString()}</p>
+                      <p className="text-[10px] uppercase mt-2 pt-2 border-t border-black/10">Created: {new Date(board.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
                     </div>
                   </div>
                   

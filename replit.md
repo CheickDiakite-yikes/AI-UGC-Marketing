@@ -199,18 +199,19 @@ AI generation tasks (images, videos, campaign packs) run in the background, allo
 
 ## Deployment
 
-The app uses Reserved VM deployment to support background job processing.
+The app uses Autoscale deployment for cost efficiency.
 
 ### Production Setup
-- Deployment type: Reserved VM (always-on)
+- Deployment type: Autoscale (pay per request)
 - Build: `npm run build`
-- Run: `bash -c "npx tsx server/jobRunner.ts & npm run start -- -p 5000 -H 0.0.0.0"`
+- Run: `npm run start -- -p 5000 -H 0.0.0.0`
 
-This runs both the Next.js server and the Job Runner in production. Reserved VM is required because background jobs need persistent execution that Autoscale deployments don't support.
+Note: With Autoscale, background job processing may be interrupted. The app now includes toast notifications and retry functionality to handle failed generations gracefully.
 
 ## Recent Changes
-- Changed to Reserved VM deployment for production job processing (January 2026)
-- Fixed hydration mismatch in Workspace component (January 2026)
+- Added toast notification system for better error/success feedback (January 2026)
+- Added retry functionality for failed generations (January 2026)
+- Switched back to Autoscale deployment for cost efficiency (January 2026)
 - Added mobile viewport configuration to prevent zoom (January 2026)
 - Added background job processing for resilient AI generation (January 2026)
 - Migrated generated items to Object Storage for better performance and scalability (January 2026)

@@ -395,14 +395,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex justify-between items-center text-[10px] border-t border-white/20 pt-2">
             <div>
               <span className="text-gray-400">Value: </span>
-              <span className="text-neo-lime font-bold">${totalValue.toLocaleString()}</span>
+              <span className="text-neo-lime font-bold">${totalValue.toLocaleString('en-US')}</span>
             </div>
             <div>
               <span className="text-gray-400">Cost: </span>
               <span className="font-bold">${totalCost.toFixed(2)}</span>
             </div>
             <div className="bg-neo-lime text-black px-2 py-0.5 font-black text-[9px] uppercase">
-              +${savings.toLocaleString()}
+              +${savings.toLocaleString('en-US')}
             </div>
           </div>
         </div>
