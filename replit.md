@@ -197,7 +197,21 @@ AI generation tasks (images, videos, campaign packs) run in the background, allo
 - `server/jobRunner.ts` - Background worker
 - `app/api/jobs/route.ts` - Job API endpoints
 
+## Deployment
+
+The app uses Reserved VM deployment to support background job processing.
+
+### Production Setup
+- Deployment type: Reserved VM (always-on)
+- Build: `npm run build`
+- Run: `bash -c "npx tsx server/jobRunner.ts & npm run start -- -p 5000 -H 0.0.0.0"`
+
+This runs both the Next.js server and the Job Runner in production. Reserved VM is required because background jobs need persistent execution that Autoscale deployments don't support.
+
 ## Recent Changes
+- Changed to Reserved VM deployment for production job processing (January 2026)
+- Fixed hydration mismatch in Workspace component (January 2026)
+- Added mobile viewport configuration to prevent zoom (January 2026)
 - Added background job processing for resilient AI generation (January 2026)
 - Migrated generated items to Object Storage for better performance and scalability (January 2026)
 - Fixed video generation with Veo 3.1 - UGC Viral Packs now include actual videos (January 2026)
