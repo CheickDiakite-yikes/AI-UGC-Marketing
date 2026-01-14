@@ -99,12 +99,20 @@ The app uses email/password authentication with JWT sessions stored in cookies.
 
 ## Object Storage
 
-Media files (logos, images, avatars) are stored in Replit Object Storage instead of base64 in the database for better performance and scalability.
+All media files (images, videos, carousels) are stored in Replit Object Storage for better performance and scalability.
 
 ### How It Works
-- When uploading media assets, files are stored in object storage with a key like `boards/{boardId}/assets/{assetId}.{ext}`
-- The `assets` table stores a `storage_key` column referencing the object storage location
+- **Generated Items**: When AI generates images/videos, they're uploaded to object storage with keys like `boards/{boardId}/generated/{itemId}.{ext}`
+- **Carousel Slides**: Each slide stored separately as `boards/{boardId}/generated/{itemId}_slide{N}.{ext}`
+- **User Assets**: Logos and uploaded files stored as `boards/{boardId}/assets/{assetId}.{ext}`
+- The database stores only `storage_key` references, not base64 data
 - Assets are served via the `/api/storage/[key]` API route
+
+### Benefits
+- ~33% smaller storage (no base64 inflation)
+- Faster database queries
+- Video streaming support
+- Better scalability for large apps
 
 ### Files
 - `services/objectStorageService.ts` - Upload/download/delete helpers
@@ -167,6 +175,7 @@ The AI agent has access to real-time web search for:
 - "UGC Viral Pack" requests will include 2-3 videos alongside images
 
 ## Recent Changes
+- Migrated generated items to Object Storage for better performance and scalability (January 2026)
 - Fixed video generation with Veo 3.1 - UGC Viral Packs now include actual videos (January 2026)
 - Upgraded website scraping to use Gemini URL Context tool for better data extraction (January 2026)
 - Added Google Search grounding for trend discovery and web research (January 2026)

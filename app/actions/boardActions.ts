@@ -242,14 +242,55 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
     
     const itemId = crypto.randomUUID();
     
-    // IMPORTANT: Store base64 directly in database - object storage has issues
-    // Keep the original content as-is (base64 or URL)
-    let dbContent: string | null = item.content;
+    let storageKey: string | null = null;
+    let dbContent: string | null = null;
     let processedCarouselUrls: string[] | null = null;
     
-    // For carousels, keep the base64 URLs directly
-    if (item.type === 'carousel' && item.carouselUrls && Array.isArray(item.carouselUrls)) {
-        processedCarouselUrls = item.carouselUrls;
+    // Upload media to object storage for better performance and scalability
+    if (item.type === 'image' || item.type === 'video') {
+        if (item.content && item.content.startsWith('data:')) {
+            console.log(`[STORAGE] Uploading ${item.type} to object storage...`);
+            const uploadResult = await uploadGeneratedItem(boardId, itemId, item.content, item.type);
+            if (uploadResult.success && uploadResult.storageKey) {
+                storageKey = uploadResult.storageKey;
+                console.log(`[STORAGE] Uploaded ${item.type}: ${storageKey}`);
+            } else {
+                console.error(`[STORAGE] Upload failed, falling back to database:`, uploadResult.error);
+                dbContent = item.content; // Fallback to database storage
+            }
+        } else {
+            dbContent = item.content; // Non-base64 content goes to database
+        }
+    } else if (item.type === 'carousel' && item.carouselUrls && Array.isArray(item.carouselUrls)) {
+        // Upload each carousel slide to object storage
+        const uploadedSlideKeys: string[] = [];
+        for (let i = 0; i < item.carouselUrls.length; i++) {
+            const slideData = item.carouselUrls[i];
+            if (slideData && slideData.startsWith('data:')) {
+                const slideResult = await uploadCarouselSlide(boardId, itemId, i, slideData);
+                if (slideResult.success && slideResult.storageKey) {
+                    uploadedSlideKeys.push(slideResult.storageKey);
+                } else {
+                    console.error(`[STORAGE] Carousel slide ${i} upload failed:`, slideResult.error);
+                    uploadedSlideKeys.push(slideData); // Fallback to base64
+                }
+            } else {
+                uploadedSlideKeys.push(slideData);
+            }
+        }
+        processedCarouselUrls = uploadedSlideKeys;
+        
+        // Upload cover image (first slide) as the main content
+        if (item.content && item.content.startsWith('data:')) {
+            const coverResult = await uploadGeneratedItem(boardId, itemId, item.content, 'image');
+            if (coverResult.success && coverResult.storageKey) {
+                storageKey = coverResult.storageKey;
+            } else {
+                dbContent = item.content;
+            }
+        }
+    } else {
+        dbContent = item.content;
     }
     
     const [saved] = await db.insert(generatedItems).values({
@@ -257,7 +298,7 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
         boardId,
         type: item.type,
         content: dbContent,
-        storageKey: null, // Not using object storage - store base64 in content
+        storageKey: storageKey,
         carouselUrls: processedCarouselUrls || item.carouselUrls,
         title: item.title,
         description: item.description,
@@ -281,8 +322,31 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
 
     revalidatePath('/');
     
-    // Return the saved item directly - content is already base64
-    return saved;
+    // Return with proper URLs for immediate display
+    let returnContent = saved.content;
+    let returnCarouselUrls = saved.carouselUrls;
+    
+    // Convert storage key to API URL for content
+    if (saved.storageKey) {
+        returnContent = `/api/storage/${encodeURIComponent(saved.storageKey)}`;
+    }
+    
+    // Convert carousel storage keys to API URLs
+    if (saved.carouselUrls && Array.isArray(saved.carouselUrls)) {
+        returnCarouselUrls = (saved.carouselUrls as string[]).map((url: string) => {
+            // If it's a storage key (not a data URL or already an API URL), convert it
+            if (url && !url.startsWith('data:') && !url.startsWith('http') && !url.startsWith('/api/')) {
+                return `/api/storage/${encodeURIComponent(url)}`;
+            }
+            return url;
+        });
+    }
+    
+    return {
+        ...saved,
+        content: returnContent,
+        carouselUrls: returnCarouselUrls
+    };
 }
 
 export async function getUserUsageAction() {
