@@ -131,7 +131,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
               {msg.role === 'user' ? (
                 msg.text
               ) : (
-                <div className="markdown-content">
+                <div className="markdown-content overflow-hidden break-words">
                   <ReactMarkdown
                     components={{
                       h1: ({node, ...props}) => <h1 className="font-display font-bold text-lg md:text-xl mb-2 mt-3 border-b-2 border-neo-pink inline-block" {...props} />,
@@ -142,7 +142,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
                       p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
                       strong: ({node, ...props}) => <strong className="font-bold bg-neo-yellow/30 px-1 rounded-sm text-black border-b border-neo-yellow" {...props} />,
                       blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-neo-cyan pl-3 my-2 italic text-gray-600 bg-white/50 py-2 rounded-r" {...props} />,
-                      code: ({node, ...props}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-neo-pink font-bold" {...props} />,
+                      code: ({node, ...props}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-neo-pink font-bold break-all" {...props} />,
+                      a: ({node, ...props}) => <a className="text-neo-pink underline break-all hover:text-neo-cyan transition-colors" {...props} />,
                       table: ({node, ...props}) => <div className="overflow-x-auto my-4"><table className="min-w-full border-2 border-black divide-y divide-black" {...props} /></div>,
                       th: ({node, ...props}) => <th className="bg-gray-100 p-2 text-left font-bold text-xs border-r border-black" {...props} />,
                       td: ({node, ...props}) => <td className="p-2 text-xs border-r border-black" {...props} />

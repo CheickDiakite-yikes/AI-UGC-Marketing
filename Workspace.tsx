@@ -631,10 +631,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       <ChatInterface messages={activeBoard.messages} onSendMessage={handleSendMessage} isProcessing={isProcessing} processingStatus={processingStatus} hasAssets={activeBoard.assets.length > 0} />
       
       {activeJobs.length > 0 && (
-        <div className="fixed bottom-24 right-4 md:bottom-28 md:right-8 z-40">
-          <div className="bg-neo-yellow border-4 border-black shadow-neo px-4 py-2 flex items-center gap-2 animate-pulse">
-            <span className="animate-spin">⚙️</span>
-            <span className="font-bold text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
+        <div className="fixed bottom-4 right-4 md:bottom-28 md:right-8 z-30">
+          <div className="bg-neo-yellow border-2 md:border-4 border-black shadow-neo px-3 py-1.5 md:px-4 md:py-2 flex items-center gap-2 animate-pulse rounded-full md:rounded-none">
+            <span className="animate-spin text-sm md:text-base">⚙️</span>
+            <span className="font-bold text-xs md:text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
           </div>
         </div>
       )}
