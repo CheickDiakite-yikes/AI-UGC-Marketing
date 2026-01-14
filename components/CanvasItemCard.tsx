@@ -161,7 +161,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
         
         {item.type === 'video' && (
           <div className="w-full h-full flex items-center justify-center cursor-zoom-in" onClick={() => onExpand && onExpand(item)}>
-            {item.content.startsWith('blob:') ? (
+            {item.content && (item.content.startsWith('blob:') || item.content.startsWith('/api/storage/') || item.content.startsWith('data:') || item.content.startsWith('http')) ? (
                <video src={item.content} controls className="w-full h-auto max-h-[400px]" onClick={e => e.stopPropagation()} />
             ) : (
                <div className="flex flex-col items-center justify-center p-8 text-center animate-pulse">
