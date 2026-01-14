@@ -6,6 +6,7 @@ import { relations } from 'drizzle-orm';
 export const assetTypeEnum = pgEnum('asset_type', ['logo', 'image', 'pdf', 'text', 'link', 'avatar']);
 export const itemTypeEnum = pgEnum('item_type', ['text', 'image', 'video', 'carousel']);
 export const roleEnum = pgEnum('role', ['user', 'model', 'system']);
+export const jobStatusEnum = pgEnum('job_status', ['pending', 'processing', 'completed', 'failed']);
 
 // --- Tables ---
 
@@ -90,12 +91,28 @@ export const avatarIdentities = pgTable('avatar_identities', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const jobs = pgTable('jobs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),
+  status: jobStatusEnum('status').default('pending').notNull(),
+  payload: jsonb('payload').notNull(),
+  result: jsonb('result'),
+  error: text('error'),
+  attempts: integer('attempts').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+});
+
 // --- Relations ---
 
 export const boardsRelations = relations(boards, ({ many, one }) => ({
   assets: many(assets),
   generatedItems: many(generatedItems),
   messages: many(messages),
+  jobs: many(jobs),
   brandIdentity: one(brandIdentities, {
     fields: [boards.brandIdentityId],
     references: [brandIdentities.id],
@@ -124,5 +141,16 @@ export const generatedItemsRelations = relations(generatedItems, ({ one }) => ({
   board: one(boards, {
     fields: [generatedItems.boardId],
     references: [boards.id],
+  }),
+}));
+
+export const jobsRelations = relations(jobs, ({ one }) => ({
+  board: one(boards, {
+    fields: [jobs.boardId],
+    references: [boards.id],
+  }),
+  user: one(users, {
+    fields: [jobs.userId],
+    references: [users.id],
   }),
 }));
