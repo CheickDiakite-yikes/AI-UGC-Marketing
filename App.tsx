@@ -30,6 +30,18 @@ const App: React.FC = () => {
     setCurrentView('app');
   };
 
+  const handleLoginClick = async () => {
+    // Check if user is already logged in
+    const session = await getSession();
+    if (session && session.userId) {
+      // Already logged in, go straight to app
+      setCurrentView('app');
+    } else {
+      // Not logged in, show login modal
+      setAuthModalMode('login');
+    }
+  };
+
   if (currentView === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center bg-neo-lime">
@@ -56,7 +68,7 @@ const App: React.FC = () => {
   return (
     <>
       <LandingPage 
-          onLogin={() => setAuthModalMode('login')}
+          onLogin={handleLoginClick}
           onSignup={() => setAuthModalMode('signup')}
           onNavigatePrivacy={() => setCurrentView('privacy')}
           onNavigateTerms={() => setCurrentView('terms')}
