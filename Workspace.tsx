@@ -10,6 +10,7 @@ import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
+import { useToast } from './components/Toast';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch } from './services/geminiService';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
@@ -34,8 +35,18 @@ interface WorkspaceProps {
   onExitApp: () => void;
 }
 
+interface FailedJob {
+  id: string;
+  type: string;
+  title: string;
+  error: string;
+  payload: any;
+}
+
 const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
+  const { showError, showSuccess, showToast } = useToast();
   const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, lastResetDate: 0 });
+  const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
 
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string>('');
@@ -164,9 +175,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         if (job.status === 'completed') {
           onComplete(job.result);
           setActiveJobs(prev => prev.filter(id => id !== jobId));
+          showSuccess(`Content generated successfully!`);
         } else if (job.status === 'failed') {
           console.error('[WORKSPACE] Job failed:', job.error);
           setActiveJobs(prev => prev.filter(id => id !== jobId));
+          const errorMessage = job.error || 'Generation failed';
+          showError(`Generation failed: ${errorMessage.substring(0, 100)}`);
+          setFailedJobs(prev => [...prev, {
+            id: jobId,
+            type: job.type || 'unknown',
+            title: job.payload?.title || 'Content',
+            error: errorMessage,
+            payload: job.payload
+          }]);
         } else {
           setTimeout(poll, 3000);
         }
@@ -176,7 +197,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       }
     };
     poll();
-  }, []);
+  }, [showError, showSuccess]);
 
   useEffect(() => {
     if (activeBoardId) {
@@ -501,9 +522,45 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     } catch (error: any) {
       console.error("Chat error:", error);
       const errMsg = error?.message || "Something went wrong. Please try again.";
+      showError(errMsg.length > 100 ? errMsg.substring(0, 100) + '...' : errMsg);
       updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: `Error: ${errMsg}` }] }));
       await saveMessageAction(activeBoardId, 'model', `Error: ${errMsg}`);
     } finally { setIsProcessing(false); setProcessingStatus(""); }
+  };
+
+  const handleRetryJob = async (failedJob: FailedJob) => {
+    if (!activeBoardId) return;
+    
+    setFailedJobs(prev => prev.filter(j => j.id !== failedJob.id));
+    showToast('Retrying generation...', 'info');
+    
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boardId: activeBoardId,
+          type: failedJob.type,
+          payload: failedJob.payload
+        })
+      });
+      
+      if (!res.ok) throw new Error('Failed to create retry job');
+      
+      const job = await res.json();
+      setActiveJobs(prev => [...prev, job.id]);
+      pollJobStatus(job.id, async () => {
+        await loadBoardDetails(activeBoardId);
+        getUserUsageAction().then(setUsage);
+      });
+    } catch (error: any) {
+      showError('Failed to retry. Please try again.');
+      setFailedJobs(prev => [...prev, failedJob]);
+    }
+  };
+
+  const handleDismissFailedJob = (jobId: string) => {
+    setFailedJobs(prev => prev.filter(j => j.id !== jobId));
   };
 
   const handleCreateBoard = async (name: string) => {
@@ -635,6 +692,39 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           <div className="bg-neo-yellow border-2 md:border-4 border-black shadow-neo px-3 py-1.5 md:px-4 md:py-2 flex items-center gap-2 animate-pulse rounded-full md:rounded-none">
             <span className="animate-spin text-sm md:text-base">⚙️</span>
             <span className="font-bold text-xs md:text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
+          </div>
+        </div>
+      )}
+      
+      {failedJobs.length > 0 && (
+        <div className="fixed bottom-20 right-4 md:bottom-40 md:right-8 z-30 max-w-xs">
+          <div className="bg-[#FF6B6B] border-2 md:border-4 border-black shadow-neo p-3 rounded-lg md:rounded-none">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-sm text-white">{failedJobs.length} failed</span>
+              <button 
+                onClick={() => setFailedJobs([])}
+                className="text-white hover:text-black text-lg font-bold"
+                aria-label="Dismiss all"
+              >×</button>
+            </div>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {failedJobs.slice(0, 3).map(job => (
+                <div key={job.id} className="bg-white border-2 border-black p-2 text-xs">
+                  <p className="font-bold truncate">{job.title}</p>
+                  <p className="text-gray-600 truncate">{job.error}</p>
+                  <div className="flex gap-2 mt-1">
+                    <button 
+                      onClick={() => handleRetryJob(job)}
+                      className="bg-neo-lime border border-black px-2 py-0.5 font-bold hover:bg-lime-300"
+                    >Retry</button>
+                    <button 
+                      onClick={() => handleDismissFailedJob(job.id)}
+                      className="text-gray-500 hover:text-black"
+                    >Dismiss</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

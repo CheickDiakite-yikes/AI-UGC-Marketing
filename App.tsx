@@ -4,6 +4,7 @@ import LandingPage from './components/LandingPage';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
 import AuthModal from './components/AuthModal';
+import { ToastProvider } from './components/Toast';
 import { getSession } from './app/actions/authActions';
 
 type ViewState = 'loading' | 'landing' | 'app' | 'privacy' | 'terms';
@@ -83,4 +84,12 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+const AppWithProviders: React.FC = () => {
+  return (
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
+};
+
+export default AppWithProviders;
