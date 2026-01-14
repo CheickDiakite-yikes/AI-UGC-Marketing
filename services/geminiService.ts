@@ -1,6 +1,6 @@
-import { ProjectAsset, AspectRatio, ImageSize, VeoConfig, BrandIdentity, AvatarIdentity } from "../types";
+import { ProjectAsset, AspectRatio, ImageSize, VeoConfig, BrandIdentity, AvatarIdentity, Product } from "../types";
 import { generateContentServer, generateImagesServer, generateContentWithSearch, generateVideoServer } from "../app/actions";
-import { FunctionDeclaration, Type, Part } from "@google/genai";
+import { FunctionDeclaration, Type, Part, VideoGenerationReferenceImage } from "@google/genai";
 
 // --- Tool Definitions ---
 
@@ -25,7 +25,9 @@ const generateVideoTool: FunctionDeclaration = {
     type: Type.OBJECT,
     properties: {
       prompt: { type: Type.STRING, description: "Description of the video content, movement, and camera angle." },
-      aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." }
+      aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
+      productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
+      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." }
     },
     required: ["prompt"]
   }
@@ -50,7 +52,9 @@ const generateCampaignPackTool: FunctionDeclaration = {
             visual_prompt: { type: Type.STRING },
             carousel_prompts: { type: Type.ARRAY, items: { type: Type.STRING } },
             caption: { type: Type.STRING },
-            aspectRatio: { type: Type.STRING }
+            aspectRatio: { type: Type.STRING },
+            productId: { type: Type.STRING },
+            ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["type", "visual_prompt", "caption", "archetype", "title", "aspectRatio"]
         }
@@ -189,7 +193,8 @@ export const chatWithMarketingAgent = async (
   newMessage: string,
   assets: ProjectAsset[],
   brandIdentity?: BrandIdentity | null,
-  avatarIdentity?: AvatarIdentity | null
+  avatarIdentity?: AvatarIdentity | null,
+  products?: Product[] | null
 ) => {
 
   // Build source knowledge from uploaded documents (PDFs, text files, etc.)
@@ -260,6 +265,47 @@ export const chatWithMarketingAgent = async (
     Note: Only use avatar for content that specifically needs a human face/spokesperson.
   ` : "";
 
+  let productInstruction = "";
+  if (products && products.length > 0) {
+    const productDetails = products.map(product => {
+      const assetLines = product.assets && product.assets.length > 0
+        ? product.assets.map(asset => `- ${asset.assetId} (${asset.role}${asset.isPrimary ? ", primary" : ""}${asset.variant ? `, variant: ${asset.variant}` : ""})`).join("\n")
+        : "None";
+      const featureText = product.keyFeatures && product.keyFeatures.length > 0 ? product.keyFeatures.join(", ") : "None";
+      const variantText = product.variants && product.variants.length > 0 ? product.variants.join(", ") : "None";
+      return `
+    [PRODUCT ${product.id}]
+    Name: ${product.name}
+    Type: ${product.productType}
+    Category: ${product.category || "Unspecified"}
+    Platforms: ${product.platforms && product.platforms.length > 0 ? product.platforms.join(", ") : "Unspecified"}
+    Digital Subtype: ${product.digitalSubtype || "Unspecified"}
+    Description: ${product.description || "None"}
+    Key Features: ${featureText}
+    Variants: ${variantText}
+    Compliance Notes: ${product.complianceNotes || "None"}
+    Assets:
+    ${assetLines}
+    `;
+    }).join("\n");
+
+    productInstruction = `
+    PRODUCT CATALOG (use this for product-specific visuals and messaging):
+    ${productDetails}
+
+    PRODUCT INSTRUCTIONS:
+    - If the user mentions a product or requests visuals, select the correct product.
+    - If multiple products exist and the user did not specify, ask a clarifying question before generating.
+    - For video generation, include ingredientAssetIds (max 3) or productId when product assets are available.
+    - Do not invent product claims beyond the Product Catalog and Source Documents.
+    `;
+  } else {
+    productInstruction = `
+    NO PRODUCTS FOUND:
+    - If the user requests product-specific visuals, ask them to add a product first.
+    `;
+  }
+
   const systemInstruction = `
     ${sourceKnowledge}
     
@@ -280,6 +326,7 @@ export const chatWithMarketingAgent = async (
     
     ${brandInstruction}
     ${avatarInstruction}
+    ${productInstruction}
     
     CONSTRAINTS:
     - Base ALL campaign content on the SOURCE DOCUMENTS above - this is non-negotiable
@@ -293,6 +340,7 @@ export const chatWithMarketingAgent = async (
     - Video prompts should describe: scene, action, movement, camera angle, mood
     - Videos take longer to generate (1-2 minutes each) so keep pack sizes reasonable
     - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
+    - Ingredient-based video generation only supports 16:9 and 8s duration (use only when compatible)
   `;
 
   const model = "gemini-3-pro-preview";
@@ -333,11 +381,15 @@ export const generateMarketingImage = async (
 
 export const generateVeoVideo = async (
   prompt: string,
-  config: VeoConfig
+  config: VeoConfig,
+  options?: { referenceImages?: VideoGenerationReferenceImage[]; traceId?: string }
 ): Promise<string> => {
   const videoUrl = await generateVideoServer(prompt, {
     aspectRatio: config.aspectRatio,
-    resolution: config.resolution
+    resolution: config.resolution,
+    durationSeconds: config.durationSeconds,
+    referenceImages: options?.referenceImages,
+    traceId: options?.traceId
   });
   return videoUrl;
 };

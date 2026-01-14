@@ -6,12 +6,13 @@ import CanvasItemCard from './components/CanvasItemCard';
 import BrandIdentityModal from './components/BrandIdentityModal';
 import AvatarAnalysisModal from './components/AvatarAnalysisModal';
 import BrandAnalysisSkeleton from './components/BrandAnalysisSkeleton';
+import ProductModal from './components/ProductModal';
 import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch } from './services/geminiService';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
 import {
@@ -27,7 +28,13 @@ import {
   deleteBoard,
   getUserUsageAction,
   deleteAssetAction,
-  deleteGeneratedItemAction
+  deleteGeneratedItemAction,
+  createProductAction,
+  updateProductAction,
+  deleteProductAction,
+  setProductAssetsAction,
+  autoTagAssetAction,
+  analyzeProductImagesAction
 } from './app/actions/boardActions';
 
 
@@ -108,6 +115,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           messages: b.messages as ChatMessage[],
           brandIdentity: b.brandIdentity as BrandIdentity | null,
           avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
+          products: (b.products || []).map((p: any) => ({
+            ...p,
+            assets: p.productAssets as ProductAsset[]
+          })),
           createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
         };
         setActiveBoard(mappedBoard);
@@ -129,6 +140,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   const [showNewBoardModal, setShowNewBoardModal] = useState(false);
   const [showBoardListModal, setShowBoardListModal] = useState(false);
@@ -160,6 +173,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         messages: b.messages as ChatMessage[],
         brandIdentity: b.brandIdentity as BrandIdentity | null,
         avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
+        products: (b.products || []).map((p: any) => ({
+          ...p,
+          assets: p.productAssets as ProductAsset[]
+        })),
         createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
       };
       setActiveBoard(mappedBoard);
@@ -279,6 +296,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
     // Simulate digesting if needed, though DB status is 'ready' by default in schema
     // If we want digesting state, we'd update DB later. For now, keep it simple.
+    if (asset.type === 'image') {
+      autoTagAssetAction(savedAsset.id)
+        .then(() => loadBoardDetails(activeBoardId))
+        .catch((error) => console.error('[AUTO-TAG] Failed:', error));
+    }
   };
 
   const handleDeleteAsset = async (assetId: string) => {
@@ -337,6 +359,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         messages: updated.messages as ChatMessage[],
         brandIdentity: updated.brandIdentity as BrandIdentity | null,
         avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
+        products: (updated.products || []).map((p: any) => ({
+          ...p,
+          assets: p.productAssets as ProductAsset[]
+        })),
         createdAt: updated.createdAt ? new Date(updated.createdAt).getTime() : Date.now()
       };
       setActiveBoard(mappedBoard);
@@ -361,10 +387,107 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         messages: updated.messages as ChatMessage[],
         brandIdentity: updated.brandIdentity as BrandIdentity | null,
         avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
+        products: (updated.products || []).map((p: any) => ({
+          ...p,
+          assets: p.productAssets as ProductAsset[]
+        })),
         createdAt: updated.createdAt ? new Date(updated.createdAt).getTime() : Date.now()
       };
       setActiveBoard(mappedBoard);
     }
+  };
+
+  const handleOpenProductModal = (productId?: string) => {
+    setEditingProductId(productId || null);
+    setShowProductModal(true);
+  };
+
+  const handleSaveProduct = async (product: Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>, assignments: Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>[]) => {
+    if (!activeBoardId) return;
+
+    let productId = editingProductId;
+    if (productId) {
+      await updateProductAction(productId, product);
+    } else {
+      const created = await createProductAction(activeBoardId, product);
+      productId = created.id;
+    }
+
+    if (productId) {
+      await setProductAssetsAction(productId, assignments);
+    }
+
+    await loadBoardDetails(activeBoardId);
+    setShowProductModal(false);
+    setEditingProductId(null);
+  };
+
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleUploadProductImages = async (files: File[]) => {
+    if (!activeBoardId) return [];
+    const uploadedAssets: ProjectAsset[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      const base64 = await readFileAsBase64(file);
+      const newAsset: ProjectAsset = {
+        id: Date.now().toString(),
+        type: 'image',
+        name: file.name,
+        content: base64,
+        mimeType: file.type,
+      };
+
+      const saved = await saveAsset(activeBoardId, newAsset);
+      const assetWithId: ProjectAsset = {
+        ...newAsset,
+        id: saved.id,
+        content: saved.content || newAsset.content,
+        storageKey: saved.storageKey,
+        status: saved.status as 'digesting' | 'ready'
+      };
+
+      updateActiveBoard((b) => ({ ...b, assets: [...b.assets, assetWithId] }));
+      uploadedAssets.push(assetWithId);
+
+      autoTagAssetAction(saved.id)
+        .then(() => loadBoardDetails(activeBoardId))
+        .catch((error) => console.error('[AUTO-TAG] Failed:', error));
+    }
+
+    return uploadedAssets;
+  };
+
+  const handleAnalyzeProductImages = async (assetIds: string[]) => {
+    if (!activeBoardId) return null;
+    try {
+      const result = await analyzeProductImagesAction(activeBoardId, assetIds);
+      if (!result) return null;
+      return {
+        analysis: result.analysis,
+        error: result.error,
+        traceId: result.traceId
+      };
+    } catch (error) {
+      console.error('[PRODUCT ANALYSIS] Failed:', error);
+      return null;
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!activeBoardId || !editingProductId) return;
+
+    await deleteProductAction(editingProductId);
+    await loadBoardDetails(activeBoardId);
+    setShowProductModal(false);
+    setEditingProductId(null);
   };
 
   // Handler for dismissing research response buttons
@@ -391,7 +514,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     try {
       const history = [...activeBoard.messages, userMsg].map(m => ({ role: m.role, parts: [{ text: m.text }] }));
       const readyAssets = activeBoard.assets.filter(a => a.status === 'ready');
-      const response = await chatWithMarketingAgent(history, text, readyAssets, activeBoard.brandIdentity, activeBoard.avatarIdentity) as any;
+      const response = await chatWithMarketingAgent(
+        history,
+        text,
+        readyAssets,
+        activeBoard.brandIdentity,
+        activeBoard.avatarIdentity,
+        activeBoard.products || []
+      ) as any;
 
       const modelParts = response.candidates[0].content.parts || [];
       let responseText = response.text || "";
@@ -424,13 +554,23 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           }
           if (fc.name === 'generate_video') {
             setProcessingStatus(`Queuing video generation...`);
+            const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
+            const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
+            const traceId = crypto.randomUUID();
             const res = await fetch('/api/jobs', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 boardId: activeBoardId,
                 type: 'generate_video',
-                payload: { prompt: fc.args['prompt'], aspectRatio: fc.args['aspectRatio'] || '16:9', resolution: '720p' }
+                payload: {
+                  prompt: fc.args['prompt'],
+                  aspectRatio: fc.args['aspectRatio'] || '16:9',
+                  resolution: '720p',
+                  productId,
+                  ingredientAssetIds,
+                  traceId
+                }
               })
             });
             const job = await res.json();
@@ -495,6 +635,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             } else {
               // Use background jobs for images and videos in packs
               const jobType = item.type === 'video' ? 'generate_video' : 'generate_image';
+              const traceId = crypto.randomUUID();
               const res = await fetch('/api/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -505,7 +646,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                     prompt: item.visual_prompt, 
                     aspectRatio: item.aspectRatio || (item.type === 'video' ? '16:9' : '1:1'),
                     resolution: '720p',
-                    title: item.title
+                    title: item.title,
+                    productId: item.productId,
+                    ingredientAssetIds: item.ingredientAssetIds,
+                    traceId
                   }
                 })
               });
@@ -636,6 +780,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   if (!activeBoard) return <div className="flex h-screen items-center justify-center font-display text-xl animate-pulse">Loading Workspace...</div>;
 
+  const editingProduct = activeBoard.products?.find(p => p.id === editingProductId) || null;
+
   return (
     <div className="flex flex-col md:flex-row min-h-[100dvh] md:h-screen w-full font-sans text-neo-black relative md:overflow-hidden bg-gray-50">
       {isCameraActive && (
@@ -681,8 +827,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         h-full
       `}>
         <Sidebar
-          assets={activeBoard.assets} brandIdentity={activeBoard.brandIdentity} avatarIdentity={activeBoard.avatarIdentity}
+          assets={activeBoard.assets} brandIdentity={activeBoard.brandIdentity} avatarIdentity={activeBoard.avatarIdentity} products={activeBoard.products}
           onAddAsset={handleAddAsset} onDeleteAsset={handleDeleteAsset} onEditBrand={() => setShowBrandModal(true)} onEditAvatar={() => setShowAvatarModal(true)}
+          onOpenProductModal={handleOpenProductModal}
           onStartCapture={() => { setIsCameraActive(true); setSidebarOpen(false); }}
           onClose={() => setSidebarOpen(false)}
           onExitApp={onExitApp} usageStats={usage}
@@ -776,6 +923,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {isAnalyzingLogo && <BrandAnalysisSkeleton />}
       {showBrandModal && pendingScannedIdentity && <BrandIdentityModal initialIdentity={pendingScannedIdentity} logoUrl={pendingLogoAsset?.content || ""} onSave={handleSaveIdentity} onClose={() => setShowBrandModal(false)} />}
       {showAvatarModal && pendingScannedAvatar && <AvatarAnalysisModal initialIdentity={pendingScannedAvatar} onSave={handleSaveAvatar} onClose={() => setShowAvatarModal(false)} />}
+      {showProductModal && (
+        <ProductModal
+          product={editingProduct}
+          assets={activeBoard.assets}
+          onUploadProductImages={handleUploadProductImages}
+          onAnalyzeProductImages={handleAnalyzeProductImages}
+          onSave={handleSaveProduct}
+          onDelete={editingProduct ? handleDeleteProduct : undefined}
+          onClose={() => {
+            setShowProductModal(false);
+            setEditingProductId(null);
+          }}
+        />
+      )}
       {showNewBoardModal && <NewBoardModal onCreate={handleCreateBoard} onCancel={() => setShowNewBoardModal(false)} />}
       {showBoardListModal && <BoardListModal boards={boards} activeBoardId={activeBoardId} onSwitch={setActiveBoardId} onClose={() => setShowBoardListModal(false)} onCreateNew={() => setShowNewBoardModal(true)} onRename={handleRenameBoard} onDelete={handleDeleteBoard} />}
       {selectedItem && <LightboxModal item={selectedItem} onClose={() => setSelectedItem(null)} />}

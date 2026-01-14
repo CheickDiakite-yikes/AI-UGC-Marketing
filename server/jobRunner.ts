@@ -1,5 +1,6 @@
 import { getPendingJobs, claimJob, updateJobStatus } from '../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../services/geminiService';
+import { resolveVideoIngredients } from '../services/videoIngredientService';
 import { uploadGeneratedItem } from '../services/objectStorageService';
 import { db } from '../db';
 import { generatedItems, users } from '../db/schema';
@@ -75,17 +76,57 @@ async function processImageJob(job: Job): Promise<JobResult> {
 }
 
 async function processVideoJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; resolution?: string; title?: string };
-  const { prompt, aspectRatio, resolution, title } = payload;
+  const payload = job.payload as {
+    prompt: string;
+    aspectRatio?: string;
+    resolution?: string;
+    title?: string;
+    productId?: string;
+    ingredientAssetIds?: string[];
+    traceId?: string;
+  };
+  const { prompt, aspectRatio, resolution, title, productId, ingredientAssetIds } = payload;
+  const traceId = payload.traceId || crypto.randomUUID();
   
   const config: VeoConfig = {
     aspectRatio: (aspectRatio === '9:16' ? '9:16' : '16:9'),
-    resolution: (resolution === '1080p' ? '1080p' : '720p')
+    resolution: (resolution === '1080p' ? '1080p' : '720p'),
+    durationSeconds: 8
   };
   
-  console.log(`[JOB RUNNER] Generating video with prompt: "${prompt.substring(0, 50)}..."`);
+  console.log(`[JOB RUNNER ${traceId}] Generating video with prompt: "${prompt.substring(0, 50)}..."`);
+
+  let referenceImages = [];
+  let selectedIngredientIds: string[] = [];
+  let productIdUsed: string | undefined;
+
+  try {
+    const ingredientResult = await resolveVideoIngredients({
+      boardId: job.boardId,
+      productId,
+      ingredientAssetIds,
+      traceId
+    });
+    referenceImages = ingredientResult.referenceImages;
+    selectedIngredientIds = ingredientResult.selectedAssetIds;
+    productIdUsed = ingredientResult.productIdUsed;
+    if (ingredientResult.warnings.length > 0) {
+      console.warn(`[JOB RUNNER ${traceId}] Ingredient warnings:`, ingredientResult.warnings);
+    }
+  } catch (error) {
+    console.error(`[JOB RUNNER ${traceId}] Ingredient resolution failed:`, error);
+  }
+
+  const useIngredients = referenceImages.length > 0 && config.aspectRatio === '16:9';
+  if (referenceImages.length > 0 && config.aspectRatio !== '16:9') {
+    console.warn(`[JOB RUNNER ${traceId}] Skipping ingredients: aspect ratio ${config.aspectRatio} is not supported for reference images`);
+  }
   
-  const videoResult = await generateVeoVideo(prompt, config);
+  const videoResult = await generateVeoVideo(
+    prompt,
+    config,
+    useIngredients ? { referenceImages, traceId } : { traceId }
+  );
   
   const itemId = crypto.randomUUID();
   let storageKey: string | null = null;
@@ -104,14 +145,22 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     content: contentToStore,
     storageKey: storageKey,
     title: title || 'Generated Video',
-    metadata: { aspectRatio, resolution, jobId: job.id, prompt: prompt.substring(0, 200) },
+    metadata: {
+      aspectRatio,
+      resolution,
+      jobId: job.id,
+      prompt: prompt.substring(0, 200),
+      productId: productIdUsed || productId || null,
+      ingredientAssetIds: selectedIngredientIds,
+      traceId
+    },
   }).returning();
   
   await db.update(users)
     .set({ videosGenerated: sql`${users.videosGenerated} + 1` })
     .where(eq(users.id, job.userId));
   
-  console.log(`[JOB RUNNER] Saved video ${itemId} to database`);
+  console.log(`[JOB RUNNER ${traceId}] Saved video ${itemId} to database`);
   
   return { 
     content: storageKey ? `/api/storage/${encodeURIComponent(storageKey)}` : videoResult, 

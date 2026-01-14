@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats } from '../types';
+import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product } from '../types';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
 import SourcePreviewModal, { getParseStatus, getStatusColor } from './SourcePreviewModal';
@@ -10,10 +10,12 @@ interface SidebarProps {
   assets: ProjectAsset[];
   brandIdentity: BrandIdentity | null;
   avatarIdentity: AvatarIdentity | null;
+  products?: Product[];
   onAddAsset: (asset: ProjectAsset) => void;
   onDeleteAsset?: (assetId: string) => void;
   onEditBrand: () => void;
   onEditAvatar: () => void;
+  onOpenProductModal: (productId?: string) => void;
   onStartCapture: () => void;
   onClose?: () => void;
   onExitApp?: () => void;
@@ -25,10 +27,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   assets,
   brandIdentity,
   avatarIdentity,
+  products,
   onAddAsset,
   onDeleteAsset,
   onEditBrand,
   onEditAvatar,
+  onOpenProductModal,
   onStartCapture,
   onClose,
   onExitApp,
@@ -44,6 +48,23 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isScrapingLink, setIsScrapingLink] = useState(false);
   const [extractingAssets, setExtractingAssets] = useState<Set<string>>(new Set());
   const [previewAsset, setPreviewAsset] = useState<ProjectAsset | null>(null);
+
+  const getAssetPreviewSrc = (asset: ProjectAsset) => {
+    if (!asset.content) return '';
+    if (asset.content.startsWith('data:') || asset.content.startsWith('http') || asset.content.startsWith('/api/')) {
+      return asset.content;
+    }
+    const mime = asset.mimeType || 'image/png';
+    return `data:${mime};base64,${asset.content}`;
+  };
+
+  const getProductPreview = (product: Product) => {
+    const productAssets = product.assets || [];
+    const primaryAsset = productAssets.find(pa => pa.isPrimary) || productAssets.find(pa => pa.role === 'hero') || productAssets[0];
+    if (!primaryAsset) return '';
+    const asset = assets.find(a => a.id === primaryAsset.assetId);
+    return asset ? getAssetPreviewSrc(asset) : '';
+  };
 
   useEffect(() => {
     const checkAndExtractPdfs = async () => {
@@ -276,6 +297,58 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
             <input type="file" ref={avatarInputRef} className="hidden" accept={ALLOWED_IMAGE_TYPES} onChange={(e) => handleFileUpload(e, 'avatar')} />
+          </div>
+
+          {/* Products Section */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[10px] font-bold tracking-widest block text-gray-700">PRODUCTS</label>
+              <button
+                onClick={() => onOpenProductModal()}
+                className="text-[10px] font-bold uppercase tracking-widest bg-white border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white transition-all"
+              >
+                Add
+              </button>
+            </div>
+            {products && products.length > 0 ? (
+              <div className="space-y-2">
+                {products.map((product) => {
+                  const previewSrc = getProductPreview(product);
+                  return (
+                    <div key={product.id} className="bg-white border-2 border-black shadow-neo-sm p-2 animate-fade-in-up">
+                      <div className="flex items-start gap-2">
+                        <div className="w-12 h-12 border-2 border-black bg-gray-100 flex-shrink-0 overflow-hidden">
+                          {previewSrc ? (
+                            <img src={previewSrc} alt={product.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-gray-400">IMG</div>
+                          )}
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <p className="text-xs font-bold truncate">{product.name}</p>
+                          <p className="text-[9px] uppercase text-gray-500 font-bold">{product.productType.replace('_', ' ')}</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5">{(product.assets || []).length} assets</p>
+                        </div>
+                        <button
+                          onClick={() => onOpenProductModal(product.id)}
+                          className="text-[10px] font-bold border-2 border-black px-2 py-1 bg-neo-lime hover:bg-black hover:text-white transition-all"
+                        >
+                          Manage
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <button
+                onClick={() => onOpenProductModal()}
+                className="w-full bg-white border-2 border-black shadow-neo-sm p-3 font-bold hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center gap-2 text-sm"
+              >
+                <span className="text-lg">📦</span>
+                Add Product
+              </button>
+            )}
           </div>
 
           {/* General Files Section */}

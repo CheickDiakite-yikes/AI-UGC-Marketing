@@ -1,6 +1,7 @@
 'use server';
 
 import { GoogleGenAI } from '@google/genai';
+import type { VideoGenerationReferenceImage } from '@google/genai';
 
 const apiKey = process.env.GOOGLE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
@@ -127,24 +128,38 @@ export async function generateImagesServer(model: string, prompt: string, config
 }
 
 export async function generateVideoServer(
-    prompt: string, 
-    config: { aspectRatio?: '16:9' | '9:16'; resolution?: '720p' | '1080p' }
+    prompt: string,
+    config: {
+        aspectRatio?: '16:9' | '9:16';
+        resolution?: '720p' | '1080p';
+        durationSeconds?: 4 | 6 | 8;
+        referenceImages?: VideoGenerationReferenceImage[];
+        traceId?: string;
+    }
 ): Promise<string> {
     if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
     
     try {
-        console.log("[Veo 3.1] Starting video generation with prompt:", prompt.substring(0, 100) + "...");
+        const traceId = config.traceId || 'no-trace';
+        const useIngredients = !!(config.referenceImages && config.referenceImages.length > 0);
+        const model = useIngredients ? "veo-3.1-generate-preview" : "veo-3.1-fast-generate-preview";
+        const durationSeconds = config.durationSeconds || (useIngredients ? 8 : undefined);
+
+        console.log(`[Veo 3.1 ${traceId}] Starting video generation with prompt:`, prompt.substring(0, 100) + "...");
         
         // Use veo-3.1-fast-generate-preview for faster generation ($0.15/sec vs $0.40/sec)
         let operation = await ai.models.generateVideos({
-            model: "veo-3.1-fast-generate-preview",
+            model,
             prompt: prompt,
             config: {
                 aspectRatio: config.aspectRatio || "16:9",
+                resolution: config.resolution || "720p",
+                durationSeconds: durationSeconds,
+                referenceImages: useIngredients ? config.referenceImages : undefined
             },
         });
 
-        console.log("[Veo 3.1] Video generation started, polling for completion...");
+        console.log(`[Veo 3.1 ${traceId}] Video generation started, polling for completion...`);
         
         // Poll for completion (timeout after 5 minutes)
         const startTime = Date.now();
@@ -155,7 +170,7 @@ export async function generateVideoServer(
                 throw new Error("Video generation timed out after 5 minutes");
             }
             
-            console.log("[Veo 3.1] Still generating... waiting 10 seconds");
+            console.log(`[Veo 3.1 ${traceId}] Still generating... waiting 10 seconds`);
             await new Promise((resolve) => setTimeout(resolve, 10000));
             
             operation = await ai.operations.getVideosOperation({
@@ -163,7 +178,7 @@ export async function generateVideoServer(
             });
         }
 
-        console.log("[Veo 3.1] Video generation complete!");
+        console.log(`[Veo 3.1 ${traceId}] Video generation complete!`);
         
         if (!operation.response?.generatedVideos || operation.response.generatedVideos.length === 0) {
             throw new Error("No videos were generated");
@@ -175,7 +190,7 @@ export async function generateVideoServer(
         }
 
         // Download the video server-side to avoid exposing API key to client
-        console.log("[Veo 3.1] Downloading video server-side...");
+        console.log(`[Veo 3.1 ${traceId}] Downloading video server-side...`);
         const videoUri = `${video.video.uri}&key=${apiKey}`;
         const response = await fetch(videoUri);
         
@@ -187,12 +202,13 @@ export async function generateVideoServer(
         const base64Video = Buffer.from(videoBuffer).toString('base64');
         const mimeType = response.headers.get('content-type') || 'video/mp4';
         
-        console.log("[Veo 3.1] Video downloaded and encoded, size:", Math.round(videoBuffer.byteLength / 1024), "KB");
+        console.log(`[Veo 3.1 ${traceId}] Video downloaded and encoded, size:`, Math.round(videoBuffer.byteLength / 1024), "KB");
         
         // Return as data URL (like we do for images)
         return `data:${mimeType};base64,${base64Video}`;
     } catch (error: any) {
-        console.error("Veo 3.1 Video API Error:", error);
+        const traceId = config.traceId || 'no-trace';
+        console.error(`[Veo 3.1 ${traceId}] Video API Error:`, error);
         throw new Error(error.message || "Failed to generate video");
     }
 }

@@ -8,6 +8,7 @@ export interface ProjectAsset {
   mimeType?: string;
   status?: 'digesting' | 'ready';
   extractedText?: string; // For PDFs: extracted readable text content
+  metadata?: AssetMetadata;
 }
 
 export interface CanvasItem {
@@ -74,6 +75,7 @@ export interface Board {
   messages: ChatMessage[];
   brandIdentity: BrandIdentity | null;
   avatarIdentity: AvatarIdentity | null;
+  products?: Product[];
   createdAt: number;
 }
 
@@ -81,6 +83,64 @@ export interface UsageStats {
   imagesGenerated: number;
   videosGenerated: number;
   lastResetDate: number; // timestamp
+}
+
+export type ProductType = 'physical_product' | 'software' | 'service' | 'digital_product' | 'hardware';
+
+export type ProductAssetRole =
+  | 'product_shot'
+  | 'packaging'
+  | 'mockup'
+  | 'screenshot'
+  | 'in_use'
+  | 'lifestyle'
+  | 'hero'
+  | 'logo'
+  | 'ui'
+  | 'other';
+
+export interface Product {
+  id: string;
+  boardId: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  productType: ProductType;
+  platforms?: string[] | null;
+  digitalSubtype?: string | null;
+  keyFeatures?: string[] | null;
+  variants?: string[] | null;
+  complianceNotes?: string | null;
+  assets?: ProductAsset[];
+  createdAt?: number;
+}
+
+export interface ProductAsset {
+  id: string;
+  productId: string;
+  assetId: string;
+  role: ProductAssetRole;
+  isPrimary?: boolean | null;
+  variant?: string | null;
+  notes?: string | null;
+  tags?: string[] | null;
+  createdAt?: number;
+}
+
+export interface AssetAutoTags {
+  isProductAsset: boolean;
+  productNameGuess?: string | null;
+  productType?: ProductType | null;
+  role?: ProductAssetRole | null;
+  variant?: string | null;
+  confidence?: number | null;
+  matchedProductId?: string | null;
+  matchConfidence?: number | null;
+  notes?: string | null;
+}
+
+export interface AssetMetadata {
+  autoTags?: AssetAutoTags;
 }
 
 export enum AspectRatio {
@@ -100,4 +160,5 @@ export enum ImageSize {
 export interface VeoConfig {
   resolution: '720p' | '1080p';
   aspectRatio: '16:9' | '9:16';
+  durationSeconds?: 4 | 6 | 8;
 }

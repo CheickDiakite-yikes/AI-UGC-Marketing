@@ -2,12 +2,14 @@
 'use server';
 
 import { db } from '@/db';
-import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users } from '@/db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets } from '@/db/schema';
+import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { Board, ProjectAsset, BrandIdentity, AvatarIdentity } from '@/types';
+import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole } from '@/types';
 import { getSession } from './authActions';
-import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage } from '@/services/objectStorageService';
+import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset } from '@/services/objectStorageService';
+import { generateContentServer } from '@/app/actions';
+import { Type } from '@google/genai';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -32,6 +34,30 @@ async function assertBoardOwnership(boardId: string) {
     }
     
     return board;
+}
+
+async function assertProductOwnership(productId: string) {
+    const product = await db.query.products.findFirst({
+        where: eq(products.id, productId)
+    });
+
+    if (!product) {
+        throw new Error('Product not found');
+    }
+
+    if (product.boardId) {
+        await assertBoardOwnership(product.boardId);
+    }
+
+    return product;
+}
+
+function logTrace(traceId: string, message: string, data?: unknown) {
+    if (data !== undefined) {
+        console.log(`[TRACE ${traceId}] ${message}`, data);
+    } else {
+        console.log(`[TRACE ${traceId}] ${message}`);
+    }
 }
 
 export async function getBoards() {
@@ -92,6 +118,7 @@ export async function getBoardDetails(boardId: string) {
             generatedItems: { orderBy: (items, { desc }) => [desc(items.createdAt)] },
             brandIdentity: true,
             avatarIdentity: true,
+            products: { with: { productAssets: true } },
         }
     });
     
@@ -161,7 +188,8 @@ export async function saveAsset(boardId: string, asset: ProjectAsset) {
         storageKey,
         mimeType: asset.mimeType,
         status: asset.status || 'ready',
-        extractedText: asset.extractedText || null
+        extractedText: asset.extractedText || null,
+        metadata: asset.metadata || null
     }).returning();
     
     revalidatePath('/');
@@ -223,6 +251,92 @@ export async function saveAvatarIdentityAction(boardId: string, identity: Avatar
 
     revalidatePath('/');
     return savedIdentity;
+}
+
+type ProductInput = Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>;
+type ProductAssetInput = Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>;
+
+export async function createProductAction(boardId: string, product: ProductInput) {
+    await assertBoardOwnership(boardId);
+
+    const [created] = await db.insert(products).values({
+        boardId,
+        name: product.name,
+        description: product.description || null,
+        category: product.category || null,
+        productType: product.productType,
+        platforms: product.platforms || null,
+        digitalSubtype: product.digitalSubtype || null,
+        keyFeatures: product.keyFeatures || null,
+        variants: product.variants || null,
+        complianceNotes: product.complianceNotes || null
+    }).returning();
+
+    revalidatePath('/');
+    return created;
+}
+
+export async function updateProductAction(productId: string, updates: Partial<ProductInput>) {
+    const product = await assertProductOwnership(productId);
+
+    const [updated] = await db.update(products)
+        .set({
+            name: updates.name ?? product.name,
+            description: updates.description ?? product.description,
+            category: updates.category ?? product.category,
+            productType: updates.productType ?? product.productType,
+            platforms: updates.platforms ?? product.platforms,
+            digitalSubtype: updates.digitalSubtype ?? product.digitalSubtype,
+            keyFeatures: updates.keyFeatures ?? product.keyFeatures,
+            variants: updates.variants ?? product.variants,
+            complianceNotes: updates.complianceNotes ?? product.complianceNotes
+        })
+        .where(eq(products.id, productId))
+        .returning();
+
+    revalidatePath('/');
+    return updated;
+}
+
+export async function deleteProductAction(productId: string) {
+    await assertProductOwnership(productId);
+
+    await db.delete(products).where(eq(products.id, productId));
+    revalidatePath('/');
+    return { success: true };
+}
+
+export async function setProductAssetsAction(productId: string, assignments: ProductAssetInput[]) {
+    const product = await assertProductOwnership(productId);
+
+    const assetIds = assignments.map(a => a.assetId);
+    const validAssets = assetIds.length > 0 ? await db.select({ id: assets.id })
+        .from(assets)
+        .where(and(eq(assets.boardId, product.boardId), inArray(assets.id, assetIds))) : [];
+
+    const validAssetIds = new Set(validAssets.map(a => a.id));
+
+    await db.delete(productAssets).where(eq(productAssets.productId, productId));
+
+    const rows = assignments
+        .filter(a => validAssetIds.has(a.assetId))
+        .map(a => ({
+            id: crypto.randomUUID(),
+            productId,
+            assetId: a.assetId,
+            role: a.role,
+            isPrimary: a.isPrimary ?? false,
+            variant: a.variant || null,
+            notes: a.notes || null,
+            tags: a.tags || null
+        }));
+
+    if (rows.length > 0) {
+        await db.insert(productAssets).values(rows);
+    }
+
+    revalidatePath('/');
+    return { success: true };
 }
 
 export async function saveMessageAction(boardId: string, role: 'user' | 'model' | 'system', text: string) {
@@ -440,6 +554,346 @@ export async function deleteGeneratedItemAction(itemId: string) {
     return { success: true };
 }
 
+const AUTO_TAG_MODEL = 'gemini-2.5-flash';
+const AUTO_TAG_MATCH_THRESHOLD = 0.75;
+
+export async function autoTagAssetAction(assetId: string) {
+    const traceId = crypto.randomUUID();
+    logTrace(traceId, `Auto-tag start for asset ${assetId}`);
+
+    try {
+        const asset = await db.query.assets.findFirst({
+            where: eq(assets.id, assetId)
+        });
+
+        if (!asset) {
+            logTrace(traceId, 'Asset not found');
+            return { success: false, error: 'Asset not found', traceId };
+        }
+
+        if (asset.boardId) {
+            await assertBoardOwnership(asset.boardId);
+        }
+
+        if (asset.type !== 'image' && asset.type !== 'logo') {
+            logTrace(traceId, `Skipping auto-tag for non-image asset type ${asset.type}`);
+            return { success: false, error: 'Asset is not an image', traceId };
+        }
+
+        let base64Content: string | null = asset.content;
+        if (!base64Content && asset.storageKey) {
+            const result = await getAsset(asset.storageKey);
+            if (result.success && result.data) {
+                base64Content = result.data;
+            }
+        }
+
+        if (!base64Content) {
+            logTrace(traceId, 'No image data available for asset');
+            return { success: false, error: 'No image content found', traceId };
+        }
+
+        const boardProducts = asset.boardId ? await db.query.products.findMany({
+            where: eq(products.boardId, asset.boardId)
+        }) : [];
+
+        const productContext = boardProducts.length > 0
+            ? boardProducts.map(p => `- ${p.id}: ${p.name} (${p.productType}) ${p.description ? `- ${p.description}` : ''}`).join('\n')
+            : 'None';
+
+        const prompt = `
+You are an expert product asset tagging assistant for marketing teams.
+Analyze the image and return JSON only, following the provided schema.
+
+Existing products on this board:
+${productContext}
+
+Tagging rules:
+- If the image is a product, packaging, or UI screenshot, set isProductAsset = true.
+- Choose the best role from: product_shot, packaging, mockup, screenshot, in_use, lifestyle, hero, logo, ui, other.
+- If this matches an existing product, set matchedProductId and matchConfidence.
+- Only choose matchedProductId if you are confident (>= 0.70).
+`;
+
+        const response: any = await generateContentServer(AUTO_TAG_MODEL, {
+            parts: [
+                { inlineData: { mimeType: asset.mimeType || 'image/png', data: base64Content } },
+                { text: prompt }
+            ]
+        }, {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    isProductAsset: { type: Type.BOOLEAN },
+                    productNameGuess: { type: Type.STRING },
+                    productType: { type: Type.STRING },
+                    role: { type: Type.STRING },
+                    variant: { type: Type.STRING },
+                    confidence: { type: Type.NUMBER },
+                    matchedProductId: { type: Type.STRING },
+                    matchConfidence: { type: Type.NUMBER },
+                    notes: { type: Type.STRING }
+                },
+                required: ['isProductAsset', 'confidence']
+            }
+        });
+
+        if (!response.text) {
+            logTrace(traceId, 'Auto-tag response missing text');
+            return { success: false, error: 'No auto-tag response', traceId };
+        }
+
+        const autoTags = JSON.parse(response.text);
+        const existingMetadata = (typeof asset.metadata === 'object' && asset.metadata !== null) ? asset.metadata : {};
+        const updatedMetadata = {
+            ...existingMetadata,
+            autoTags
+        };
+
+        await db.update(assets)
+            .set({ metadata: updatedMetadata })
+            .where(eq(assets.id, assetId));
+
+        logTrace(traceId, 'Auto-tag metadata saved', autoTags);
+
+        let assignedProductId: string | null = null;
+        const matchConfidence = typeof autoTags?.matchConfidence === 'number' ? autoTags.matchConfidence : 0;
+        const allowedRoles = new Set([
+            'product_shot',
+            'packaging',
+            'mockup',
+            'screenshot',
+            'in_use',
+            'lifestyle',
+            'hero',
+            'logo',
+            'ui',
+            'other'
+        ]);
+        const normalizedRole = allowedRoles.has(autoTags?.role) ? autoTags.role : 'other';
+
+        if (autoTags?.isProductAsset && autoTags?.matchedProductId && matchConfidence >= AUTO_TAG_MATCH_THRESHOLD) {
+            const matchedProduct = boardProducts.find(p => p.id === autoTags.matchedProductId);
+            if (matchedProduct) {
+                const existingAssignment = await db.query.productAssets.findFirst({
+                    where: and(
+                        eq(productAssets.productId, matchedProduct.id),
+                        eq(productAssets.assetId, assetId)
+                    )
+                });
+
+                if (existingAssignment) {
+                    await db.update(productAssets)
+                        .set({
+                            role: normalizedRole as ProductAssetRole,
+                            variant: autoTags.variant || null,
+                            notes: autoTags.notes || null
+                        })
+                        .where(eq(productAssets.id, existingAssignment.id));
+                } else {
+                    await db.insert(productAssets).values({
+                        id: crypto.randomUUID(),
+                        productId: matchedProduct.id,
+                        assetId,
+                        role: normalizedRole as ProductAssetRole,
+                        isPrimary: false,
+                        variant: autoTags.variant || null,
+                        notes: autoTags.notes || null
+                    });
+                }
+
+                assignedProductId = matchedProduct.id;
+                logTrace(traceId, `Auto-assigned asset to product ${matchedProduct.id}`);
+            }
+        }
+
+        revalidatePath('/');
+        return { success: true, autoTags, assignedProductId, traceId };
+    } catch (error: any) {
+        logTrace(traceId, 'Auto-tag failed', error?.message || error);
+        return { success: false, error: error.message || 'Auto-tag failed', traceId };
+    }
+}
+
+const PRODUCT_ANALYSIS_MODEL = 'gemini-2.5-flash';
+const MAX_PRODUCT_IMAGES = 6;
+
+export async function analyzeProductImagesAction(boardId: string, assetIds: string[]) {
+    const traceId = crypto.randomUUID();
+    logTrace(traceId, `Product image analysis start`, { boardId, assetIds: assetIds.length });
+
+    try {
+        await assertBoardOwnership(boardId);
+
+        if (!assetIds || assetIds.length === 0) {
+            return { success: false, error: 'No assets provided', traceId };
+        }
+
+        const assetsToAnalyze = await db
+            .select({
+                id: assets.id,
+                name: assets.name,
+                content: assets.content,
+                storageKey: assets.storageKey,
+                mimeType: assets.mimeType
+            })
+            .from(assets)
+            .where(and(eq(assets.boardId, boardId), inArray(assets.id, assetIds)));
+
+        if (assetsToAnalyze.length === 0) {
+            return { success: false, error: 'Assets not found', traceId };
+        }
+
+        const limitedAssets = assetsToAnalyze.slice(0, MAX_PRODUCT_IMAGES);
+        const buildParts = async (assetList: typeof limitedAssets) => {
+            const parts: any[] = [];
+            for (const asset of assetList) {
+                let base64Content: string | null = asset.content;
+                if (!base64Content && asset.storageKey) {
+                    const result = await getAsset(asset.storageKey);
+                    if (result.success && result.data) {
+                        base64Content = result.data;
+                    }
+                }
+
+                if (!base64Content) {
+                    continue;
+                }
+
+                parts.push({ text: `ASSET_ID: ${asset.id} | NAME: ${asset.name}` });
+                parts.push({ inlineData: { mimeType: asset.mimeType || 'image/png', data: base64Content } });
+            }
+            return parts;
+        };
+
+        const attempts = [limitedAssets, limitedAssets.slice(0, 3)];
+        let analysisResponse: any = null;
+        let analysisError: string | null = null;
+
+        for (const assetList of attempts) {
+            const parts = await buildParts(assetList);
+            if (parts.length === 0) {
+                analysisError = 'No image bytes available';
+                continue;
+            }
+
+            const prompt = `
+You are a product intelligence analyst for marketing teams.
+Analyze the product images provided and return JSON that matches the schema.
+
+Goals:
+- Identify product name, category, and type.
+- Identify platforms (web, ios, android, desktop, api, extension, other) and digitalSubtype if applicable.
+- Extract likely key features and variants visible in packaging or UI.
+- Provide compliance notes if the product is regulated (health, finance, medical, etc.).
+- For each ASSET_ID, assign a role and notes (front label, back, side, hero, etc.).
+
+Allowed productType values:
+- physical_product
+- software
+- service
+- digital_product
+- hardware
+
+Allowed platforms:
+- web
+- ios
+- android
+- desktop
+- api
+- extension
+- other
+
+Allowed digitalSubtype values:
+- SaaS
+- mobile_app
+- course
+- coin_token
+- marketplace
+- community
+- newsletter
+- template
+- dataset
+- AI_tool
+- other
+
+Allowed asset roles:
+- product_shot
+- packaging
+- mockup
+- screenshot
+- in_use
+- lifestyle
+- hero
+- logo
+- ui
+- other
+
+If you cannot determine a field, leave it empty.
+`;
+
+            const contents = [{
+                role: 'user',
+                parts: [{ text: prompt }, ...parts]
+            }];
+
+            try {
+                analysisResponse = await generateContentServer(PRODUCT_ANALYSIS_MODEL, contents, {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                            category: { type: Type.STRING },
+                            productType: { type: Type.STRING },
+                            platforms: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            digitalSubtype: { type: Type.STRING },
+                            keyFeatures: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            variants: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            complianceNotes: { type: Type.STRING },
+                            assetAssignments: {
+                                type: Type.ARRAY,
+                                items: {
+                                    type: Type.OBJECT,
+                                    properties: {
+                                        assetId: { type: Type.STRING },
+                                        role: { type: Type.STRING },
+                                        isPrimary: { type: Type.BOOLEAN },
+                                        variant: { type: Type.STRING },
+                                        notes: { type: Type.STRING },
+                                        tags: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                    },
+                                    required: ['assetId', 'role']
+                                }
+                            }
+                        },
+                        required: []
+                    }
+                });
+                analysisError = null;
+                break;
+            } catch (error: any) {
+                analysisError = error?.message || 'Analysis failed';
+                logTrace(traceId, 'Analysis attempt failed, retrying with fewer images', analysisError);
+            }
+        }
+
+        if (!analysisResponse?.text) {
+            return { success: false, error: analysisError || 'No analysis output', traceId };
+        }
+
+        const analysis = JSON.parse(analysisResponse.text);
+        logTrace(traceId, 'Product image analysis complete', analysis);
+
+        return { success: true, analysis, traceId };
+    } catch (error: any) {
+        logTrace(traceId, 'Product image analysis failed', error?.message || error);
+        return { success: false, error: error.message || 'Product image analysis failed', traceId };
+    }
+}
+
 export async function reExtractPdfAction(assetId: string) {
     try {
         const asset = await db.query.assets.findFirst({
@@ -457,7 +911,6 @@ export async function reExtractPdfAction(assetId: string) {
         let base64Content: string | null = asset.content;
         
         if (!base64Content && asset.storageKey) {
-            const { getAsset } = await import('@/services/objectStorageService');
             const result = await getAsset(asset.storageKey);
             if (result.success && result.data) {
                 base64Content = result.data;

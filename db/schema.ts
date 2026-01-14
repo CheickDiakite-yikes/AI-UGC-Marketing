@@ -7,6 +7,19 @@ export const assetTypeEnum = pgEnum('asset_type', ['logo', 'image', 'pdf', 'text
 export const itemTypeEnum = pgEnum('item_type', ['text', 'image', 'video', 'carousel']);
 export const roleEnum = pgEnum('role', ['user', 'model', 'system']);
 export const jobStatusEnum = pgEnum('job_status', ['pending', 'processing', 'completed', 'failed']);
+export const productTypeEnum = pgEnum('product_type', ['physical_product', 'software', 'service', 'digital_product', 'hardware']);
+export const productAssetRoleEnum = pgEnum('product_asset_role', [
+  'product_shot',
+  'packaging',
+  'mockup',
+  'screenshot',
+  'in_use',
+  'lifestyle',
+  'hero',
+  'logo',
+  'ui',
+  'other',
+]);
 
 // --- Tables ---
 
@@ -44,6 +57,7 @@ export const assets = pgTable('assets', {
   mimeType: text('mime_type'),
   status: text('status').default('ready'),
   extractedText: text('extracted_text'), // For PDFs: extracted readable text content
+  metadata: jsonb('metadata'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -91,6 +105,33 @@ export const avatarIdentities = pgTable('avatar_identities', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const products = pgTable('products', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category'),
+  productType: productTypeEnum('product_type').notNull(),
+  platforms: jsonb('platforms'),
+  digitalSubtype: text('digital_subtype'),
+  keyFeatures: jsonb('key_features'),
+  variants: jsonb('variants'),
+  complianceNotes: text('compliance_notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const productAssets = pgTable('product_assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }),
+  assetId: uuid('asset_id').references(() => assets.id, { onDelete: 'cascade' }),
+  role: productAssetRoleEnum('role').notNull(),
+  isPrimary: boolean('is_primary').default(false),
+  variant: text('variant'),
+  notes: text('notes'),
+  tags: jsonb('tags'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const jobs = pgTable('jobs', {
   id: uuid('id').defaultRandom().primaryKey(),
   boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }),
@@ -113,6 +154,7 @@ export const boardsRelations = relations(boards, ({ many, one }) => ({
   generatedItems: many(generatedItems),
   messages: many(messages),
   jobs: many(jobs),
+  products: many(products),
   brandIdentity: one(brandIdentities, {
     fields: [boards.brandIdentityId],
     references: [brandIdentities.id],
@@ -130,10 +172,30 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const assetsRelations = relations(assets, ({ one }) => ({
+export const assetsRelations = relations(assets, ({ one, many }) => ({
   board: one(boards, {
     fields: [assets.boardId],
     references: [boards.id],
+  }),
+  productAssets: many(productAssets),
+}));
+
+export const productsRelations = relations(products, ({ many, one }) => ({
+  board: one(boards, {
+    fields: [products.boardId],
+    references: [boards.id],
+  }),
+  productAssets: many(productAssets),
+}));
+
+export const productAssetsRelations = relations(productAssets, ({ one }) => ({
+  product: one(products, {
+    fields: [productAssets.productId],
+    references: [products.id],
+  }),
+  asset: one(assets, {
+    fields: [productAssets.assetId],
+    references: [assets.id],
   }),
 }));
 

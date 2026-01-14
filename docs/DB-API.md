@@ -82,7 +82,7 @@ GET /api/db?action=tables
 **Response:**
 ```json
 {
-  "tables": ["users", "boards", "assets", "generated_items", "messages", "brand_identities", "avatar_identities"]
+  "tables": ["users", "boards", "assets", "generated_items", "messages", "brand_identities", "avatar_identities", "products", "product_assets"]
 }
 ```
 
@@ -587,6 +587,8 @@ The following tables are pre-configured:
 | users | User accounts |
 | boards | Content boards/projects |
 | assets | Media assets (logos, images, PDFs) |
+| products | Product catalog entries |
+| product_assets | Product-to-asset assignments |
 | generated_items | AI-generated content |
 | messages | Chat/conversation history |
 | brand_identities | Brand styling configuration |
