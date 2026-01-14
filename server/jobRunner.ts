@@ -1,5 +1,9 @@
 import { getPendingJobs, claimJob, updateJobStatus } from '../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../services/geminiService';
+import { uploadGeneratedItem } from '../services/objectStorageService';
+import { db } from '../db';
+import { generatedItems, users } from '../db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { AspectRatio, VeoConfig } from '../types';
 
 const POLL_INTERVAL = 5000;
@@ -28,8 +32,8 @@ interface JobResult {
 }
 
 async function processImageJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string };
-  const { prompt, aspectRatio, imageSize } = payload;
+  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string };
+  const { prompt, aspectRatio, title } = payload;
   
   const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.SQUARE;
   
@@ -37,12 +41,42 @@ async function processImageJob(job: Job): Promise<JobResult> {
   
   const imageResult = await generateMarketingImage(prompt, aspectRatioValue);
   
-  return { content: imageResult, type: 'image' };
+  const itemId = crypto.randomUUID();
+  let storageKey: string | null = null;
+  let contentToStore: string | null = imageResult;
+  
+  const uploadResult = await uploadGeneratedItem(job.boardId, itemId, imageResult, 'image');
+  if (uploadResult.success && uploadResult.storageKey) {
+    storageKey = uploadResult.storageKey;
+    contentToStore = null;
+  }
+  
+  const [saved] = await db.insert(generatedItems).values({
+    id: itemId,
+    boardId: job.boardId,
+    type: 'image',
+    content: contentToStore,
+    storageKey: storageKey,
+    title: title || 'Generated Image',
+    metadata: { aspectRatio, jobId: job.id, prompt: prompt.substring(0, 200) },
+  }).returning();
+  
+  await db.update(users)
+    .set({ imagesGenerated: sql`${users.imagesGenerated} + 1` })
+    .where(eq(users.id, job.userId));
+  
+  console.log(`[JOB RUNNER] Saved image ${itemId} to database`);
+  
+  return { 
+    content: storageKey ? `/api/storage/${encodeURIComponent(storageKey)}` : imageResult, 
+    type: 'image',
+    itemId: saved.id
+  };
 }
 
 async function processVideoJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; resolution?: string };
-  const { prompt, aspectRatio, resolution } = payload;
+  const payload = job.payload as { prompt: string; aspectRatio?: string; resolution?: string; title?: string };
+  const { prompt, aspectRatio, resolution, title } = payload;
   
   const config: VeoConfig = {
     aspectRatio: (aspectRatio === '9:16' ? '9:16' : '16:9'),
@@ -53,7 +87,37 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   
   const videoResult = await generateVeoVideo(prompt, config);
   
-  return { content: videoResult, type: 'video' };
+  const itemId = crypto.randomUUID();
+  let storageKey: string | null = null;
+  let contentToStore: string | null = videoResult;
+  
+  const uploadResult = await uploadGeneratedItem(job.boardId, itemId, videoResult, 'video');
+  if (uploadResult.success && uploadResult.storageKey) {
+    storageKey = uploadResult.storageKey;
+    contentToStore = null;
+  }
+  
+  const [saved] = await db.insert(generatedItems).values({
+    id: itemId,
+    boardId: job.boardId,
+    type: 'video',
+    content: contentToStore,
+    storageKey: storageKey,
+    title: title || 'Generated Video',
+    metadata: { aspectRatio, resolution, jobId: job.id, prompt: prompt.substring(0, 200) },
+  }).returning();
+  
+  await db.update(users)
+    .set({ videosGenerated: sql`${users.videosGenerated} + 1` })
+    .where(eq(users.id, job.userId));
+  
+  console.log(`[JOB RUNNER] Saved video ${itemId} to database`);
+  
+  return { 
+    content: storageKey ? `/api/storage/${encodeURIComponent(storageKey)}` : videoResult, 
+    type: 'video',
+    itemId: saved.id
+  };
 }
 
 async function processCampaignJob(job: Job): Promise<JobResult> {

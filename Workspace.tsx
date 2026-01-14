@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import CanvasItemCard from './components/CanvasItemCard';
@@ -126,6 +126,77 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   const [pendingScannedIdentity, setPendingScannedIdentity] = useState<BrandIdentity | null>(null);
   const [pendingScannedAvatar, setPendingScannedAvatar] = useState<AvatarIdentity | null>(null);
+
+  const [activeJobs, setActiveJobs] = useState<string[]>([]);
+
+  const loadBoardDetails = useCallback(async (boardId: string) => {
+    const b = await getBoardDetails(boardId);
+    if (b) {
+      const mappedBoard: Board = {
+        ...b,
+        items: b.generatedItems.map((gi: any) => ({
+          id: gi.id,
+          type: gi.type,
+          content: gi.content,
+          carouselUrls: gi.carouselUrls,
+          title: gi.title,
+          description: gi.description,
+          meta: gi.metadata,
+          x: gi.x,
+          y: gi.y
+        })),
+        assets: b.assets as ProjectAsset[],
+        messages: b.messages as ChatMessage[],
+        brandIdentity: b.brandIdentity as BrandIdentity | null,
+        avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
+        createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
+      };
+      setActiveBoard(mappedBoard);
+    }
+  }, []);
+
+  const pollJobStatus = useCallback((jobId: string, onComplete: (result: any) => void) => {
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        const job = await res.json();
+        
+        if (job.status === 'completed') {
+          onComplete(job.result);
+          setActiveJobs(prev => prev.filter(id => id !== jobId));
+        } else if (job.status === 'failed') {
+          console.error('[WORKSPACE] Job failed:', job.error);
+          setActiveJobs(prev => prev.filter(id => id !== jobId));
+        } else {
+          setTimeout(poll, 3000);
+        }
+      } catch (error) {
+        console.error('[WORKSPACE] Error polling job:', error);
+        setTimeout(poll, 5000);
+      }
+    };
+    poll();
+  }, []);
+
+  useEffect(() => {
+    if (activeBoardId) {
+      fetch(`/api/jobs?boardId=${activeBoardId}`)
+        .then(res => res.json())
+        .then(jobs => {
+          const pendingJobs = jobs.filter((j: any) => j.status === 'pending' || j.status === 'processing');
+          if (pendingJobs.length > 0) {
+            setActiveJobs(pendingJobs.map((j: any) => j.id));
+            pendingJobs.forEach((job: any) => {
+              pollJobStatus(job.id, async () => {
+                await loadBoardDetails(activeBoardId);
+                getUserUsageAction().then(setUsage);
+              });
+            });
+          }
+        })
+        .catch(console.error);
+    }
+  }, [activeBoardId, pollJobStatus, loadBoardDetails]);
 
   const handleAddAsset = async (asset: ProjectAsset) => {
     if (!activeBoardId) return;
@@ -281,20 +352,46 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         if (part.functionCall) {
           const fc = part.functionCall as FunctionCall;
           if (fc.name === 'generate_image') {
-            setProcessingStatus(`Rendering High-Fi Image...`);
-            const imgData = await generateMarketingImage(fc.args['prompt'] as string, fc.args['aspectRatio'] as AspectRatio || AspectRatio.SQUARE);
-            const item: CanvasItem = { id: Math.random().toString(), type: 'image', content: imgData, title: "Custom Asset", meta: { aspectRatio: fc.args['aspectRatio'] as string } };
-            newItems.push(item);
-            await saveGeneratedItemAction(activeBoardId, item);
-            getUserUsageAction().then(setUsage);
+            setProcessingStatus(`Queuing image generation...`);
+            const res = await fetch('/api/jobs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                boardId: activeBoardId,
+                type: 'generate_image',
+                payload: { prompt: fc.args['prompt'], aspectRatio: fc.args['aspectRatio'] || '1:1' }
+              })
+            });
+            const job = await res.json();
+            if (job.id) {
+              setActiveJobs(prev => [...prev, job.id]);
+              pollJobStatus(job.id, async () => {
+                await loadBoardDetails(activeBoardId);
+                getUserUsageAction().then(setUsage);
+              });
+              responseText = `🎨 Image generation in progress. This will complete even if you leave the page.`;
+            }
           }
           if (fc.name === 'generate_video') {
-            setProcessingStatus(`Simulating Cinematic Video...`);
-            const videoUrl = await generateVeoVideo(fc.args['prompt'] as string, { resolution: '720p', aspectRatio: (fc.args['aspectRatio'] as any) || '16:9' });
-            const item: CanvasItem = { id: Math.random().toString(), type: 'video', content: videoUrl, title: "Cinematic Clip" };
-            newItems.push(item);
-            await saveGeneratedItemAction(activeBoardId, item);
-            getUserUsageAction().then(setUsage);
+            setProcessingStatus(`Queuing video generation...`);
+            const res = await fetch('/api/jobs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                boardId: activeBoardId,
+                type: 'generate_video',
+                payload: { prompt: fc.args['prompt'], aspectRatio: fc.args['aspectRatio'] || '16:9', resolution: '720p' }
+              })
+            });
+            const job = await res.json();
+            if (job.id) {
+              setActiveJobs(prev => [...prev, job.id]);
+              pollJobStatus(job.id, async () => {
+                await loadBoardDetails(activeBoardId);
+                getUserUsageAction().then(setUsage);
+              });
+              responseText = `🎬 Video generation in progress (takes 1-2 min). This will complete even if you leave the page.`;
+            }
           }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
           
@@ -325,27 +422,57 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       }
 
       if (packQueue.length > 0) {
+        let jobCount = 0;
         for (const pack of packQueue) {
           for (const item of pack.items) {
-            setProcessingStatus(`Constructing ${item.title}...`);
+            setProcessingStatus(`Queuing ${item.title}...`);
             if (item.type === 'carousel') {
-              const slides: string[] = [];
-              for (const p of item.carousel_prompts) {
-                const slide = await generateMarketingImage(p, item.aspectRatio || AspectRatio.SQUARE);
-                slides.push(slide);
+              // TODO: Add carousel support to job runner
+              // For now, run synchronously with fallback
+              try {
+                const slides: string[] = [];
+                for (const p of item.carousel_prompts) {
+                  const slide = await generateMarketingImage(p, item.aspectRatio || AspectRatio.SQUARE);
+                  slides.push(slide);
+                }
+                const carouselItem: CanvasItem = { id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
+                newItems.push(carouselItem);
+                await saveGeneratedItemAction(activeBoardId, carouselItem);
+                getUserUsageAction().then(setUsage);
+              } catch (error) {
+                console.error('[WORKSPACE] Carousel generation failed:', error);
               }
-              const carouselItem: CanvasItem = { id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
-              newItems.push(carouselItem);
-              await saveGeneratedItemAction(activeBoardId, carouselItem);
-              getUserUsageAction().then(setUsage);
             } else {
-              const res = await (item.type === 'video' ? generateVeoVideo(item.visual_prompt, { resolution: '720p', aspectRatio: item.aspectRatio }) : generateMarketingImage(item.visual_prompt, item.aspectRatio));
-              const singleItem: CanvasItem = { id: Math.random().toString(), type: item.type === 'video' ? 'video' : 'image', content: res, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
-              newItems.push(singleItem);
-              await saveGeneratedItemAction(activeBoardId, singleItem);
-              getUserUsageAction().then(setUsage);
+              // Use background jobs for images and videos in packs
+              const jobType = item.type === 'video' ? 'generate_video' : 'generate_image';
+              const res = await fetch('/api/jobs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  boardId: activeBoardId,
+                  type: jobType,
+                  payload: { 
+                    prompt: item.visual_prompt, 
+                    aspectRatio: item.aspectRatio || (item.type === 'video' ? '16:9' : '1:1'),
+                    resolution: '720p',
+                    title: item.title
+                  }
+                })
+              });
+              const job = await res.json();
+              if (job.id) {
+                jobCount++;
+                setActiveJobs(prev => [...prev, job.id]);
+                pollJobStatus(job.id, async () => {
+                  await loadBoardDetails(activeBoardId);
+                  getUserUsageAction().then(setUsage);
+                });
+              }
             }
           }
+        }
+        if (jobCount > 0) {
+          responseText = `📦 Campaign pack queued! ${jobCount} items are generating in the background. This will complete even if you leave the page.`;
         }
       }
 
@@ -502,6 +629,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       </div>
 
       <ChatInterface messages={activeBoard.messages} onSendMessage={handleSendMessage} isProcessing={isProcessing} processingStatus={processingStatus} hasAssets={activeBoard.assets.length > 0} />
+      
+      {activeJobs.length > 0 && (
+        <div className="fixed bottom-24 right-4 md:bottom-28 md:right-8 z-40">
+          <div className="bg-neo-yellow border-4 border-black shadow-neo px-4 py-2 flex items-center gap-2 animate-pulse">
+            <span className="animate-spin">⚙️</span>
+            <span className="font-bold text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
+          </div>
+        </div>
+      )}
       {isAnalyzingLogo && <BrandAnalysisSkeleton />}
       {showBrandModal && pendingScannedIdentity && <BrandIdentityModal initialIdentity={pendingScannedIdentity} logoUrl={pendingLogoAsset?.content || ""} onSave={handleSaveIdentity} onClose={() => setShowBrandModal(false)} />}
       {showAvatarModal && pendingScannedAvatar && <AvatarAnalysisModal initialIdentity={pendingScannedAvatar} onSave={handleSaveAvatar} onClose={() => setShowAvatarModal(false)} />}

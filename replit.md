@@ -174,7 +174,31 @@ The AI agent has access to real-time web search for:
 - Prompts should describe: scene, action, movement, camera angle, mood
 - "UGC Viral Pack" requests will include 2-3 videos alongside images
 
+## Background Job Processing
+
+AI generation tasks (images, videos, campaign packs) run in the background, allowing users to navigate away without losing their work.
+
+### How It Works
+- When user requests content generation, a job is created in the `jobs` table
+- A background worker (`server/jobRunner.ts`) polls for pending jobs every 5 seconds
+- Jobs are processed independently of user connection
+- Results are saved directly to object storage and database
+- Users can see active jobs indicator and items appear when complete
+
+### Job States
+- `pending` - Job queued, waiting for worker
+- `processing` - Worker is generating content
+- `completed` - Content generated and saved
+- `failed` - Generation failed (error logged)
+
+### Key Files
+- `db/schema.ts` - Jobs table schema
+- `services/jobService.ts` - Job CRUD helpers
+- `server/jobRunner.ts` - Background worker
+- `app/api/jobs/route.ts` - Job API endpoints
+
 ## Recent Changes
+- Added background job processing for resilient AI generation (January 2026)
 - Migrated generated items to Object Storage for better performance and scalability (January 2026)
 - Fixed video generation with Veo 3.1 - UGC Viral Packs now include actual videos (January 2026)
 - Upgraded website scraping to use Gemini URL Context tool for better data extraction (January 2026)
