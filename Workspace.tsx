@@ -551,7 +551,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   if (!activeBoard) return <div className="flex h-screen items-center justify-center font-display text-xl animate-pulse">Loading Workspace...</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full font-sans text-neo-black relative overflow-hidden bg-gray-50">
+    <div className="flex flex-col md:flex-row min-h-[100dvh] md:h-screen w-full font-sans text-neo-black relative md:overflow-hidden bg-gray-50">
       {isCameraActive && (
         <CameraModal
           onCapture={() => { }} // Not used in batch mode

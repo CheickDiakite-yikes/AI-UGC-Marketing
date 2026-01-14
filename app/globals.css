@@ -14,8 +14,13 @@ body {
   background-color: #F3F4F6;
   background-image: radial-gradient(#1A1A1A 1px, transparent 1px);
   background-size: 24px 24px;
-  overflow: hidden;
-  /* App handles scrolling */
+  overflow-x: hidden;
+  /* Allow vertical scroll on mobile for Safari viewport recovery */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Safe area insets for notch/status bar on iOS */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
   /* Fallback font */
   font-family: sans-serif;
 }
