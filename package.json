@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:jobs": "npx tsx server/jobRunner.ts",
     "lint": "next lint",
     "test": "vitest",
     "db:push": "drizzle-kit push",
@@ -40,8 +41,10 @@
     "jsdom": "^27.4.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
-    "tsx": "^4.21.0",
     "typescript": "^5.0.0",
     "vitest": "^1.6.0"
+  },
+  "optionalDependencies": {
+    "tsx": "^4.21.0"
   }
 }
