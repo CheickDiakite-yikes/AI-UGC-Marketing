@@ -64,7 +64,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         <div className="flex gap-4">
           <button onClick={onLogin} className="hidden md:block font-bold hover:underline decoration-neo-pink underline-offset-4 decoration-2 text-neo-black">Log In</button>
           <button 
-            onClick={onSignup}
+            onClick={onLogin}
             className="bg-neo-black text-white px-4 py-2 md:px-6 md:py-2.5 text-sm md:text-base font-bold border-2 border-transparent shadow-neo hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all hover:bg-neo-pink hover:text-black"
           >
             Get Started
@@ -102,7 +102,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         <Reveal delay={600}>
           <div className="flex flex-col md:flex-row gap-6 items-center w-full justify-center">
              <button 
-               onClick={onSignup}
+               onClick={onLogin}
                className="bg-neo-pink text-black border-4 border-black px-8 py-4 md:px-10 md:py-5 text-lg md:text-xl font-bold shadow-neo-lg hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] hover:bg-neo-cyan transition-all w-full md:w-auto transform hover:-rotate-1"
              >
                Start Creating for Free
@@ -363,7 +363,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         <div className="relative z-10 max-w-4xl mx-auto">
            <h2 className="font-display font-black text-4xl md:text-8xl mb-6 md:mb-8">READY TO LAUNCH?</h2>
            <button 
-             onClick={onSignup}
+             onClick={onLogin}
              className="bg-white text-black border-4 border-transparent px-8 py-4 md:px-12 md:py-6 text-xl md:text-2xl font-bold hover:scale-110 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)]"
            >
              Start Your Free Trial
