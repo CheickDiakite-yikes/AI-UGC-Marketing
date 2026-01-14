@@ -6,12 +6,33 @@ import ReactMarkdown from 'react-markdown';
 interface ChatInterfaceProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
+  onDismissResearch?: (messageId: string) => void;
   isProcessing: boolean;
   processingStatus?: string;
   hasAssets: boolean;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, isProcessing, processingStatus, hasAssets }) => {
+// Helper to format long URLs into readable short versions
+const formatUrl = (url: string): string => {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.replace('www.', '');
+    // Get first meaningful path segment
+    const pathParts = urlObj.pathname.split('/').filter(Boolean);
+    if (pathParts.length > 0 && pathParts[0].length < 30) {
+      return `${hostname}/${pathParts[0]}...`;
+    }
+    return hostname;
+  } catch {
+    // Fallback for malformed URLs
+    if (url.length > 40) {
+      return url.slice(0, 35) + '...';
+    }
+    return url;
+  }
+};
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, onDismissResearch, isProcessing, processingStatus, hasAssets }) => {
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -159,7 +180,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
                <div className="mt-2 ml-1 max-w-[90%] flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-neo-cyan animate-pulse"></span>
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Trend Sources</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sources</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {msg.groundingLinks.map((link, idx) => (
@@ -168,13 +189,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
                          href={link.url} 
                          target="_blank" 
                          rel="noopener noreferrer"
-                         className="text-[10px] bg-white border-2 border-black px-2 py-1 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all truncate max-w-[200px] font-bold"
+                         title={link.url}
+                         className="text-[10px] bg-white border-2 border-black px-2 py-1 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold inline-flex items-center gap-1"
                        >
-                         ↗ {link.title}
+                         <span className="text-neo-cyan">↗</span>
+                         <span className="max-w-[150px] truncate">{link.title || formatUrl(link.url)}</span>
                        </a>
                     ))}
                   </div>
                </div>
+            )}
+            
+            {/* Response buttons for research results */}
+            {msg.role === 'model' && msg.groundingLinks && msg.groundingLinks.length > 0 && !msg.researchDismissed && (
+              <div className="mt-3 ml-1 max-w-[90%] flex flex-col gap-2 animate-fade-in-up">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Quick Actions</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => onSendMessage("Generate the campaign now based on this research")}
+                    disabled={isProcessing}
+                    className="text-xs bg-neo-lime border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <span>🚀</span> Generate Now
+                  </button>
+                  <button
+                    onClick={() => onSendMessage("Expand this research further with more details and examples")}
+                    disabled={isProcessing}
+                    className="text-xs bg-neo-cyan border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <span>🔍</span> Expand Research
+                  </button>
+                  <button
+                    onClick={() => onDismissResearch?.(msg.id)}
+                    disabled={isProcessing}
+                    className="text-xs bg-white border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold text-gray-600 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <span>✕</span> Dismiss
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         ))}

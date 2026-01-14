@@ -36,6 +36,8 @@ export interface ChatMessage {
   isThinking?: boolean;
   relatedCanvasItems?: string[]; // IDs of items generated in this turn
   groundingLinks?: { title: string; url: string }[];
+  isResearchResult?: boolean; // True when AI did research and awaiting user decision
+  researchDismissed?: boolean; // True when user dismissed the research
 }
 
 export interface BrandIdentity {

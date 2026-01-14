@@ -349,6 +349,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   };
 
+  // Handler for dismissing research response buttons
+  const handleDismissResearch = (messageId: string) => {
+    if (!activeBoard) return;
+    updateActiveBoard(b => ({
+      ...b,
+      messages: b.messages.map(msg => 
+        msg.id === messageId ? { ...msg, researchDismissed: true } : msg
+      )
+    }));
+  };
+
   const handleSendMessage = async (text: string) => {
     if (!activeBoard || !activeBoardId) return;
 
@@ -685,7 +696,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         </div>
       </div>
 
-      <ChatInterface messages={activeBoard.messages} onSendMessage={handleSendMessage} isProcessing={isProcessing} processingStatus={processingStatus} hasAssets={activeBoard.assets.length > 0} />
+      <ChatInterface messages={activeBoard.messages} onSendMessage={handleSendMessage} onDismissResearch={handleDismissResearch} isProcessing={isProcessing} processingStatus={processingStatus} hasAssets={activeBoard.assets.length > 0} />
       
       {activeJobs.length > 0 && (
         <div className="fixed bottom-4 right-4 md:bottom-28 md:right-8 z-30">
