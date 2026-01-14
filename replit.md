@@ -178,12 +178,14 @@ The AI agent has access to real-time web search for:
 
 AI generation tasks (images, videos, campaign packs) run in the background, allowing users to navigate away without losing their work.
 
-### How It Works
+### How It Works (Autoscale-Compatible)
 - When user requests content generation, a job is created in the `jobs` table
-- A background worker (`server/jobRunner.ts`) polls for pending jobs every 5 seconds
-- Jobs are processed independently of user connection
+- **In Development**: A background worker (`server/jobRunner.ts`) polls for pending jobs every 5 seconds
+- **In Production (Autoscale)**: Jobs are processed via API calls (`POST /api/jobs/process`)
+- The frontend triggers job processing on each poll cycle, ensuring jobs complete even in Autoscale
 - Results are saved directly to object storage and database
 - Users can see active jobs indicator and items appear when complete
+- Users can clear stuck jobs using the "Clear" button on the jobs indicator
 
 ### Job States
 - `pending` - Job queued, waiting for worker
@@ -194,7 +196,8 @@ AI generation tasks (images, videos, campaign packs) run in the background, allo
 ### Key Files
 - `db/schema.ts` - Jobs table schema
 - `services/jobService.ts` - Job CRUD helpers
-- `server/jobRunner.ts` - Background worker
+- `server/jobRunner.ts` - Background worker (development only)
+- `app/api/jobs/process/route.ts` - On-demand job processor (works with Autoscale)
 - `app/api/jobs/route.ts` - Job API endpoints
 
 ## Deployment

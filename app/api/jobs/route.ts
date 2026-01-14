@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createJob, getJobsByBoard } from '@/services/jobService';
 import { getSession } from '@/app/actions/authActions';
 import { db } from '@/db';
-import { boards } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { boards, jobs } from '@/db/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
@@ -84,6 +84,53 @@ export async function GET(request: NextRequest) {
     })));
   } catch (error) {
     console.error('[API] Error fetching jobs:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getSession();
+    if (!session || !session.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const boardId = searchParams.get('boardId');
+    const action = searchParams.get('action');
+
+    if (!boardId) {
+      return NextResponse.json({ error: 'boardId is required' }, { status: 400 });
+    }
+
+    const board = await db.query.boards.findFirst({
+      where: eq(boards.id, boardId),
+    });
+
+    if (!board || board.userId !== session.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    if (action === 'clear-stuck') {
+      const result = await db.update(jobs)
+        .set({ status: 'failed', error: 'Cleared by user - job was stuck', updatedAt: new Date() })
+        .where(
+          and(
+            eq(jobs.boardId, boardId),
+            inArray(jobs.status, ['pending', 'processing'])
+          )
+        )
+        .returning({ id: jobs.id });
+
+      return NextResponse.json({ 
+        cleared: result.length,
+        message: `Cleared ${result.length} stuck jobs`
+      });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    console.error('[API] Error clearing jobs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

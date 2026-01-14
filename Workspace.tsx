@@ -166,9 +166,25 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   }, []);
 
+  // Trigger the job processor API to process pending jobs (works with Autoscale)
+  const triggerJobProcessing = useCallback(async () => {
+    try {
+      const res = await fetch('/api/jobs/process', { method: 'POST' });
+      const result = await res.json();
+      console.log('[WORKSPACE] Job processor result:', result);
+      return result.processed;
+    } catch (error) {
+      console.error('[WORKSPACE] Failed to trigger job processor:', error);
+      return false;
+    }
+  }, []);
+
   const pollJobStatus = useCallback((jobId: string, onComplete: (result: any) => void) => {
     const poll = async () => {
       try {
+        // Trigger job processing on each poll (ensures jobs get processed in Autoscale)
+        await triggerJobProcessing();
+        
         const res = await fetch(`/api/jobs/${jobId}`);
         const job = await res.json();
         
@@ -197,16 +213,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       }
     };
     poll();
-  }, [showError, showSuccess]);
+  }, [showError, showSuccess, triggerJobProcessing]);
 
   useEffect(() => {
     if (activeBoardId) {
       fetch(`/api/jobs?boardId=${activeBoardId}`)
         .then(res => res.json())
-        .then(jobs => {
+        .then(async (jobs) => {
           const pendingJobs = jobs.filter((j: any) => j.status === 'pending' || j.status === 'processing');
           if (pendingJobs.length > 0) {
             setActiveJobs(pendingJobs.map((j: any) => j.id));
+            // Immediately trigger job processing for any pending jobs
+            await triggerJobProcessing();
             pendingJobs.forEach((job: any) => {
               pollJobStatus(job.id, async () => {
                 await loadBoardDetails(activeBoardId);
@@ -217,7 +235,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         })
         .catch(console.error);
     }
-  }, [activeBoardId, pollJobStatus, loadBoardDetails]);
+  }, [activeBoardId, pollJobStatus, loadBoardDetails, triggerJobProcessing]);
 
   const handleAddAsset = async (asset: ProjectAsset) => {
     if (!activeBoardId) return;
@@ -700,9 +718,25 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       
       {activeJobs.length > 0 && (
         <div className="fixed bottom-4 right-4 md:bottom-28 md:right-8 z-30">
-          <div className="bg-neo-yellow border-2 md:border-4 border-black shadow-neo px-3 py-1.5 md:px-4 md:py-2 flex items-center gap-2 animate-pulse rounded-full md:rounded-none">
+          <div className="bg-neo-yellow border-2 md:border-4 border-black shadow-neo px-3 py-1.5 md:px-4 md:py-2 flex items-center gap-2 rounded-full md:rounded-none">
             <span className="animate-spin text-sm md:text-base">⚙️</span>
             <span className="font-bold text-xs md:text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
+            <button
+              onClick={async () => {
+                if (confirm('Clear all stuck jobs? This will cancel any pending generations.')) {
+                  try {
+                    await fetch(`/api/jobs?boardId=${activeBoardId}&action=clear-stuck`, { method: 'DELETE' });
+                    setActiveJobs([]);
+                    showToast('Stuck jobs cleared', 'info');
+                  } catch (e) {
+                    console.error('Failed to clear jobs:', e);
+                  }
+                }
+              }}
+              className="ml-1 text-xs font-bold bg-white/50 hover:bg-white px-2 py-0.5 rounded border border-black/30"
+            >
+              Clear
+            </button>
           </div>
         </div>
       )}
