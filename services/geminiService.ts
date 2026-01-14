@@ -1,5 +1,5 @@
 import { ProjectAsset, AspectRatio, ImageSize, VeoConfig, BrandIdentity, AvatarIdentity } from "../types";
-import { generateContentServer, generateImagesServer, generateContentWithSearch } from "../app/actions";
+import { generateContentServer, generateImagesServer, generateContentWithSearch, generateVideoServer } from "../app/actions";
 import { FunctionDeclaration, Type, Part } from "@google/genai";
 
 // --- Tool Definitions ---
@@ -286,7 +286,13 @@ export const chatWithMarketingAgent = async (
     - Extract the company/product name from source docs and use it in all content
     - Match the tone, language, and positioning from the source documents
     - Don't use Search and Function Calling in the same turn
-    - Video generation is currently unavailable - use ONLY images and carousels
+    
+    VIDEO GENERATION GUIDELINES:
+    - Use generate_video for cinematic UGC-style videos, viral shorts, or Reels content
+    - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
+    - Video prompts should describe: scene, action, movement, camera angle, mood
+    - Videos take longer to generate (1-2 minutes each) so keep pack sizes reasonable
+    - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
   `;
 
   const model = "gemini-3-pro-preview";
@@ -296,7 +302,7 @@ export const chatWithMarketingAgent = async (
     { role: "user", parts: [{ text: newMessage }] }
   ];
 
-  const tools = [{ functionDeclarations: [generateImageTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
+  const tools = [{ functionDeclarations: [generateImageTool, generateVideoTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
 
   const response: any = await generateContentServer(model, contents, {
     systemInstruction,
@@ -329,7 +335,11 @@ export const generateVeoVideo = async (
   prompt: string,
   config: VeoConfig
 ): Promise<string> => {
-  throw new Error("Video generation migration pending: Requires background job setup.");
+  const videoUrl = await generateVideoServer(prompt, {
+    aspectRatio: config.aspectRatio,
+    resolution: config.resolution
+  });
+  return videoUrl;
 };
 
 export const researchWithGoogleSearch = async (

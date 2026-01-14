@@ -125,3 +125,74 @@ export async function generateImagesServer(model: string, prompt: string, config
         throw new Error(error.message || "Failed to generate image");
     }
 }
+
+export async function generateVideoServer(
+    prompt: string, 
+    config: { aspectRatio?: '16:9' | '9:16'; resolution?: '720p' | '1080p' }
+): Promise<string> {
+    if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
+    
+    try {
+        console.log("[Veo 3.1] Starting video generation with prompt:", prompt.substring(0, 100) + "...");
+        
+        // Use veo-3.1-fast-generate-preview for faster generation ($0.15/sec vs $0.40/sec)
+        let operation = await ai.models.generateVideos({
+            model: "veo-3.1-fast-generate-preview",
+            prompt: prompt,
+            config: {
+                aspectRatio: config.aspectRatio || "16:9",
+            },
+        });
+
+        console.log("[Veo 3.1] Video generation started, polling for completion...");
+        
+        // Poll for completion (timeout after 5 minutes)
+        const startTime = Date.now();
+        const timeout = 5 * 60 * 1000; // 5 minutes
+        
+        while (!operation.done) {
+            if (Date.now() - startTime > timeout) {
+                throw new Error("Video generation timed out after 5 minutes");
+            }
+            
+            console.log("[Veo 3.1] Still generating... waiting 10 seconds");
+            await new Promise((resolve) => setTimeout(resolve, 10000));
+            
+            operation = await ai.operations.getVideosOperation({
+                operation: operation,
+            });
+        }
+
+        console.log("[Veo 3.1] Video generation complete!");
+        
+        if (!operation.response?.generatedVideos || operation.response.generatedVideos.length === 0) {
+            throw new Error("No videos were generated");
+        }
+
+        const video = operation.response.generatedVideos[0];
+        if (!video.video?.uri) {
+            throw new Error("Generated video has no URI");
+        }
+
+        // Download the video server-side to avoid exposing API key to client
+        console.log("[Veo 3.1] Downloading video server-side...");
+        const videoUri = `${video.video.uri}&key=${apiKey}`;
+        const response = await fetch(videoUri);
+        
+        if (!response.ok) {
+            throw new Error(`Failed to download video: ${response.status}`);
+        }
+        
+        const videoBuffer = await response.arrayBuffer();
+        const base64Video = Buffer.from(videoBuffer).toString('base64');
+        const mimeType = response.headers.get('content-type') || 'video/mp4';
+        
+        console.log("[Veo 3.1] Video downloaded and encoded, size:", Math.round(videoBuffer.byteLength / 1024), "KB");
+        
+        // Return as data URL (like we do for images)
+        return `data:${mimeType};base64,${base64Video}`;
+    } catch (error: any) {
+        console.error("Veo 3.1 Video API Error:", error);
+        throw new Error(error.message || "Failed to generate video");
+    }
+}

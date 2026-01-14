@@ -137,6 +137,7 @@ Media files (logos, images, avatars) are stored in Replit Object Storage instead
 ### Gemini Models Used
 - **gemini-3-pro-preview** - Main chat agent for content planning and function calling
 - **gemini-3-pro-image-preview** - Marketing image generation
+- **veo-3.1-fast-generate-preview** - Cinematic video generation (UGC, Reels, TikTok)
 - **gemini-2.5-flash** - URL Context (website scraping) and Google Search grounding
 
 ### Website Scraping (URL Context)
@@ -152,12 +153,21 @@ The AI agent has access to real-time web search for:
 
 ### Available AI Tools
 1. `generate_image` - Create high-fidelity marketing images
-2. `generate_campaign_pack` - Generate 5-10 item campaign packs
-3. `generate_avatar_visual` - Design brand mascots/avatars
-4. `discover_trends` - Search for latest trends with Google Search
-5. `web_research` - General web research with citations
+2. `generate_video` - Create cinematic marketing videos using Veo 3.1
+3. `generate_campaign_pack` - Generate 5-10 item campaign packs (images, videos, carousels)
+4. `generate_avatar_visual` - Design brand mascots/avatars
+5. `discover_trends` - Search for latest trends with Google Search
+6. `web_research` - General web research with citations
+
+### Video Generation (Veo 3.1)
+- Uses `veo-3.1-fast-generate-preview` model ($0.15/second)
+- Supports 16:9 (landscape) and 9:16 (portrait/Reels) aspect ratios
+- Videos take 1-2 minutes to generate
+- Prompts should describe: scene, action, movement, camera angle, mood
+- "UGC Viral Pack" requests will include 2-3 videos alongside images
 
 ## Recent Changes
+- Fixed video generation with Veo 3.1 - UGC Viral Packs now include actual videos (January 2026)
 - Upgraded website scraping to use Gemini URL Context tool for better data extraction (January 2026)
 - Added Google Search grounding for trend discovery and web research (January 2026)
 - Fixed data isolation - all board operations verify user ownership (January 2026)
