@@ -1,9 +1,10 @@
 import { db } from '@/db';
 import { assets, products } from '@/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { getAsset } from './objectStorageService';
 import { VideoGenerationReferenceType } from '@google/genai';
 import type { VideoGenerationReferenceImage } from '@google/genai';
+import sharp from 'sharp';
 
 const ROLE_PRIORITY: Record<string, number> = {
   hero: 100,
@@ -18,6 +19,23 @@ const ROLE_PRIORITY: Record<string, number> = {
   other: 10,
 };
 
+const SUPPORTED_REFERENCE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const MAX_REFERENCE_DIMENSION = 1536;
+
+const detectMimeFromBuffer = (buffer: Buffer): string | null => {
+  if (buffer.length < 12) return null;
+  const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  const isWebP = buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+  const isGif = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
+  if (isPng) return 'image/png';
+  if (isJpeg) return 'image/jpeg';
+  if (isWebP) return 'image/webp';
+  if (isGif) return 'image/gif';
+  return null;
+};
+
 function logTrace(traceId: string, message: string, data?: unknown) {
   if (data !== undefined) {
     console.log(`[VIDEO-INGREDIENTS ${traceId}] ${message}`, data);
@@ -28,17 +46,56 @@ function logTrace(traceId: string, message: string, data?: unknown) {
 
 async function getAssetBase64(asset: { content: string | null; storageKey: string | null; mimeType: string | null }) {
   if (asset.content) {
-    return { base64: asset.content, mimeType: asset.mimeType || 'image/png' };
+    if (asset.content.startsWith('http') || asset.content.startsWith('/api/')) {
+      return null;
+    }
+    const base64Data = asset.content.includes(',') ? asset.content.split(',')[1] : asset.content;
+    const sanitized = base64Data.replace(/\s/g, '');
+    return { base64: sanitized, mimeType: asset.mimeType || 'image/png' };
   }
 
   if (asset.storageKey) {
     const result = await getAsset(asset.storageKey);
     if (result.success && result.data) {
-      return { base64: result.data, mimeType: asset.mimeType || 'image/png' };
+      const sanitized = result.data.replace(/\s/g, '');
+      return { base64: sanitized, mimeType: asset.mimeType || 'image/png' };
     }
   }
 
   return null;
+}
+
+async function normalizeReferenceImage(base64: string, mimeType?: string | null) {
+  const buffer = Buffer.from(base64, 'base64');
+  const detected = detectMimeFromBuffer(buffer);
+  const finalMime = detected || mimeType || 'image/png';
+
+  try {
+    const meta = await sharp(buffer).metadata();
+    let pipeline = sharp(buffer).rotate().toColorspace('srgb');
+    const shouldResize = (meta.width && meta.width > MAX_REFERENCE_DIMENSION) || (meta.height && meta.height > MAX_REFERENCE_DIMENSION);
+    if (shouldResize) {
+      pipeline = pipeline.resize({
+        width: MAX_REFERENCE_DIMENSION,
+        height: MAX_REFERENCE_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true
+      });
+    }
+
+    const outputBuffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+    const outputMime = 'image/png';
+
+    return {
+      base64: outputBuffer.toString('base64'),
+      mimeType: outputMime,
+      converted: !SUPPORTED_REFERENCE_MIME.has(finalMime) || outputMime !== finalMime,
+      resized: !!shouldResize,
+      sizeBytes: outputBuffer.length
+    };
+  } catch (error) {
+    return { error: `Unable to process image (${finalMime})` };
+  }
 }
 
 export interface ResolveIngredientsResult {
@@ -52,9 +109,10 @@ export async function resolveVideoIngredients(params: {
   boardId: string;
   productId?: string | null;
   ingredientAssetIds?: string[] | null;
+  prompt?: string | null;
   traceId: string;
 }): Promise<ResolveIngredientsResult> {
-  const { boardId, productId, ingredientAssetIds, traceId } = params;
+  const { boardId, productId, ingredientAssetIds, prompt, traceId } = params;
   const warnings: string[] = [];
 
   let candidateAssets: Array<{ id: string; content: string | null; storageKey: string | null; mimeType: string | null }> = [];
@@ -98,7 +156,41 @@ export async function resolveVideoIngredients(params: {
           return scoreB - scoreA;
         });
 
-        const selectedAssetIds = Array.from(new Set(sortedAssignments.map(a => a.assetId))).slice(0, 3);
+        const productAssetIds = Array.from(new Set(sortedAssignments.map(a => a.assetId)));
+        const selectedAssetIds: string[] = [];
+
+        if (productAssetIds.length > 0) {
+          selectedAssetIds.push(productAssetIds[0]);
+        }
+
+        const promptText = (prompt || '').toLowerCase();
+        const blockAvatar = /no (people|person|faces|human|avatar|model)/.test(promptText) || /product\s*only/.test(promptText);
+
+        const avatarAssets = await db
+          .select({ id: assets.id, content: assets.content, storageKey: assets.storageKey, mimeType: assets.mimeType })
+          .from(assets)
+          .where(and(eq(assets.boardId, boardId), eq(assets.type, 'avatar')))
+          .orderBy(desc(assets.createdAt))
+          .limit(1);
+
+        const logoAssets = await db
+          .select({ id: assets.id, content: assets.content, storageKey: assets.storageKey, mimeType: assets.mimeType })
+          .from(assets)
+          .where(and(eq(assets.boardId, boardId), eq(assets.type, 'logo')))
+          .orderBy(desc(assets.createdAt))
+          .limit(1);
+
+        if (!blockAvatar && avatarAssets.length > 0 && selectedAssetIds.length < 3) {
+          selectedAssetIds.push(avatarAssets[0].id);
+        }
+        if (logoAssets.length > 0 && selectedAssetIds.length < 3) {
+          selectedAssetIds.push(logoAssets[0].id);
+        }
+
+        for (const id of productAssetIds.slice(1)) {
+          if (selectedAssetIds.length >= 3) break;
+          if (!selectedAssetIds.includes(id)) selectedAssetIds.push(id);
+        }
 
         if (selectedAssetIds.length === 0) {
           warnings.push('No product assets assigned');
@@ -126,10 +218,29 @@ export async function resolveVideoIngredients(params: {
       continue;
     }
 
+    const normalized = await normalizeReferenceImage(base64.base64, base64.mimeType);
+    if ('error' in normalized) {
+      warnings.push(`${normalized.error} for asset ${asset.id}`);
+      continue;
+    }
+
+    if (typeof normalized.sizeBytes === 'number') {
+      const sizeKb = Math.round(normalized.sizeBytes / 1024);
+      logTrace(traceId, `Prepared reference image ${asset.id}`, {
+        mimeType: normalized.mimeType,
+        sizeKb,
+        resized: normalized.resized || false,
+        converted: normalized.converted
+      });
+      if (normalized.sizeBytes > 8 * 1024 * 1024) {
+        warnings.push(`Large reference image (${sizeKb} KB) for asset ${asset.id}`);
+      }
+    }
+
     referenceImages.push({
       image: {
-        imageBytes: base64.base64,
-        mimeType: base64.mimeType,
+        imageBytes: normalized.base64,
+        mimeType: normalized.mimeType,
       },
       referenceType: VideoGenerationReferenceType.ASSET,
     });

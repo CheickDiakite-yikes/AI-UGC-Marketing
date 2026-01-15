@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole } from '@/types';
 import { getSession } from './authActions';
 import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset } from '@/services/objectStorageService';
+import { processImageForGemini } from '@/services/imageProcessingService';
 import { generateContentServer } from '@/app/actions';
 import { Type } from '@google/genai';
 
@@ -580,18 +581,22 @@ export async function autoTagAssetAction(assetId: string) {
             return { success: false, error: 'Asset is not an image', traceId };
         }
 
-        let base64Content: string | null = asset.content;
-        if (!base64Content && asset.storageKey) {
+        let rawBase64: string | null = asset.content;
+        if (!rawBase64 && asset.storageKey) {
             const result = await getAsset(asset.storageKey);
             if (result.success && result.data) {
-                base64Content = result.data;
+                rawBase64 = result.data;
             }
         }
 
-        if (!base64Content) {
+        if (!rawBase64) {
             logTrace(traceId, 'No image data available for asset');
             return { success: false, error: 'No image content found', traceId };
         }
+
+        // Process image: detect correct MIME type and resize if needed
+        const processed = await processImageForGemini(rawBase64, asset.mimeType, traceId);
+        logTrace(traceId, `Image processed: ${processed.originalSize} -> ${processed.processedSize} bytes, mime: ${processed.mimeType}`);
 
         const boardProducts = asset.boardId ? await db.query.products.findMany({
             where: eq(products.boardId, asset.boardId)
@@ -617,7 +622,7 @@ Tagging rules:
 
         const response: any = await generateContentServer(AUTO_TAG_MODEL, {
             parts: [
-                { inlineData: { mimeType: asset.mimeType || 'image/png', data: base64Content } },
+                { inlineData: { mimeType: processed.mimeType, data: processed.base64 } },
                 { text: prompt }
             ]
         }, {
@@ -749,20 +754,30 @@ export async function analyzeProductImagesAction(boardId: string, assetIds: stri
         const buildParts = async (assetList: typeof limitedAssets) => {
             const parts: any[] = [];
             for (const asset of assetList) {
-                let base64Content: string | null = asset.content;
-                if (!base64Content && asset.storageKey) {
+                let rawBase64: string | null = asset.content;
+                if (!rawBase64 && asset.storageKey) {
                     const result = await getAsset(asset.storageKey);
                     if (result.success && result.data) {
-                        base64Content = result.data;
+                        rawBase64 = result.data;
                     }
                 }
 
-                if (!base64Content) {
+                if (!rawBase64) {
+                    logTrace(traceId, `Skipping asset ${asset.id}: no image data`);
                     continue;
                 }
 
-                parts.push({ text: `ASSET_ID: ${asset.id} | NAME: ${asset.name}` });
-                parts.push({ inlineData: { mimeType: asset.mimeType || 'image/png', data: base64Content } });
+                try {
+                    // Process image: detect correct MIME type and resize if needed
+                    const processed = await processImageForGemini(rawBase64, asset.mimeType, traceId);
+                    logTrace(traceId, `Asset ${asset.id} processed: ${processed.originalSize} -> ${processed.processedSize} bytes`);
+                    
+                    parts.push({ text: `ASSET_ID: ${asset.id} | NAME: ${asset.name}` });
+                    parts.push({ inlineData: { mimeType: processed.mimeType, data: processed.base64 } });
+                } catch (err) {
+                    logTrace(traceId, `Failed to process asset ${asset.id}: ${err}`);
+                    continue;
+                }
             }
             return parts;
         };

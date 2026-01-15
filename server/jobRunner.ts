@@ -105,6 +105,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       boardId: job.boardId,
       productId,
       ingredientAssetIds,
+      prompt,
       traceId
     });
     referenceImages = ingredientResult.referenceImages;
@@ -122,11 +123,26 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     console.warn(`[JOB RUNNER ${traceId}] Skipping ingredients: aspect ratio ${config.aspectRatio} is not supported for reference images`);
   }
   
-  const videoResult = await generateVeoVideo(
-    prompt,
-    config,
-    useIngredients ? { referenceImages, traceId } : { traceId }
-  );
+  let videoResult: string;
+  let ingredientFailure: string | null = null;
+  try {
+    videoResult = await generateVeoVideo(
+      prompt,
+      config,
+      useIngredients ? { referenceImages, traceId } : { traceId }
+    );
+  } catch (error: any) {
+    if (!useIngredients) {
+      throw error;
+    }
+    ingredientFailure = error?.message || 'Ingredient video generation failed';
+    console.warn(`[JOB RUNNER ${traceId}] Ingredient generation failed, retrying without references: ${ingredientFailure}`);
+    videoResult = await generateVeoVideo(
+      prompt,
+      config,
+      { traceId }
+    );
+  }
   
   const itemId = crypto.randomUUID();
   let storageKey: string | null = null;
@@ -152,6 +168,8 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       prompt: prompt.substring(0, 200),
       productId: productIdUsed || productId || null,
       ingredientAssetIds: selectedIngredientIds,
+      ingredientFallback: !!ingredientFailure,
+      ingredientError: ingredientFailure,
       traceId
     },
   }).returning();
