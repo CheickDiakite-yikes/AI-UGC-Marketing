@@ -259,6 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             ) : (
               <button
                 onClick={() => logoInputRef.current?.click()}
+                data-tour="upload-logo"
                 className="w-full bg-white border-2 border-black shadow-neo-sm p-3 font-bold hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center gap-2 text-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -290,7 +291,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-2" data-tour="add-avatar">
                 <button
                   onClick={() => avatarInputRef.current?.click()}
                   className="flex-1 bg-white border-2 border-black shadow-neo-sm p-2.5 font-bold text-xs hover:translate-y-[1px] hover:shadow-none transition-all flex flex-col items-center gap-0.5"
@@ -316,6 +317,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <label className="text-[10px] font-bold tracking-widest block text-gray-700">PRODUCTS</label>
               <button
                 onClick={() => onOpenProductModal()}
+                data-tour="add-product"
                 className="text-[10px] font-bold uppercase tracking-widest bg-white border-2 border-black px-2 py-0.5 hover:bg-black hover:text-white transition-all"
               >
                 Add
@@ -354,6 +356,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             ) : (
               <button
                 onClick={() => onOpenProductModal()}
+                data-tour="add-product"
                 className="w-full bg-white border-2 border-black shadow-neo-sm p-3 font-bold hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center gap-2 text-sm"
               >
                 <span className="text-lg">📦</span>
@@ -368,6 +371,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex gap-2">
               <button
                 onClick={() => fileInputRef.current?.click()}
+                data-tour="upload-sources"
                 className="flex-1 bg-white border-2 border-black shadow-neo-sm p-2.5 font-bold hover:translate-y-[1px] hover:shadow-none transition-all flex flex-col items-center gap-0.5 text-xs"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -375,6 +379,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </button>
               <button
                 onClick={() => setShowLinkModal(true)}
+                data-tour="add-link"
                 className="flex-1 bg-white border-2 border-black shadow-neo-sm p-2.5 font-bold hover:translate-y-[1px] hover:shadow-none transition-all flex flex-col items-center gap-0.5 text-xs"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>

@@ -90,7 +90,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
     { 
       label: "🚀 Product Launch", 
       prompt: "Propose a '3-Phase Launch Pack': 1. Teaser (Image), 2. Big Reveal (Video), 3. Features Highlight (Carousel). Ground this in the USPs found in my uploaded assets.",
-      color: "bg-neo-yellow"
+      color: "bg-neo-yellow",
+      tour: "product-launch-chip"
     },
     { 
       label: "🎯 Persona Map", 
@@ -266,6 +267,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
              <button
                key={i}
                onClick={() => handleChipClick(chip.prompt)}
+               data-tour={chip.tour}
                className={`${chip.color} border-2 border-black shadow-neo-sm hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] text-xs font-bold px-4 py-2 rounded-full whitespace-nowrap transition-all flex-shrink-0 animate-pop-in`}
                style={{ animationDelay: `${i * 100}ms` }}
              >
@@ -283,6 +285,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             onChange={(e) => setInput(e.target.value)}
             placeholder="Scan trends or generate campaigns..."
             ref={inputRef}
+            data-tour="chat-input"
             className="w-full bg-white/80 border-2 border-transparent focus:border-neo-pink rounded-xl py-4 pl-4 pr-14 text-base text-gray-800 placeholder-gray-500 outline-none transition-all shadow-inner"
           />
           <button 

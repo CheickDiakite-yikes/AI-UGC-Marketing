@@ -8,6 +8,7 @@ import AvatarAnalysisModal from './components/AvatarAnalysisModal';
 import BrandAnalysisSkeleton from './components/BrandAnalysisSkeleton';
 import ProductModal from './components/ProductModal';
 import OnboardingPanel from './components/OnboardingPanel';
+import OnboardingCoach, { CoachStep } from './components/OnboardingCoach';
 import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
@@ -60,6 +61,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
   const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
   const [isOnboardingLoading, setIsOnboardingLoading] = useState(false);
+  const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
+  const [skippedOnboardingSteps, setSkippedOnboardingSteps] = useState<string[]>([]);
+  const [activeOnboardingStepIndex, setActiveOnboardingStepIndex] = useState(0);
 
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string>('');
@@ -424,6 +428,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       };
       setActiveBoard(mappedBoard);
     }
+    refreshOnboardingState();
     setShowBrandModal(false);
   };
 
@@ -452,12 +457,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       };
       setActiveBoard(mappedBoard);
     }
+    refreshOnboardingState();
   };
 
-  const handleOpenProductModal = (productId?: string) => {
+  const handleOpenProductModal = useCallback((productId?: string) => {
     setEditingProductId(productId || null);
     setShowProductModal(true);
-  };
+  }, []);
 
   const handleOpenLinkModal = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -470,6 +476,164 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       window.dispatchEvent(new Event('open-chat'));
     }
   }, []);
+
+  const onboardingSteps: CoachStep[] = React.useMemo(() => {
+    if (!onboardingState) return [];
+    const isSkipped = (id: string) => skippedOnboardingSteps.includes(id);
+    const isComplete = (id: string) => {
+      switch (id) {
+        case 'website-link':
+          return onboardingState.required.websiteLink;
+        case 'campaign':
+          return onboardingState.required.campaignCreated;
+        case 'logo':
+          return onboardingState.optional.logo;
+        case 'avatar':
+          return onboardingState.optional.avatar;
+        case 'product':
+          return onboardingState.optional.product;
+        case 'sources':
+          return onboardingState.optional.sources;
+        case 'boards':
+          return onboardingState.optional.multipleBoards;
+        default:
+          return false;
+      }
+    };
+
+    const steps: CoachStep[] = [
+      {
+        id: 'website-link',
+        title: 'Add your website',
+        description: 'We scan your site to build instant brand context.',
+        targetSelector: '[data-tour="add-link"]',
+        actionLabel: 'Add Link',
+        onAction: handleOpenLinkModal
+      },
+      {
+        id: 'logo',
+        title: 'Upload your logo',
+        description: 'Optional, but it improves visual consistency.',
+        targetSelector: '[data-tour="upload-logo"]',
+        optional: true
+      },
+      {
+        id: 'avatar',
+        title: 'Add an avatar',
+        description: 'Optional spokesperson or founder for on-camera ads.',
+        targetSelector: '[data-tour="add-avatar"]',
+        optional: true
+      },
+      {
+        id: 'product',
+        title: 'Add a product',
+        description: 'Optional, but best for product-led campaigns.',
+        targetSelector: '[data-tour="add-product"]',
+        optional: true,
+        actionLabel: 'Add Product',
+        onAction: () => handleOpenProductModal()
+      },
+      {
+        id: 'sources',
+        title: 'Upload sources or docs',
+        description: 'Optional PDFs or files to ground copy.',
+        targetSelector: '[data-tour="upload-sources"]',
+        optional: true
+      },
+      {
+        id: 'boards',
+        title: 'Manage boards',
+        description: 'Optional. Keep multiple campaigns organized.',
+        targetSelector: '[data-tour="boards"]',
+        optional: true,
+        actionLabel: 'Boards',
+        onAction: () => setShowBoardListModal(true)
+      },
+      {
+        id: 'campaign',
+        title: 'Create your first campaign',
+        description: 'Tap Product Launch or type a request to generate assets.',
+        targetSelector: '[data-tour="product-launch-chip"], [data-tour="chat-input"]',
+        actionLabel: 'Open Chat',
+        onAction: handleOpenChat
+      }
+    ];
+
+    return steps.filter(step => {
+      if (isComplete(step.id)) return false;
+      if (step.optional && isSkipped(step.id)) return false;
+      return true;
+    });
+  }, [handleOpenChat, handleOpenLinkModal, handleOpenProductModal, onboardingState, skippedOnboardingSteps]);
+
+  const activeOnboardingStep = onboardingSteps[activeOnboardingStepIndex] || null;
+  const isActiveStepComplete = React.useMemo(() => {
+    if (!activeOnboardingStep || !onboardingState) return false;
+    const { required, optional } = onboardingState;
+    switch (activeOnboardingStep.id) {
+      case 'website-link':
+        return required.websiteLink;
+      case 'campaign':
+        return required.campaignCreated;
+      case 'logo':
+        return optional.logo;
+      case 'avatar':
+        return optional.avatar;
+      case 'product':
+        return optional.product;
+      case 'sources':
+        return optional.sources;
+      case 'boards':
+        return optional.multipleBoards;
+      default:
+        return false;
+    }
+  }, [activeOnboardingStep, onboardingState]);
+
+  const handleSkipOnboardingStep = useCallback(() => {
+    if (!activeOnboardingStep?.optional) return;
+    setSkippedOnboardingSteps(prev => [...prev, activeOnboardingStep.id]);
+    setActiveOnboardingStepIndex(prev => Math.max(0, prev));
+  }, [activeOnboardingStep]);
+
+  const handleAdvanceOnboardingStep = useCallback(() => {
+    setActiveOnboardingStepIndex(prev => {
+      const next = prev + 1;
+      if (next >= onboardingSteps.length) {
+        return prev;
+      }
+      return next;
+    });
+  }, [onboardingSteps.length]);
+
+  useEffect(() => {
+    if (!onboardingState) return;
+    if (!showOnboardingGuide && !onboardingState.completed) {
+      setShowOnboardingGuide(true);
+    }
+  }, [onboardingState, showOnboardingGuide]);
+
+  useEffect(() => {
+    if (!showOnboardingGuide) return;
+    if (onboardingSteps.length === 0) {
+      setShowOnboardingGuide(false);
+      return;
+    }
+    if (activeOnboardingStepIndex >= onboardingSteps.length) {
+      setActiveOnboardingStepIndex(0);
+    }
+  }, [activeOnboardingStepIndex, onboardingSteps.length, showOnboardingGuide]);
+
+  useEffect(() => {
+    if (!showOnboardingGuide || !activeOnboardingStep) return;
+    const sidebarStepIds = new Set(['website-link', 'logo', 'avatar', 'product', 'sources']);
+    if (sidebarStepIds.has(activeOnboardingStep.id) && window.innerWidth < 768) {
+      setSidebarOpen(true);
+    }
+    if (activeOnboardingStep.id === 'campaign') {
+      handleOpenChat();
+    }
+  }, [activeOnboardingStep, handleOpenChat, showOnboardingGuide]);
 
   const handleSaveProduct = async (product: Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>, assignments: Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>[]) => {
     if (!activeBoardId) return;
@@ -1136,7 +1300,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         </button>
         <h2 className="font-display font-black text-base truncate flex-1">{activeBoard.name}</h2>
         <div className="flex gap-1 flex-shrink-0">
-          <button onClick={() => setShowBoardListModal(true)} className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">📋</button>
+          <button onClick={() => setShowBoardListModal(true)} data-tour="boards" className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">📋</button>
           <button onClick={() => setShowNewBoardModal(true)} className="p-2 bg-neo-black text-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">+</button>
         </div>
       </div>
@@ -1184,7 +1348,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         <header className="hidden md:flex justify-between items-center mb-12">
           <h2 className="text-5xl font-display font-black tracking-tight">{activeBoard.name}</h2>
           <div className="flex gap-3">
-            <button onClick={() => setShowBoardListModal(true)} className="bg-white border-4 border-black shadow-neo px-6 py-2 font-black uppercase text-sm">Boards</button>
+            <button onClick={() => setShowBoardListModal(true)} data-tour="boards" className="bg-white border-4 border-black shadow-neo px-6 py-2 font-black uppercase text-sm">Boards</button>
             <button onClick={() => setShowNewBoardModal(true)} className="bg-neo-black text-white border-4 border-black shadow-neo px-6 py-2 font-black uppercase text-sm">+ New</button>
           </div>
         </header>
@@ -1283,6 +1447,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {showNewBoardModal && <NewBoardModal onCreate={handleCreateBoard} onCancel={() => setShowNewBoardModal(false)} />}
       {showBoardListModal && <BoardListModal boards={boards} activeBoardId={activeBoardId} onSwitch={setActiveBoardId} onClose={() => setShowBoardListModal(false)} onCreateNew={() => setShowNewBoardModal(true)} onRename={handleRenameBoard} onDelete={handleDeleteBoard} />}
       {selectedItem && <LightboxModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
+      {showOnboardingGuide && activeOnboardingStep && (
+        <OnboardingCoach
+          step={activeOnboardingStep}
+          stepIndex={activeOnboardingStepIndex}
+          totalSteps={onboardingSteps.length}
+          isStepComplete={isActiveStepComplete}
+          onNext={handleAdvanceOnboardingStep}
+          onSkip={handleSkipOnboardingStep}
+        />
+      )}
     </div>
   );
 };
