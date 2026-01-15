@@ -236,11 +236,25 @@ export async function getAsset(storageKey: string): Promise<{ success: boolean; 
       return { success: false, error: error?.message || 'Download failed' };
     }
     
-    const buffer = Buffer.from(value as unknown as ArrayBuffer);
+    // Handle different buffer types returned by object storage (same as storage route)
+    let buffer: Buffer;
+    if (value instanceof Uint8Array) {
+      buffer = Buffer.from(value);
+    } else if (Buffer.isBuffer(value)) {
+      buffer = value;
+    } else if (Array.isArray(value) && value.length > 0 && Buffer.isBuffer(value[0])) {
+      buffer = Buffer.concat(value);
+    } else if (value instanceof ArrayBuffer) {
+      buffer = Buffer.from(value);
+    } else {
+      // Last resort: try to treat as ArrayBuffer
+      buffer = Buffer.from(value as unknown as ArrayBuffer);
+    }
+    
     console.log(`[GET_ASSET] Downloaded ${buffer.length} bytes, first bytes: [${buffer.slice(0, 8).join(',')}]`);
     
     const base64Data = buffer.toString('base64');
-    console.log(`[GET_ASSET] Base64 length: ${base64Data.length}, first 50 chars: ${base64Data.substring(0, 50)}`);
+    console.log(`[GET_ASSET] Base64 length: ${base64Data.length}`);
     return { success: true, data: base64Data };
   } catch (err) {
     console.log(`[GET_ASSET] Exception: ${err}`);
