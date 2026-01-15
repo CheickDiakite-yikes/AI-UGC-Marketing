@@ -27,9 +27,9 @@ export async function compileVisualPromptWithIdentity(params: {
 
   const compiled = buildIdentityConstraints({
     basePrompt,
-    brandIdentity: board.brandIdentity as BrandIdentity | null,
-    avatarIdentity: board.avatarIdentity as AvatarIdentity | null,
-    products: board.products as Product[] | undefined,
+    brandIdentity: board.brandIdentity as unknown as BrandIdentity | null,
+    avatarIdentity: board.avatarIdentity as unknown as AvatarIdentity | null,
+    products: board.products as unknown as Product[] | undefined,
     productId
   });
 
