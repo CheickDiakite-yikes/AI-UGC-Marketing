@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPendingJobs, claimJob, updateJobStatus } from '../../../../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../../../../services/geminiService';
 import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
-import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
 import { uploadGeneratedItem } from '../../../../services/objectStorageService';
 import { db } from '../../../../db';
 import { generatedItems, users } from '../../../../db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { AspectRatio, VeoConfig } from '../../../../types';
+import { IMAGE_LIMIT, VIDEO_LIMIT } from '../../../../services/usageLimits';
 
 interface Job {
   id: string;
@@ -33,10 +33,38 @@ interface JobResult {
   [key: string]: unknown;
 }
 
+const assertImageQuota = async (userId: string, count: number = 1) => {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { imagesGenerated: true }
+  });
+  if (!user) {
+    throw new Error('User not found for quota check');
+  }
+  if (user.imagesGenerated + count > IMAGE_LIMIT) {
+    throw new Error('Image quota exceeded');
+  }
+};
+
+const assertVideoQuota = async (userId: string, count: number = 1) => {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { videosGenerated: true }
+  });
+  if (!user) {
+    throw new Error('User not found for quota check');
+  }
+  if (user.videosGenerated + count > VIDEO_LIMIT) {
+    throw new Error('Video quota exceeded');
+  }
+};
+
 async function processImageJob(job: Job): Promise<JobResult> {
   const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string };
   const { prompt, aspectRatio, title, caption, hook, archetype, productId } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
+
+  await assertImageQuota(job.userId, 1);
   
   const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.SQUARE;
   
@@ -108,6 +136,8 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   };
   const { prompt, aspectRatio, resolution, title, caption, hook, archetype, productId, ingredientAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
+
+  await assertVideoQuota(job.userId, 1);
   
   const config: VeoConfig = {
     aspectRatio: (aspectRatio === '9:16' ? '9:16' : '16:9'),
@@ -227,6 +257,8 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
     metadata?: Record<string, unknown>;
   };
   const { slides, aspectRatio, title, description, metadata } = payload;
+
+  await assertImageQuota(job.userId, slides.length);
   
   console.log(`[API JOB PROCESSOR] Generating carousel with ${slides.length} slides...`);
   

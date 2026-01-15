@@ -15,6 +15,7 @@ import { useToast } from './components/Toast';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
+import { IMAGE_LIMIT, VIDEO_LIMIT, getRemainingImages, getRemainingVideos } from './services/usageLimits';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
 import {
   getBoards,
@@ -96,6 +97,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   // Fetch active board details
   React.useEffect(() => {
     if (!activeBoardId) return;
+    setPendingItems([]);
+    setActiveJobs([]);
     getBoardDetails(activeBoardId).then(b => {
       if (b) {
         // Map DB structure to Frontend structure
@@ -153,6 +156,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [pendingScannedAvatar, setPendingScannedAvatar] = useState<AvatarIdentity | null>(null);
 
   const [activeJobs, setActiveJobs] = useState<string[]>([]);
+  const [pendingItems, setPendingItems] = useState<CanvasItem[]>([]);
 
   const loadBoardDetails = useCallback(async (boardId: string) => {
     const b = await getBoardDetails(boardId);
@@ -187,7 +191,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   // Trigger the job processor API to process pending jobs (works with Autoscale)
   const triggerJobProcessing = useCallback(async () => {
     try {
-      const res = await fetch('/api/jobs/process', { method: 'POST' });
+      const res = await fetch('/api/jobs/process', { method: 'POST', cache: 'no-store' });
       const result = await res.json();
       console.log('[WORKSPACE] Job processor result:', result);
       return result.processed;
@@ -203,15 +207,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         // Trigger job processing on each poll (ensures jobs get processed in Autoscale)
         await triggerJobProcessing();
         
-        const res = await fetch(`/api/jobs/${jobId}`);
+        const res = await fetch(`/api/jobs/${jobId}`, { cache: 'no-store' });
         const job = await res.json();
         
         if (job.status === 'completed') {
+          setPendingItems(prev => prev.filter(item => item.id !== jobId));
           onComplete(job.result);
           setActiveJobs(prev => prev.filter(id => id !== jobId));
           showSuccess(`Content generated successfully!`);
         } else if (job.status === 'failed') {
           console.error('[WORKSPACE] Job failed:', job.error);
+          setPendingItems(prev => prev.filter(item => item.id !== jobId));
           setActiveJobs(prev => prev.filter(id => id !== jobId));
           const errorMessage = job.error || 'Generation failed';
           showError(`Generation failed: ${errorMessage.substring(0, 100)}`);
@@ -223,6 +229,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             payload: job.payload
           }]);
         } else {
+          const nextStatus = job.status === 'processing' ? 'processing' : 'queued';
+          setPendingItems(prev => prev.map(item => item.id === jobId ? {
+            ...item,
+            meta: { ...item.meta, status: nextStatus }
+          } : item));
           setTimeout(poll, 3000);
         }
       } catch (error) {
@@ -233,14 +244,38 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     poll();
   }, [showError, showSuccess, triggerJobProcessing]);
 
+  const addPendingItem = useCallback((jobId: string, type: CanvasItem['type'], payload?: Record<string, unknown>) => {
+    setPendingItems(prev => {
+      if (prev.some(item => item.id === jobId)) return prev;
+      const title = typeof payload?.title === 'string'
+        ? payload.title
+        : type === 'video' ? 'Generating Video' : 'Generating Image';
+      const meta = {
+        aspectRatio: typeof payload?.aspectRatio === 'string' ? payload.aspectRatio : undefined,
+        resolution: typeof payload?.resolution === 'string' ? payload.resolution : undefined,
+        caption: typeof payload?.caption === 'string' ? payload.caption : undefined,
+        hook: typeof payload?.hook === 'string' ? payload.hook : undefined,
+        archetype: typeof payload?.archetype === 'string' ? payload.archetype : undefined,
+        status: 'queued' as const
+      };
+      return [...prev, { id: jobId, type, content: '', title, meta }];
+    });
+  }, []);
+
   useEffect(() => {
     if (activeBoardId) {
-      fetch(`/api/jobs?boardId=${activeBoardId}`)
+      fetch(`/api/jobs?boardId=${activeBoardId}`, { cache: 'no-store' })
         .then(res => res.json())
         .then(async (jobs) => {
           const pendingJobs = jobs.filter((j: any) => j.status === 'pending' || j.status === 'processing');
           if (pendingJobs.length > 0) {
             setActiveJobs(pendingJobs.map((j: any) => j.id));
+            pendingJobs.forEach((job: any) => {
+              const itemType = job.type === 'generate_video' ? 'video' : 'image';
+              addPendingItem(job.id, itemType, {
+                title: itemType === 'video' ? 'Generating Video' : 'Generating Image'
+              });
+            });
             // Immediately trigger job processing for any pending jobs
             await triggerJobProcessing();
             pendingJobs.forEach((job: any) => {
@@ -253,7 +288,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         })
         .catch(console.error);
     }
-  }, [activeBoardId, pollJobStatus, loadBoardDetails, triggerJobProcessing]);
+  }, [activeBoardId, pollJobStatus, loadBoardDetails, triggerJobProcessing, addPendingItem]);
 
   const handleAddAsset = async (asset: ProjectAsset) => {
     if (!activeBoardId) return;
@@ -524,6 +559,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         activeBoard.products || []
       ) as any;
 
+      const pendingImageCount = pendingItems.filter(item => item.type === 'image').length;
+      const pendingVideoCount = pendingItems.filter(item => item.type === 'video').length;
+      let remainingImages = getRemainingImages(usage.imagesGenerated + pendingImageCount);
+      let remainingVideos = getRemainingVideos(usage.videosGenerated + pendingVideoCount);
+
       const modelParts = response.candidates[0].content.parts || [];
       let responseText = response.text || "";
       let newItems: CanvasItem[] = [];
@@ -536,6 +576,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             setProcessingStatus(`Queuing image generation...`);
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
             const traceId = crypto.randomUUID();
+            if (remainingImages <= 0) {
+              const message = `Image quota reached (${usage.imagesGenerated}/${IMAGE_LIMIT}).`;
+              showError(message);
+              continue;
+            }
             const res = await fetch('/api/jobs', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -550,9 +595,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 }
               })
             });
-            const job = await res.json();
+            const job = await res.json().catch(() => null);
+            if (!res.ok || !job?.id) {
+              const message = job?.error || 'Image generation request failed.';
+              showError(message);
+              continue;
+            }
             if (job.id) {
               setActiveJobs(prev => [...prev, job.id]);
+              addPendingItem(job.id, 'image', {
+                title: fc.args['prompt'] ? 'Queued Image' : 'Generating Image',
+                aspectRatio: fc.args['aspectRatio'] || '1:1'
+              });
+              remainingImages = Math.max(0, remainingImages - 1);
               pollJobStatus(job.id, async () => {
                 await loadBoardDetails(activeBoardId);
                 getUserUsageAction().then(setUsage);
@@ -565,6 +620,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
             const traceId = crypto.randomUUID();
+            if (remainingVideos <= 0) {
+              const message = `Video quota reached (${usage.videosGenerated}/${VIDEO_LIMIT}).`;
+              showError(message);
+              continue;
+            }
             const res = await fetch('/api/jobs', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -581,9 +641,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 }
               })
             });
-            const job = await res.json();
+            const job = await res.json().catch(() => null);
+            if (!res.ok || !job?.id) {
+              const message = job?.error || 'Video generation request failed.';
+              showError(message);
+              continue;
+            }
             if (job.id) {
               setActiveJobs(prev => [...prev, job.id]);
+              addPendingItem(job.id, 'video', {
+                title: fc.args['prompt'] ? 'Queued Video' : 'Generating Video',
+                aspectRatio: fc.args['aspectRatio'] || '16:9',
+                resolution: '720p'
+              });
+              remainingVideos = Math.max(0, remainingVideos - 1);
               pollJobStatus(job.id, async () => {
                 await loadBoardDetails(activeBoardId);
                 getUserUsageAction().then(setUsage);
@@ -620,9 +691,87 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       }
 
       if (packQueue.length > 0) {
-        let jobCount = 0;
+        let backgroundCount = 0;
+        let immediateCount = 0;
+        let queuedCount = 0;
+        let skippedCount = 0;
+        const skippedReasons: string[] = [];
+
+        const selectProductForPack = (productId?: string) => {
+          if (!activeBoard.products || activeBoard.products.length === 0) return undefined;
+          if (productId) {
+            return activeBoard.products.find(p => p.id === productId);
+          }
+          if (activeBoard.products.length === 1) return activeBoard.products[0];
+          return undefined;
+        };
+
+        const ensureLaunchPackItems = (items: any[], requestText: string, productId?: string) => {
+          if (!/3[- ]phase launch pack|product launch/i.test(requestText)) {
+            return items;
+          }
+
+          const hasTeaser = items.some(i => i.type === 'image' && /teaser/i.test(i.title || ''));
+          const hasReveal = items.some(i => i.type === 'video' && /reveal/i.test(i.title || ''));
+          const hasFeatures = items.some(i => i.type === 'carousel' && /feature/i.test(i.title || ''));
+          const product = selectProductForPack(productId);
+          const productName = product?.name || 'the product';
+          const features = (product?.keyFeatures || []).slice(0, 3);
+
+          const fallbackItems = [...items];
+
+          if (!hasTeaser) {
+            fallbackItems.push({
+              type: 'image',
+              title: 'Phase 1: Teaser',
+              archetype: 'Teaser',
+              hook: 'Something powerful is coming.',
+              caption: `Coming soon: ${productName}.`,
+              aspectRatio: '1:1',
+              productId,
+              visual_prompt: `A minimal teaser image. Close-up silhouette of ${productName}, dramatic lighting, high contrast, brand colors, shallow depth of field, intrigue.`
+            });
+          }
+
+          if (!hasReveal) {
+            fallbackItems.push({
+              type: 'video',
+              title: 'Phase 2: Big Reveal',
+              archetype: 'Reveal',
+              hook: `Meet ${productName}.`,
+              caption: `The reveal: ${productName} is here.`,
+              aspectRatio: '16:9',
+              productId,
+              visual_prompt: `Cinematic product reveal. Slow dolly-in on ${productName} on a pedestal, soft volumetric lighting, subtle rotation, clean studio background, premium vibe.`
+            });
+          }
+
+          if (!hasFeatures) {
+            const slidePrompts = [
+              `Hero shot of ${productName} with bold headline: "Why ${productName}." Clean backdrop, brand colors.`,
+              `Feature spotlight: ${features[0] || 'Key Benefit 1'}. Visual callout, clean layout, product in focus.`,
+              `Feature spotlight: ${features[1] || 'Key Benefit 2'}. Emphasize outcome, premium aesthetic.`
+            ];
+
+            fallbackItems.push({
+              type: 'carousel',
+              title: 'Phase 3: Features Highlight',
+              archetype: 'Feature Spotlight',
+              hook: `What makes ${productName} different.`,
+              caption: `Top benefits of ${productName}.`,
+              aspectRatio: '1:1',
+              productId,
+              carousel_prompts: slidePrompts
+            });
+          }
+
+          return fallbackItems;
+        };
+
         for (const pack of packQueue) {
-          for (const item of pack.items) {
+          const normalizedItems = ensureLaunchPackItems(pack.items || [], text, pack.productId);
+
+          for (const item of normalizedItems) {
             const traceId = crypto.randomUUID();
             if (item.caption || item.hook || item.title) {
               try {
@@ -653,8 +802,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               // TODO: Add carousel support to job runner
               // For now, run synchronously with fallback
               try {
+                const prompts = Array.isArray(item.carousel_prompts) ? item.carousel_prompts : [];
+                const safePrompts = prompts.length > 0 ? prompts : [`Hero slide for ${item.title || 'product'} with bold headline.`];
+                const slidesToGenerate = Math.min(safePrompts.length, remainingImages);
+                if (slidesToGenerate <= 0) {
+                  skippedCount++;
+                  skippedReasons.push('Not enough image quota for carousel.');
+                  continue;
+                }
+                if (slidesToGenerate < safePrompts.length) {
+                  skippedReasons.push(`Carousel trimmed to ${slidesToGenerate} slide(s) due to image quota.`);
+                }
+                const promptsToUse = safePrompts.slice(0, slidesToGenerate);
                 const slides: string[] = [];
-                for (const p of item.carousel_prompts) {
+                for (const p of promptsToUse) {
                   const compiled = buildIdentityConstraints({
                     basePrompt: p,
                     brandIdentity: activeBoard.brandIdentity,
@@ -669,11 +830,26 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 newItems.push(carouselItem);
                 await saveGeneratedItemAction(activeBoardId, carouselItem);
                 getUserUsageAction().then(setUsage);
+                immediateCount++;
+                queuedCount++;
+                remainingImages = Math.max(0, remainingImages - slidesToGenerate);
               } catch (error) {
                 console.error('[WORKSPACE] Carousel generation failed:', error);
               }
             } else {
               // Use background jobs for images and videos in packs
+              if (item.type === 'video') {
+                if (remainingVideos <= 0) {
+                  skippedCount++;
+                  skippedReasons.push('Not enough video quota.');
+                  continue;
+                }
+              } else if (remainingImages <= 0) {
+                skippedCount++;
+                skippedReasons.push('Not enough image quota.');
+                continue;
+              }
+
               const jobType = item.type === 'video' ? 'generate_video' : 'generate_image';
               const res = await fetch('/api/jobs', {
                 method: 'POST',
@@ -695,10 +871,34 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   }
                 })
               });
-              const job = await res.json();
+              const job = await res.json().catch(() => null);
+              if (!res.ok || !job?.id) {
+                const message = job?.error || 'Generation request failed.';
+                if (job?.code === 'QUOTA_EXCEEDED') {
+                  skippedCount++;
+                  skippedReasons.push(message);
+                } else {
+                  showError(message);
+                }
+                continue;
+              }
               if (job.id) {
-                jobCount++;
+                backgroundCount++;
+                queuedCount++;
                 setActiveJobs(prev => [...prev, job.id]);
+                addPendingItem(job.id, item.type === 'video' ? 'video' : 'image', {
+                  title: item.title,
+                  aspectRatio: item.aspectRatio || (item.type === 'video' ? '16:9' : '1:1'),
+                  resolution: item.type === 'video' ? '720p' : undefined,
+                  caption: item.caption,
+                  hook: item.hook,
+                  archetype: item.archetype
+                });
+                if (item.type === 'video') {
+                  remainingVideos = Math.max(0, remainingVideos - 1);
+                } else {
+                  remainingImages = Math.max(0, remainingImages - 1);
+                }
                 pollJobStatus(job.id, async () => {
                   await loadBoardDetails(activeBoardId);
                   getUserUsageAction().then(setUsage);
@@ -707,8 +907,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             }
           }
         }
-        if (jobCount > 0) {
-          responseText = `📦 Campaign pack queued! ${jobCount} items are generating in the background. This will complete even if you leave the page.`;
+        if (queuedCount > 0) {
+          if (backgroundCount > 0 && immediateCount > 0) {
+            responseText = `📦 Campaign pack queued! ${queuedCount} items total: ${immediateCount} created now, ${backgroundCount} generating in the background.`;
+          } else if (backgroundCount > 0) {
+            responseText = `📦 Campaign pack queued! ${backgroundCount} items are generating in the background.`;
+          } else if (immediateCount > 0) {
+            responseText = `📦 Campaign pack ready! ${immediateCount} items created.`;
+          }
+          if (skippedCount > 0) {
+            responseText += ` Skipped ${skippedCount} item${skippedCount > 1 ? 's' : ''} due to quota.`;
+          }
+        } else if (skippedCount > 0) {
+          responseText = `⚠️ No items generated. ${skippedCount} item${skippedCount > 1 ? 's were' : ' was'} skipped due to quota.`;
+        }
+        if (skippedReasons.length > 0) {
+          skippedReasons.slice(0, 2).forEach((reason) => showToast(reason, 'info'));
         }
       }
 
@@ -743,6 +957,47 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     } finally { setIsProcessing(false); setProcessingStatus(""); }
   };
 
+  useEffect(() => {
+    if (!activeBoardId) return;
+    if (activeJobs.length === 0) return;
+
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs?boardId=${activeBoardId}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const jobs = await res.json();
+        if (cancelled) return;
+        const pendingJobs = jobs.filter((j: any) => j.status === 'pending' || j.status === 'processing');
+        if (pendingJobs.length > 0) {
+          setActiveJobs(pendingJobs.map((j: any) => j.id));
+          const pendingIds = new Set(pendingJobs.map((j: any) => j.id));
+          setPendingItems(prev => prev
+            .filter(item => pendingIds.has(item.id))
+            .map(item => {
+              const match = pendingJobs.find((j: any) => j.id === item.id);
+              if (!match) return item;
+              const nextStatus = match.status === 'processing' ? 'processing' : 'queued';
+              return { ...item, meta: { ...item.meta, status: nextStatus } };
+            })
+          );
+          await loadBoardDetails(activeBoardId);
+          getUserUsageAction().then(setUsage);
+        } else if (activeJobs.length > 0) {
+          setActiveJobs([]);
+          setPendingItems([]);
+        }
+      } catch (error) {
+        console.warn('[WORKSPACE] Job sync failed', error);
+      }
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeBoardId, activeJobs.length, loadBoardDetails]);
+
   const handleRetryJob = async (failedJob: FailedJob) => {
     if (!activeBoardId) return;
     
@@ -764,6 +1019,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       
       const job = await res.json();
       setActiveJobs(prev => [...prev, job.id]);
+      addPendingItem(job.id, failedJob.type === 'generate_video' ? 'video' : 'image', failedJob.payload);
       pollJobStatus(job.id, async () => {
         await loadBoardDetails(activeBoardId);
         getUserUsageAction().then(setUsage);
@@ -892,14 +1148,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
         {/* Canvas Grid */}
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8 pb-32">
-          {activeBoard.items.length === 0 && !isProcessing && (
+          {activeBoard.items.length === 0 && pendingItems.length === 0 && !isProcessing && (
             <div className="col-span-full py-16 md:py-32 text-center opacity-20">
               <p className="text-6xl md:text-9xl mb-4 md:mb-6">🎨</p>
               <p className="font-display font-black text-xl md:text-3xl uppercase">Canvas Empty</p>
               <p className="text-sm mt-2 font-medium">Use the agent to generate your first campaign</p>
             </div>
           )}
-          {activeBoard.items.map(item => <CanvasItemCard key={item.id} item={item} onExpand={setSelectedItem} onDelete={handleDeleteItem} />)}
+          {[...pendingItems, ...activeBoard.items].map(item => (
+            <CanvasItemCard key={item.id} item={item} onExpand={setSelectedItem} onDelete={handleDeleteItem} />
+          ))}
         </div>
       </div>
 

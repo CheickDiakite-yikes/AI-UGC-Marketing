@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product } from '../types';
+import { IMAGE_LIMIT, VIDEO_LIMIT } from '../services/usageLimits';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
 import SourcePreviewModal, { getParseStatus, getStatusColor } from './SourcePreviewModal';
@@ -448,19 +449,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex-1">
               <div className="flex justify-between text-[9px] mb-0.5">
                 <span className="text-gray-400">IMAGES</span>
-                <span className="text-white font-bold">{usageStats?.imagesGenerated || 0}/20</span>
+                <span className="text-white font-bold">{usageStats?.imagesGenerated || 0}/{IMAGE_LIMIT}</span>
               </div>
               <div className="w-full bg-white/20 h-1.5 rounded-full">
-                <div className="bg-neo-pink h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, ((usageStats?.imagesGenerated || 0) / 20) * 100)}%` }}></div>
+                <div className="bg-neo-pink h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, ((usageStats?.imagesGenerated || 0) / IMAGE_LIMIT) * 100)}%` }}></div>
               </div>
             </div>
             <div className="flex-1">
               <div className="flex justify-between text-[9px] mb-0.5">
                 <span className="text-gray-400">VIDEOS</span>
-                <span className="text-white font-bold">{usageStats?.videosGenerated || 0}/5</span>
+                <span className="text-white font-bold">{usageStats?.videosGenerated || 0}/{VIDEO_LIMIT}</span>
               </div>
               <div className="w-full bg-white/20 h-1.5 rounded-full">
-                <div className="bg-neo-cyan h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, ((usageStats?.videosGenerated || 0) / 5) * 100)}%` }}></div>
+                <div className="bg-neo-cyan h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, ((usageStats?.videosGenerated || 0) / VIDEO_LIMIT) * 100)}%` }}></div>
               </div>
             </div>
           </div>

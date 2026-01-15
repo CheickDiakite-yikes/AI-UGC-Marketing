@@ -183,12 +183,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess, initi
           <div className="mt-6 text-center text-sm">
             {mode === 'login' ? (
               <p>
-                Don't have an account?{' '}
+                New User?{' '}
                 <button
                   onClick={() => setMode('signup')}
                   className="font-bold text-neo-pink hover:underline"
                 >
-                  Sign up
+                  Sign Up
                 </button>
               </p>
             ) : (
@@ -198,7 +198,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess, initi
                   onClick={() => setMode('login')}
                   className="font-bold text-neo-pink hover:underline"
                 >
-                  Sign in
+                  Sign In
                 </button>
               </p>
             )}

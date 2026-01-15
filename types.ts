@@ -25,6 +25,7 @@ export interface CanvasItem {
     caption?: string; // Social media caption
     archetype?: string; // Creative style
     hook?: string; // Marketing hook
+    status?: 'queued' | 'processing' | 'failed';
   };
   x?: number; // For future drag/drop
   y?: number;

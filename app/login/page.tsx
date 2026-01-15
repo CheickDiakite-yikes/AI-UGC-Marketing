@@ -76,9 +76,9 @@ export default function LoginPage() {
 
                 {/* Footer */}
                 <div className="mt-8 text-center text-sm font-bold">
-                    <span className="text-gray-400">New Agent?</span>{' '}
+                    <span className="text-gray-400">New User?</span>{' '}
                     <Link href="/signup" className="underline decoration-4 decoration-neo-lime hover:text-neo-pink transition-colors">
-                        Initialize Protocol
+                        Sign Up
                     </Link>
                 </div>
             </div>

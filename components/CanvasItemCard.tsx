@@ -74,6 +74,8 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
     displayContent.startsWith('http') ||
     displayContent.startsWith('/api/storage/')
   );
+  const pendingStatus = !isContentReady ? (item.meta?.status || 'queued') : null;
+  const pendingLabel = pendingStatus === 'processing' ? 'Processing' : pendingStatus === 'failed' ? 'Failed' : 'Queued';
 
   return (
     <div className="bg-white border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
@@ -81,7 +83,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
       <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden group/header">
         <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
         <div className="flex items-center gap-2 z-10 relative">
-          {onDelete && (
+          {onDelete && isContentReady && (
             <button
               onClick={handleDelete}
               className={`${isContentReady ? 'opacity-0 group-hover/header:opacity-100' : 'opacity-100'} transition-opacity p-1 hover:bg-red-500 hover:text-white rounded text-red-600`}
@@ -105,6 +107,11 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
       
       {/* Media Content */}
       <div className="relative group bg-gray-100 min-h-[200px] flex items-center justify-center overflow-hidden">
+        {!isContentReady && (
+          <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded border border-white/30">
+            {pendingLabel}
+          </div>
+        )}
         {(item.type === 'image' || item.type === 'carousel') && (
            <div 
              className="cursor-zoom-in relative w-full h-full flex items-center justify-center bg-gray-200"

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createJob, getJobsByBoard } from '@/services/jobService';
 import { getSession } from '@/app/actions/authActions';
 import { db } from '@/db';
-import { boards, jobs } from '@/db/schema';
+import { boards, jobs, users } from '@/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
+import { IMAGE_LIMIT, VIDEO_LIMIT, getRemainingImages, getRemainingVideos } from '@/services/usageLimits';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,53 @@ export async function POST(request: NextRequest) {
 
     if (board.userId !== session.userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    if (type === 'generate_image' || type === 'generate_video' || type === 'generate_carousel') {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, session.userId as string),
+        columns: {
+          imagesGenerated: true,
+          videosGenerated: true
+        }
+      });
+
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      if (type === 'generate_image' && user.imagesGenerated >= IMAGE_LIMIT) {
+        return NextResponse.json({
+          error: 'Image quota exceeded',
+          code: 'QUOTA_EXCEEDED',
+          limit: IMAGE_LIMIT,
+          used: user.imagesGenerated,
+          remaining: getRemainingImages(user.imagesGenerated)
+        }, { status: 402 });
+      }
+
+      if (type === 'generate_video' && user.videosGenerated >= VIDEO_LIMIT) {
+        return NextResponse.json({
+          error: 'Video quota exceeded',
+          code: 'QUOTA_EXCEEDED',
+          limit: VIDEO_LIMIT,
+          used: user.videosGenerated,
+          remaining: getRemainingVideos(user.videosGenerated)
+        }, { status: 402 });
+      }
+
+      if (type === 'generate_carousel') {
+        const slides = Array.isArray(payload?.slides) ? payload.slides.length : 0;
+        if (slides > 0 && user.imagesGenerated + slides > IMAGE_LIMIT) {
+          return NextResponse.json({
+            error: 'Image quota exceeded',
+            code: 'QUOTA_EXCEEDED',
+            limit: IMAGE_LIMIT,
+            used: user.imagesGenerated,
+            remaining: getRemainingImages(user.imagesGenerated)
+          }, { status: 402 });
+        }
+      }
     }
 
     const job = await createJob(boardId, session.userId as string, type, payload);
