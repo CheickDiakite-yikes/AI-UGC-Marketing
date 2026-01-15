@@ -41,7 +41,7 @@ export default function LoginPage() {
                 {/* Header */}
                 <div className="text-center mb-10">
                     <div className="inline-block bg-black text-white px-3 py-1 text-xs font-bold uppercase mb-4 transform -rotate-2">
-                        System Identity
+                        Welcome Back
                     </div>
                     <h1 className="text-4xl md:text-5xl font-display font-black leading-none mb-2 tracking-tight">
                         PREDI<span className="text-neo-pink">.AI</span>
