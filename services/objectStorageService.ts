@@ -228,15 +228,22 @@ export async function getPublicUrl(storageKey: string): Promise<string> {
 
 export async function getAsset(storageKey: string): Promise<{ success: boolean; data?: string; error?: string }> {
   try {
+    console.log(`[GET_ASSET] Downloading: ${storageKey}`);
     const { ok, value, error } = await client.downloadAsBytes(storageKey);
     
     if (!ok || !value) {
+      console.log(`[GET_ASSET] Download failed: ${error?.message || 'no value'}`);
       return { success: false, error: error?.message || 'Download failed' };
     }
     
-    const base64Data = Buffer.from(value as unknown as ArrayBuffer).toString('base64');
+    const buffer = Buffer.from(value as unknown as ArrayBuffer);
+    console.log(`[GET_ASSET] Downloaded ${buffer.length} bytes, first bytes: [${buffer.slice(0, 8).join(',')}]`);
+    
+    const base64Data = buffer.toString('base64');
+    console.log(`[GET_ASSET] Base64 length: ${base64Data.length}, first 50 chars: ${base64Data.substring(0, 50)}`);
     return { success: true, data: base64Data };
   } catch (err) {
+    console.log(`[GET_ASSET] Exception: ${err}`);
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
