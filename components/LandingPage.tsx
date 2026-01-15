@@ -77,7 +77,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         
         <Reveal delay={100}>
           <div className="inline-block bg-neo-lime border-2 border-black px-4 py-1.5 md:px-6 md:py-2 font-bold text-xs md:text-sm uppercase tracking-widest mb-6 md:mb-8 shadow-neo hover:rotate-2 transition-transform cursor-default">
-             ⚡ v2.0 Now with Gemini 3 Pro
+             ⚡ BETA Now with Gemini 3 Pro
           </div>
         </Reveal>
 
