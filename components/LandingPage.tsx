@@ -7,7 +7,14 @@ interface Props {
   onNavigateTerms: () => void;
 }
 
-// --- Animation Hook ---
+function useHasMounted() {
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+  return hasMounted;
+}
+
 function useOnScreen(ref: React.RefObject<HTMLElement>, rootMargin = "0px") {
   const [isIntersecting, setIntersecting] = useState(false);
   useEffect(() => {
@@ -26,15 +33,58 @@ function useOnScreen(ref: React.RefObject<HTMLElement>, rootMargin = "0px") {
   return isIntersecting;
 }
 
-// --- Reveal Component ---
+function useScrollProgress() {
+  const [progress, setProgress] = useState(0);
+  const hasMounted = useHasMounted();
+  useEffect(() => {
+    if (!hasMounted) return;
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollProgress = docHeight > 0 ? scrollTop / docHeight : 0;
+      setProgress(Math.min(1, Math.max(0, scrollProgress)));
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMounted]);
+  return progress;
+}
+
+function useElementScrollProgress(ref: React.RefObject<HTMLElement>) {
+  const [progress, setProgress] = useState(0.5);
+  const hasMounted = useHasMounted();
+  useEffect(() => {
+    if (!hasMounted) return;
+    const handleScroll = () => {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const elementTop = rect.top;
+      const elementHeight = rect.height;
+      const start = windowHeight;
+      const end = -elementHeight;
+      const current = start - elementTop;
+      const total = start - end;
+      const prog = Math.min(1, Math.max(0, current / total));
+      setProgress(prog);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [ref, hasMounted]);
+  return progress;
+}
+
 const Reveal = ({ children, delay = 0, className = "" }: { children?: ReactNode, delay?: number, className?: string }) => {
   const ref = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(ref, "-50px");
+  const hasMounted = useHasMounted();
 
   return (
     <div 
       ref={ref}
-      className={`transition-all duration-1000 ease-out ${className} ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+      className={`transition-all duration-1000 ease-out ${className} ${!hasMounted || isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
@@ -42,19 +92,160 @@ const Reveal = ({ children, delay = 0, className = "" }: { children?: ReactNode,
   );
 };
 
+const AssembleOnScroll = ({ children, className = "" }: { children: ReactNode[], className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const progress = useElementScrollProgress(ref);
+  
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      {React.Children.map(children, (child, index) => {
+        const childProgress = Math.min(1, Math.max(0, (progress - index * 0.1) * 2));
+        const translateY = (1 - childProgress) * 50;
+        const opacity = childProgress;
+        const rotate = (1 - childProgress) * (index % 2 === 0 ? -5 : 5);
+        
+        return (
+          <div
+            style={{
+              transform: `translateY(${translateY}px) rotate(${rotate}deg)`,
+              opacity,
+              transition: 'transform 0.1s ease-out, opacity 0.1s ease-out'
+            }}
+          >
+            {child}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const StoryBlock = ({ 
+  step, 
+  title, 
+  description, 
+  visual, 
+  accentClass = "bg-neo-pink" 
+}: { 
+  step: number, 
+  title: string, 
+  description: string, 
+  visual: ReactNode,
+  accentClass?: string 
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const progress = useElementScrollProgress(ref);
+  const hasMounted = useHasMounted();
+  const isActive = hasMounted ? (progress > 0.2 && progress < 0.8) : true;
+  
+  return (
+    <div 
+      ref={ref}
+      className={`min-h-[80vh] flex items-center py-16 md:py-24 transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-40'}`}
+    >
+      <div className="max-w-7xl mx-auto px-6 md:px-12 w-full">
+        <div className={`flex flex-col ${step % 2 === 0 ? 'md:flex-row-reverse' : 'md:flex-row'} gap-8 md:gap-16 items-center`}>
+          <div className="md:w-1/2">
+            <div 
+              className={`inline-block ${accentClass} border-4 border-black px-4 py-2 font-display font-black text-2xl md:text-4xl mb-4 shadow-neo transform transition-transform duration-500`}
+              style={{ 
+                transform: `rotate(${isActive ? -2 : -8}deg) scale(${isActive ? 1 : 0.9})`,
+              }}
+            >
+              STEP {step}
+            </div>
+            <h3 
+              className="font-display font-black text-3xl md:text-5xl mb-4 text-neo-black transition-all duration-500"
+              style={{
+                transform: `translateX(${isActive ? 0 : -20}px)`,
+                opacity: isActive ? 1 : 0.5
+              }}
+            >
+              {title}
+            </h3>
+            <p 
+              className="text-lg md:text-xl font-medium text-gray-700 leading-relaxed transition-all duration-700"
+              style={{
+                transform: `translateX(${isActive ? 0 : -30}px)`,
+                opacity: isActive ? 1 : 0.3
+              }}
+            >
+              {description}
+            </p>
+          </div>
+          <div 
+            className="md:w-1/2 transition-all duration-500"
+            style={{
+              transform: hasMounted ? `scale(${0.8 + progress * 0.2}) rotate(${isActive ? 0 : (step % 2 === 0 ? 3 : -3)}deg)` : 'scale(1)',
+              opacity: hasMounted ? 0.5 + progress * 0.5 : 1
+            }}
+          >
+            {visual}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FloatingElement = ({ 
+  children, 
+  className = "",
+  offsetX = 0,
+  offsetY = 0,
+  rotateRange = 5
+}: { 
+  children: ReactNode, 
+  className?: string,
+  offsetX?: number,
+  offsetY?: number,
+  rotateRange?: number
+}) => {
+  const scrollProgress = useScrollProgress();
+  const translateX = Math.sin(scrollProgress * Math.PI * 2) * offsetX;
+  const translateY = Math.cos(scrollProgress * Math.PI * 2) * offsetY;
+  const rotate = Math.sin(scrollProgress * Math.PI * 4) * rotateRange;
+  
+  return (
+    <div 
+      className={className}
+      style={{
+        transform: `translate(${translateX}px, ${translateY}px) rotate(${rotate}deg)`,
+        transition: 'transform 0.1s ease-out'
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
 const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, onNavigateTerms }) => {
+  const scrollProgress = useScrollProgress();
+  
   return (
     <div className="w-full h-screen overflow-y-auto overflow-x-hidden bg-white custom-scrollbar relative selection:bg-neo-pink selection:text-black font-sans text-neo-black">
       
-      {/* Background Decor - Scaled down for mobile to avoid crowding */}
+      <div 
+        className="fixed top-0 left-0 h-1 bg-gradient-to-r from-neo-pink via-neo-cyan to-neo-lime z-[100]"
+        style={{ width: `${scrollProgress * 100}%` }}
+      />
+
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-30">
-        <div className="absolute -top-20 -left-20 w-64 h-64 md:w-96 md:h-96 bg-neo-pink rounded-full blur-3xl animate-float"></div>
-        <div className="absolute top-1/3 -right-20 w-72 h-72 md:w-[500px] md:h-[500px] bg-neo-cyan rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-0 left-1/3 w-64 h-64 md:w-80 md:h-80 bg-neo-yellow rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }}></div>
+        <div 
+          className="absolute -top-20 -left-20 w-64 h-64 md:w-96 md:h-96 bg-neo-pink rounded-full blur-3xl"
+          style={{ transform: `translate(${scrollProgress * 100}px, ${scrollProgress * 50}px)` }}
+        />
+        <div 
+          className="absolute top-1/3 -right-20 w-72 h-72 md:w-[500px] md:h-[500px] bg-neo-cyan rounded-full blur-3xl"
+          style={{ transform: `translate(${-scrollProgress * 80}px, ${scrollProgress * 30}px)` }}
+        />
+        <div 
+          className="absolute bottom-0 left-1/3 w-64 h-64 md:w-80 md:h-80 bg-neo-yellow rounded-full blur-3xl"
+          style={{ transform: `translate(${scrollProgress * 60}px, ${-scrollProgress * 40}px)` }}
+        />
       </div>
 
-      {/* Navigation */}
-      <nav className="relative z-50 flex items-center justify-between p-4 md:p-6 md:px-12 max-w-7xl mx-auto">
+      <nav className="sticky top-0 z-50 flex items-center justify-between p-4 md:p-6 md:px-12 max-w-7xl mx-auto bg-white/80 backdrop-blur-md border-b-2 border-transparent" style={{ borderColor: scrollProgress > 0.05 ? 'black' : 'transparent' }}>
         <div className="flex items-center gap-2 group cursor-pointer">
            <div className="w-10 h-10 md:w-12 md:h-12 bg-neo-black text-neo-yellow flex items-center justify-center font-display font-bold text-xl md:text-2xl border-2 border-transparent shadow-neo group-hover:rotate-12 transition-transform duration-300">
              P
@@ -72,7 +263,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-6 md:px-16 lg:px-24 max-w-7xl mx-auto flex flex-col items-center text-center">
         
         <Reveal delay={100}>
@@ -82,11 +272,9 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </Reveal>
 
         <Reveal delay={200}>
-          {/* Typography - responsive sizing for all screens */}
           <h1 className="font-display font-black text-[2.5rem] sm:text-5xl md:text-7xl lg:text-8xl leading-[0.95] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm max-w-full px-2">
             MARKETING <br/>
-            {/* Gradient Text - scales to fit on mobile */}
-            <span className="relative inline-block mt-1 md:mt-2">
+            <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
                <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none" aria-hidden="true">ON AUTOPILOT.</span>
                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
             </span>
@@ -109,7 +297,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
              </button>
              <div className="flex flex-col items-center md:items-start">
                 <div className="flex -space-x-2 mb-1">
-                   {/* CSS-Only Avatars to prevent load lag */}
                    {[
                      { bg: 'bg-neo-pink', text: 'JD' },
                      { bg: 'bg-neo-cyan', text: 'AS' },
@@ -129,27 +316,38 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
           </div>
         </Reveal>
 
-        {/* Hero Visual */}
         <Reveal delay={800} className="w-full flex justify-center px-0 md:px-4">
-          <div className="mt-12 md:mt-20 w-full max-w-6xl bg-neo-black p-1 md:p-2 rounded-xl transform rotate-1 hover:rotate-0 transition-transform duration-700 ease-out shadow-2xl">
+          <div className="mt-12 md:mt-20 w-full max-w-6xl bg-neo-black p-1 md:p-2 rounded-xl transform rotate-1 hover:rotate-0 transition-transform duration-700 ease-out shadow-2xl relative">
+             <FloatingElement className="absolute -top-6 -left-6 z-30 hidden md:block" offsetX={15} offsetY={10} rotateRange={8}>
+               <div className="bg-neo-lime border-4 border-black p-3 shadow-neo font-display font-bold text-lg">
+                 UPLOAD 📁
+               </div>
+             </FloatingElement>
+             <FloatingElement className="absolute -top-4 -right-8 z-30 hidden md:block" offsetX={-20} offsetY={12} rotateRange={-6}>
+               <div className="bg-neo-pink border-4 border-black p-3 shadow-neo font-display font-bold text-lg">
+                 GENERATE ✨
+               </div>
+             </FloatingElement>
+             <FloatingElement className="absolute -bottom-6 left-1/4 z-30 hidden md:block" offsetX={10} offsetY={-15} rotateRange={5}>
+               <div className="bg-neo-cyan border-4 border-black p-3 shadow-neo font-display font-bold text-lg">
+                 PUBLISH 🚀
+               </div>
+             </FloatingElement>
+             
              <div className="bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-800 relative group aspect-video flex flex-col">
-                {/* Mock UI Header */}
                 <div className="w-full h-6 md:h-8 bg-gray-200 border-b-2 border-gray-300 flex items-center px-3 gap-2 z-10 shrink-0">
                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-red-400 border border-black/20"></div>
                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-yellow-400 border border-black/20"></div>
                    <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-400 border border-black/20"></div>
                 </div>
                 
-                {/* CSS Mockup Dashboard - Loads Instantly */}
                 <div className="flex-1 flex overflow-hidden bg-white">
-                    {/* Mock Sidebar */}
                     <div className="hidden sm:flex w-1/4 border-r border-gray-200 bg-gray-50 p-3 flex-col gap-3">
                        <div className="h-4 w-1/2 bg-gray-300 rounded mb-2"></div>
                        <div className="h-8 w-full bg-neo-pink/20 border border-neo-pink rounded-md"></div>
                        <div className="h-8 w-full bg-white border border-gray-200 rounded-md"></div>
                        <div className="h-8 w-full bg-white border border-gray-200 rounded-md"></div>
                     </div>
-                    {/* Mock Content */}
                     <div className="flex-1 p-4 md:p-6 overflow-hidden relative">
                        <div className="flex justify-between items-center mb-6">
                           <div className="h-6 w-1/3 bg-gray-200 rounded"></div>
@@ -169,24 +367,28 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
                           </div>
                        </div>
                        
-                       {/* Floating Badge Mockup */}
                        <div className="absolute bottom-6 right-6 bg-neo-lime border-2 border-black p-2 md:p-3 shadow-neo-sm transform -rotate-3 z-20 hidden md:block">
                            <div className="text-[10px] md:text-xs font-bold text-black">VIDEO GENERATED ✅</div>
                        </div>
                     </div>
                 </div>
 
-                {/* Floating Elements - Re-implemented with CSS */}
                 <div className="absolute top-1/4 -right-5 bg-white border-4 border-black p-4 shadow-neo-lg transform rotate-6 animate-wiggle z-20 hidden lg:block">
                    <div className="font-display font-bold text-2xl">VIRAL! 🚀</div>
                 </div>
              </div>
           </div>
         </Reveal>
+        
+        <div className="mt-16 md:mt-24 flex flex-col items-center animate-bounce">
+          <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-2">Scroll to explore</p>
+          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </div>
       </section>
 
-      {/* Marquee */}
-      <div className="bg-neo-black py-4 md:py-6 overflow-hidden border-y-4 border-black rotate-1 scale-105 mb-16 md:mb-24 relative z-20 shadow-neo-lg">
+      <div className="bg-neo-black py-4 md:py-6 overflow-hidden border-y-4 border-black rotate-1 scale-105 mb-0 relative z-20 shadow-neo-lg">
          <div className="animate-marquee whitespace-nowrap flex gap-8 md:gap-12">
             {[...Array(10)].map((_, i) => (
                <div key={i} className="flex items-center gap-4">
@@ -203,7 +405,111 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
          </div>
       </div>
 
-      {/* Features Grid */}
+      <section className="relative z-10 bg-gradient-to-b from-white via-gray-50 to-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-16 md:py-24">
+            <Reveal>
+              <div className="inline-block bg-neo-black text-white px-6 py-2 font-bold text-sm uppercase tracking-widest mb-6 transform -rotate-1">
+                How It Works
+              </div>
+              <h2 className="font-display font-black text-4xl md:text-6xl text-neo-black mb-4">
+                THREE STEPS TO <br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-neo-pink to-neo-cyan">MARKETING MAGIC</span>
+              </h2>
+            </Reveal>
+          </div>
+
+          <StoryBlock
+            step={1}
+            title="UPLOAD YOUR BRAND"
+            description="Drop your logo, pitch deck, or product photos. Our AI extracts your brand DNA instantly—colors, fonts, voice, everything. No manual setup required."
+            accentClass="bg-neo-pink"
+            visual={
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo-lg">
+                <div className="flex gap-4 mb-6">
+                  <div className="w-20 h-20 bg-neo-pink/20 border-2 border-black flex items-center justify-center">
+                    <span className="text-3xl">🎨</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
+                    <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                  </div>
+                </div>
+                <div className="flex gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-neo-pink border-2 border-black"></div>
+                  <div className="w-8 h-8 rounded-full bg-neo-cyan border-2 border-black"></div>
+                  <div className="w-8 h-8 rounded-full bg-neo-yellow border-2 border-black"></div>
+                </div>
+                <div className="bg-neo-lime/30 border-2 border-black p-3 font-bold text-sm">
+                  Brand DNA: "Bold, Playful, Gen-Z Forward"
+                </div>
+              </div>
+            }
+          />
+
+          <StoryBlock
+            step={2}
+            title="DESCRIBE YOUR VISION"
+            description="Chat naturally with your AI CMO. Ask for 'a viral TikTok for my sneaker launch' or 'UGC-style content for Instagram.' It understands marketing."
+            accentClass="bg-neo-cyan"
+            visual={
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo-lg">
+                <div className="space-y-4">
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-neo-black rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">AI</div>
+                    <div className="bg-gray-100 border-2 border-black p-3 rounded-lg max-w-xs">
+                      <p className="text-sm font-medium">What kind of content would you like to create today?</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <div className="bg-neo-pink border-2 border-black p-3 rounded-lg max-w-xs">
+                      <p className="text-sm font-bold">I need a viral UGC pack for my new skincare launch! 🧴✨</p>
+                    </div>
+                    <div className="w-8 h-8 bg-neo-yellow rounded-full flex items-center justify-center text-xs font-bold shrink-0">YOU</div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-neo-black rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">AI</div>
+                    <div className="bg-neo-lime border-2 border-black p-3 rounded-lg">
+                      <p className="text-sm font-bold">Generating 5 videos + 10 images... 🚀</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          />
+
+          <StoryBlock
+            step={3}
+            title="DOWNLOAD & DOMINATE"
+            description="Get broadcast-ready images and videos in seconds. Every asset is on-brand, unique, and optimized for each platform. Just download and post."
+            accentClass="bg-neo-lime"
+            visual={
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo-lg">
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="aspect-square bg-neo-pink/20 border-2 border-black rounded flex items-center justify-center text-2xl">📸</div>
+                  <div className="aspect-square bg-neo-cyan/20 border-2 border-black rounded flex items-center justify-center text-2xl">🎬</div>
+                  <div className="aspect-square bg-neo-yellow/20 border-2 border-black rounded flex items-center justify-center text-2xl">📸</div>
+                </div>
+                <div className="flex gap-2 mb-4">
+                  <div className="flex-1 bg-gray-100 border-2 border-black p-2 text-center">
+                    <span className="text-xs font-bold">TIKTOK</span>
+                  </div>
+                  <div className="flex-1 bg-gray-100 border-2 border-black p-2 text-center">
+                    <span className="text-xs font-bold">REELS</span>
+                  </div>
+                  <div className="flex-1 bg-gray-100 border-2 border-black p-2 text-center">
+                    <span className="text-xs font-bold">STORIES</span>
+                  </div>
+                </div>
+                <button className="w-full bg-neo-black text-white border-2 border-black py-3 font-bold shadow-neo hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all">
+                  Download All ↓
+                </button>
+              </div>
+            }
+          />
+        </div>
+      </section>
+
       <section className="relative z-10 py-16 md:py-20 px-6 md:px-12 max-w-7xl mx-auto">
          <div className="text-center mb-12 md:mb-16">
             <h2 className="font-display font-black text-3xl md:text-5xl mb-4 text-neo-black">POWERED BY GEMINI 3</h2>
@@ -211,7 +517,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
          </div>
          
          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
             <Reveal delay={0}>
               <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col hover:shadow-neo-lg hover:-translate-y-2 transition-all duration-300 group">
                 <div className="w-16 h-16 bg-neo-cyan border-2 border-black flex items-center justify-center text-3xl mb-6 shadow-neo-sm group-hover:rotate-12 transition-transform">
@@ -224,7 +529,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
               </div>
             </Reveal>
 
-            {/* Feature 2 */}
             <Reveal delay={150}>
               <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col hover:shadow-neo-lg hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group">
                 <div className="absolute -right-12 top-4 bg-neo-pink text-black text-xs font-black px-12 py-1 border-2 border-black transform rotate-45 shadow-sm">
@@ -240,7 +544,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
               </div>
             </Reveal>
 
-            {/* Feature 3 */}
             <Reveal delay={300}>
               <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col hover:shadow-neo-lg hover:-translate-y-2 transition-all duration-300 group">
                 <div className="w-16 h-16 bg-neo-pink border-2 border-black flex items-center justify-center text-3xl mb-6 shadow-neo-sm group-hover:scale-110 transition-transform">
@@ -255,9 +558,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
          </div>
       </section>
 
-      {/* Value Prop / ROI */}
       <section className="py-16 md:py-24 bg-neo-lime border-y-4 border-black relative overflow-hidden">
-         {/* Background Pattern */}
          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
          
          <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row gap-12 md:gap-16 items-center relative z-10">
@@ -309,7 +610,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
          </div>
       </section>
 
-      {/* FAQ Section */}
       <section className="py-16 md:py-24 px-6 md:px-12 max-w-4xl mx-auto">
          <h2 className="font-display font-black text-3xl md:text-5xl text-center mb-12 md:mb-16 text-neo-black">FREQUENTLY ASKED</h2>
          <div className="space-y-4 md:space-y-6">
@@ -357,7 +657,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
          </div>
       </section>
 
-      {/* CTA Footer */}
       <section className="py-16 md:py-24 px-6 text-center bg-black text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-neo-pink opacity-20 blur-3xl animate-pulse"></div>
         <div className="relative z-10 max-w-4xl mx-auto">
@@ -371,7 +670,6 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </div>
       </section>
 
-      {/* Footer Links */}
       <footer className="bg-black text-white py-12 border-t border-gray-800">
          <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-8">
             <div className="text-center md:text-left">
