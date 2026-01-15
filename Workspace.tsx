@@ -7,12 +7,13 @@ import BrandIdentityModal from './components/BrandIdentityModal';
 import AvatarAnalysisModal from './components/AvatarAnalysisModal';
 import BrandAnalysisSkeleton from './components/BrandAnalysisSkeleton';
 import ProductModal from './components/ProductModal';
+import OnboardingPanel from './components/OnboardingPanel';
 import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { IMAGE_LIMIT, VIDEO_LIMIT, getRemainingImages, getRemainingVideos } from './services/usageLimits';
@@ -36,7 +37,8 @@ import {
   deleteProductAction,
   setProductAssetsAction,
   autoTagAssetAction,
-  analyzeProductImagesAction
+  analyzeProductImagesAction,
+  getOnboardingStateAction
 } from './app/actions/boardActions';
 
 
@@ -56,6 +58,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const { showError, showSuccess, showToast } = useToast();
   const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, lastResetDate: 0 });
   const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
+  const [isOnboardingLoading, setIsOnboardingLoading] = useState(false);
 
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string>('');
@@ -94,6 +98,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     });
   }, []);
 
+  // Refresh onboarding state helper - must be defined before useEffects that use it
+  const refreshOnboardingState = useCallback(async () => {
+    setIsOnboardingLoading(true);
+    try {
+      const state = await getOnboardingStateAction();
+      setOnboardingState(state);
+    } catch (error) {
+      console.error('[ONBOARDING] Failed to load onboarding state:', error);
+    } finally {
+      setIsOnboardingLoading(false);
+    }
+  }, []);
+
   // Fetch active board details
   React.useEffect(() => {
     if (!activeBoardId) return;
@@ -127,8 +144,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         };
         setActiveBoard(mappedBoard);
       }
+    }).finally(() => {
+      refreshOnboardingState();
     });
-  }, [activeBoardId]);
+  }, [activeBoardId, refreshOnboardingState]);
 
   const updateActiveBoard = (updater: (board: Board) => Board) => {
     if (activeBoard) setActiveBoard(updater(activeBoard));
@@ -186,7 +205,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       };
       setActiveBoard(mappedBoard);
     }
-  }, []);
+    await refreshOnboardingState();
+  }, [refreshOnboardingState]);
 
   // Trigger the job processor API to process pending jobs (works with Autoscale)
   const triggerJobProcessing = useCallback(async () => {
@@ -299,6 +319,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
     // Optimistic update
     updateActiveBoard(b => ({ ...b, assets: [...b.assets, assetWithId] }));
+    refreshOnboardingState();
 
     if (asset.type === 'logo') {
       setIsAnalyzingLogo(true);
@@ -437,6 +458,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setEditingProductId(productId || null);
     setShowProductModal(true);
   };
+
+  const handleOpenLinkModal = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('open-link-modal'));
+    }
+  }, []);
+
+  const handleOpenChat = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('open-chat'));
+    }
+  }, []);
 
   const handleSaveProduct = async (product: Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>, assignments: Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>[]) => {
     if (!activeBoardId) return;
@@ -947,6 +980,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         items: [...newItems, ...b.items],
         messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: modelMsgText }]
       }));
+      refreshOnboardingState();
 
     } catch (error: any) {
       console.error("Chat error:", error);
@@ -1137,6 +1171,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
       {/* Main Content */}
       <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 pb-32 md:pt-0">
+        {!isOnboardingLoading && onboardingState && !onboardingState.completed && (
+          <OnboardingPanel
+            state={onboardingState}
+            onOpenLinkModal={handleOpenLinkModal}
+            onOpenChat={handleOpenChat}
+            onOpenBoards={() => setShowBoardListModal(true)}
+            onOpenProduct={() => handleOpenProductModal()}
+          />
+        )}
         {/* Desktop Header - Hidden on mobile */}
         <header className="hidden md:flex justify-between items-center mb-12">
           <h2 className="text-5xl font-display font-black tracking-tight">{activeBoard.name}</h2>

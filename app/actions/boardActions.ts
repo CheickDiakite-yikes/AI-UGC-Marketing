@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/db';
-import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets } from '@/db/schema';
+import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs } from '@/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole } from '@/types';
@@ -487,6 +487,81 @@ export async function getUserUsageAction() {
         imagesGenerated: user?.imagesGenerated || 0,
         videosGenerated: user?.videosGenerated || 0,
         lastResetDate: Date.now() // We could store this in DB too if needed
+    };
+}
+
+export async function getOnboardingStateAction() {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return {
+            completed: true,
+            required: { websiteLink: true, campaignCreated: true },
+            optional: { logo: true, avatar: true, product: true, sources: true, multipleBoards: true }
+        };
+    }
+
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, session.userId as string),
+        columns: { onboardingCompleted: true }
+    });
+
+    const userBoards = await db.query.boards.findMany({
+        where: eq(boards.userId, session.userId as string),
+        columns: { id: true }
+    });
+
+    const boardIds = userBoards.map(board => board.id);
+    const assetTypes = boardIds.length > 0
+        ? await db.select({ type: assets.type }).from(assets).where(inArray(assets.boardId, boardIds))
+        : [];
+    const assetTypeSet = new Set(assetTypes.map(asset => asset.type));
+
+    const hasWebsiteLink = assetTypeSet.has('link');
+    const hasLogo = assetTypeSet.has('logo');
+    const hasAvatar = assetTypeSet.has('avatar');
+    const hasSources = assetTypeSet.has('pdf') || assetTypeSet.has('text');
+
+    const hasProduct = boardIds.length > 0
+        ? (await db.select({ id: products.id }).from(products).where(inArray(products.boardId, boardIds)).limit(1)).length > 0
+        : false;
+
+    const hasGeneratedItem = boardIds.length > 0
+        ? (await db.select({ id: generatedItems.id }).from(generatedItems).where(inArray(generatedItems.boardId, boardIds)).limit(1)).length > 0
+        : false;
+
+    const hasGenerationJob = (await db.select({ id: jobs.id }).from(jobs).where(
+        and(
+            eq(jobs.userId, session.userId as string),
+            inArray(jobs.type, ['generate_image', 'generate_video', 'generate_carousel'])
+        )
+    ).limit(1)).length > 0;
+
+    const hasCampaign = hasGeneratedItem || hasGenerationJob;
+    const hasMultipleBoards = userBoards.length > 1;
+
+    const requiredComplete = hasWebsiteLink && hasCampaign;
+    let completed = Boolean(user?.onboardingCompleted);
+
+    if (!completed && requiredComplete) {
+        await db.update(users)
+            .set({ onboardingCompleted: true, onboardingCompletedAt: new Date() })
+            .where(eq(users.id, session.userId as string));
+        completed = true;
+    }
+
+    return {
+        completed,
+        required: {
+            websiteLink: hasWebsiteLink,
+            campaignCreated: hasCampaign
+        },
+        optional: {
+            logo: hasLogo,
+            avatar: hasAvatar,
+            product: hasProduct,
+            sources: hasSources,
+            multipleBoards: hasMultipleBoards
+        }
     };
 }
 

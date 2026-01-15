@@ -87,6 +87,21 @@ export interface UsageStats {
   lastResetDate: number; // timestamp
 }
 
+export interface OnboardingState {
+  completed: boolean;
+  required: {
+    websiteLink: boolean;
+    campaignCreated: boolean;
+  };
+  optional: {
+    logo: boolean;
+    avatar: boolean;
+    product: boolean;
+    sources: boolean;
+    multipleBoards: boolean;
+  };
+}
+
 export type ProductType = 'physical_product' | 'software' | 'service' | 'digital_product' | 'hardware';
 
 export type ProductAssetRole =

@@ -36,11 +36,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (window.innerWidth >= 768) {
       setIsOpen(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleOpenChat = () => {
+      setIsOpen(true);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    };
+
+    window.addEventListener('open-chat', handleOpenChat);
+    return () => window.removeEventListener('open-chat', handleOpenChat);
   }, []);
 
   const scrollToBottom = () => {
@@ -271,6 +282,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Scan trends or generate campaigns..."
+            ref={inputRef}
             className="w-full bg-white/80 border-2 border-transparent focus:border-neo-pink rounded-xl py-4 pl-4 pr-14 text-base text-gray-800 placeholder-gray-500 outline-none transition-all shadow-inner"
           />
           <button 

@@ -105,6 +105,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [assets]);
 
+  useEffect(() => {
+    const handleOpenLinkModal = () => {
+      setShowLinkModal(true);
+      setLinkUrl('');
+    };
+
+    window.addEventListener('open-link-modal', handleOpenLinkModal);
+    return () => window.removeEventListener('open-link-modal', handleOpenLinkModal);
+  }, []);
+
   const ALLOWED_IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/heic,image/heif";
   const ALLOWED_DOC_TYPES = ".pdf,text/plain";
 

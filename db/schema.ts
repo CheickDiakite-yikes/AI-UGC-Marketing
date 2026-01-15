@@ -34,6 +34,8 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   imagesGenerated: integer('images_generated').default(0).notNull(),
   videosGenerated: integer('videos_generated').default(0).notNull(),
+  onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
+  onboardingCompletedAt: timestamp('onboarding_completed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
