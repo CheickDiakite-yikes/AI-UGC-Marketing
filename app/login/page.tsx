@@ -1,8 +1,9 @@
 
 'use client';
 
-import React from 'react';
-import { useFormStatus, useFormState } from 'react-dom';
+import React, { useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { login } from '../actions/authActions';
 import Link from 'next/link';
 
@@ -20,7 +21,14 @@ function SubmitButton() {
 }
 
 export default function LoginPage() {
-    const [state, formAction] = useFormState(login, null);
+    const [state, formAction] = useActionState(login, null);
+    const router = useRouter();
+
+    useEffect(() => {
+        if (state?.success) {
+            router.push('/');
+        }
+    }, [state?.success, router]);
 
     return (
         <div className="min-h-screen bg-neo-yellow flex flex-col items-center justify-center p-4 relative overflow-hidden">

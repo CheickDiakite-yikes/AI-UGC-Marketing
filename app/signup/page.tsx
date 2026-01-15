@@ -1,8 +1,9 @@
 
 'use client';
 
-import React from 'react';
-import { useFormStatus, useFormState } from 'react-dom';
+import React, { useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { signup } from '../actions/authActions';
 import Link from 'next/link';
 
@@ -15,13 +16,20 @@ function SubmitButton() {
             className={`w-full text-white px-8 py-4 font-black uppercase tracking-wider text-xl border-4 border-black shadow-neo-sm transform active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed
         ${pending ? 'bg-gray-400' : 'bg-neo-lime hover:bg-neo-pink hover:text-black text-black'}`}
         >
-            {pending ? 'Calibrating...' : 'Launch Application'}
+            {pending ? 'Creating Account...' : 'Launch Application'}
         </button>
     );
 }
 
 export default function SignupPage() {
-    const [state, formAction] = useFormState(signup, null);
+    const [state, formAction] = useActionState(signup, null);
+    const router = useRouter();
+
+    useEffect(() => {
+        if (state?.success) {
+            router.push('/');
+        }
+    }, [state?.success, router]);
 
     return (
         <div className="min-h-screen bg-white flex flex-col md:flex-row">
