@@ -17,7 +17,18 @@ function useHasMounted() {
 
 function useOnScreen(ref: React.RefObject<HTMLElement>, rootMargin = "0px") {
   const [isIntersecting, setIntersecting] = useState(false);
+  
   useEffect(() => {
+    // Check if element is already in view on mount
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const isAlreadyVisible = rect.top < window.innerHeight && rect.bottom > 0;
+      if (isAlreadyVisible) {
+        setIntersecting(true);
+        return;
+      }
+    }
+    
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -25,7 +36,7 @@ function useOnScreen(ref: React.RefObject<HTMLElement>, rootMargin = "0px") {
            observer.disconnect(); 
         }
       },
-      { rootMargin }
+      { rootMargin, threshold: 0.1 }
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
