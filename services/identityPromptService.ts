@@ -1,3 +1,4 @@
+import { BrandIdentity, AvatarIdentity, Product } from '@/types';
 import { db } from '@/db';
 import { boards } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -26,9 +27,9 @@ export async function compileVisualPromptWithIdentity(params: {
 
   const compiled = buildIdentityConstraints({
     basePrompt,
-    brandIdentity: board.brandIdentity,
-    avatarIdentity: board.avatarIdentity,
-    products: board.products,
+    brandIdentity: board.brandIdentity as BrandIdentity | null,
+    avatarIdentity: board.avatarIdentity as AvatarIdentity | null,
+    products: board.products as Product[] | undefined,
     productId
   });
 
