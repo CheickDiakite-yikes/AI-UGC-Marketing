@@ -236,7 +236,8 @@ export async function saveAvatarIdentityAction(boardId: string, identity: Avatar
         description: identity.description,
         traits: identity.traits,
         atomicTraits: identity.atomicTraits,
-        referenceImages: identity.referenceImages
+        referenceImages: identity.referenceImages,
+        consistencySpec: identity.consistencySpec || null
     }).returning();
 
     await db.update(boards)
@@ -270,7 +271,9 @@ export async function createProductAction(boardId: string, product: ProductInput
         digitalSubtype: product.digitalSubtype || null,
         keyFeatures: product.keyFeatures || null,
         variants: product.variants || null,
-        complianceNotes: product.complianceNotes || null
+        complianceNotes: product.complianceNotes || null,
+        visualSpec: product.visualSpec || null,
+        copySpec: product.copySpec || null
     }).returning();
 
     revalidatePath('/');
@@ -290,7 +293,9 @@ export async function updateProductAction(productId: string, updates: Partial<Pr
             digitalSubtype: updates.digitalSubtype ?? product.digitalSubtype,
             keyFeatures: updates.keyFeatures ?? product.keyFeatures,
             variants: updates.variants ?? product.variants,
-            complianceNotes: updates.complianceNotes ?? product.complianceNotes
+            complianceNotes: updates.complianceNotes ?? product.complianceNotes,
+            visualSpec: updates.visualSpec ?? product.visualSpec,
+            copySpec: updates.copySpec ?? product.copySpec
         })
         .where(eq(products.id, productId))
         .returning();
@@ -803,6 +808,8 @@ Goals:
 - Extract likely key features and variants visible in packaging or UI.
 - Provide compliance notes if the product is regulated (health, finance, medical, etc.).
 - For each ASSET_ID, assign a role and notes (front label, back, side, hero, etc.).
+- Extract exact on-pack or on-screen text into labelText (case-sensitive).
+- Note any immutable visual identifiers (logo placement, color blocking, cap shape, UI layout).
 
 Allowed productType values:
 - physical_product
@@ -846,6 +853,10 @@ Allowed asset roles:
 - other
 
 If you cannot determine a field, leave it empty.
+
+Return detailed Visual Spec and Copy Spec to ensure visual and messaging consistency.
+Visual Spec should capture physical shape, colors, materials, label text, and do-not-change rules.
+Copy Spec should capture canonical naming, tagline, approved claims, proof points, and language to avoid.
 `;
 
             const contents = [{
@@ -868,6 +879,32 @@ If you cannot determine a field, leave it empty.
                             keyFeatures: { type: Type.ARRAY, items: { type: Type.STRING } },
                             variants: { type: Type.ARRAY, items: { type: Type.STRING } },
                             complianceNotes: { type: Type.STRING },
+                            visualSpec: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    dominantColors: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    materials: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    formFactor: { type: Type.STRING },
+                                    packagingGeometry: { type: Type.STRING },
+                                    labelText: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    logoPlacement: { type: Type.STRING },
+                                    distinctiveMarkers: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    usageContexts: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    doNotChange: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                }
+                            },
+                            copySpec: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    canonicalName: { type: Type.STRING },
+                                    tagline: { type: Type.STRING },
+                                    allowedClaims: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    disallowedClaims: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    proofPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    toneDirectives: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                    requiredPhrases: { type: Type.ARRAY, items: { type: Type.STRING } }
+                                }
+                            },
                             assetAssignments: {
                                 type: Type.ARRAY,
                                 items: {

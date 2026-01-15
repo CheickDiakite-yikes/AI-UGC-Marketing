@@ -102,6 +102,7 @@ export const avatarIdentities = pgTable('avatar_identities', {
   traits: jsonb('traits'), // string[]
   atomicTraits: jsonb('atomic_traits').notNull(), // { faceShape, ... }
   referenceImages: jsonb('reference_images'), // string[] (base64)
+  consistencySpec: jsonb('consistency_spec'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -117,6 +118,8 @@ export const products = pgTable('products', {
   keyFeatures: jsonb('key_features'),
   variants: jsonb('variants'),
   complianceNotes: text('compliance_notes'),
+  visualSpec: jsonb('visual_spec'),
+  copySpec: jsonb('copy_spec'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

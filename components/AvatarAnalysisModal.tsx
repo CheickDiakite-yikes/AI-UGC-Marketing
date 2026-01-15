@@ -10,6 +10,13 @@ interface Props {
 
 const AvatarAnalysisModal: React.FC<Props> = ({ initialIdentity, onSave, onClose }) => {
   const [identity, setIdentity] = useState<AvatarIdentity>(initialIdentity);
+  const consistency = identity.consistencySpec || {};
+
+  const parseList = (value: string) =>
+    value
+      .split(/[\n,]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
@@ -94,11 +101,107 @@ const AvatarAnalysisModal: React.FC<Props> = ({ initialIdentity, onSave, onClose
                <div className="pt-4">
                   <label className="text-[10px] font-black uppercase text-gray-400 block mb-3">Reconstruction Tags</label>
                   <div className="flex flex-wrap gap-2">
-                     {identity.traits.map((trait, idx) => (
+                     {(identity.traits || []).map((trait, idx) => (
                         <div key={idx} className="bg-white border-2 border-black px-3 py-1 text-xs font-bold shadow-neo-sm hover:translate-y-[-1px] transition-transform">
                            #{trait}
                         </div>
                      ))}
+                  </div>
+               </div>
+
+               <div className="pt-4 border-t-2 border-black space-y-4">
+                  <div>
+                     <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Consistency Rules (Do Not Change)</label>
+                     <textarea
+                       value={(consistency.doNotChange || []).join('\n')}
+                       onChange={(e) => setIdentity({
+                          ...identity,
+                          consistencySpec: { ...consistency, doNotChange: parseList(e.target.value) }
+                       })}
+                       className="w-full bg-white border-2 border-black p-3 text-xs font-bold min-h-[80px]"
+                       placeholder="Hair color\nEye shape\nDistinctive mark"
+                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Style Keywords</label>
+                        <textarea
+                          value={(consistency.styleKeywords || []).join('\n')}
+                          onChange={(e) => setIdentity({
+                             ...identity,
+                             consistencySpec: { ...consistency, styleKeywords: parseList(e.target.value) }
+                          })}
+                          className="w-full bg-white border-2 border-black p-3 text-xs font-bold min-h-[70px]"
+                          placeholder="Minimalist\nWarm\nCandid"
+                        />
+                     </div>
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Wardrobe</label>
+                        <input
+                          value={consistency.wardrobe || ''}
+                          onChange={(e) => setIdentity({
+                             ...identity,
+                             consistencySpec: { ...consistency, wardrobe: e.target.value }
+                          })}
+                          className="w-full bg-white border-2 border-black p-3 text-xs font-bold"
+                          placeholder="Neutral blazer, white tee"
+                        />
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Accessories</label>
+                        <textarea
+                          value={(consistency.accessories || []).join('\n')}
+                          onChange={(e) => setIdentity({
+                             ...identity,
+                             consistencySpec: { ...consistency, accessories: parseList(e.target.value) }
+                          })}
+                          className="w-full bg-white border-2 border-black p-3 text-xs font-bold min-h-[60px]"
+                          placeholder="Silver hoop earrings"
+                        />
+                     </div>
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Camera Angles</label>
+                        <textarea
+                          value={(consistency.cameraAngles || []).join('\n')}
+                          onChange={(e) => setIdentity({
+                             ...identity,
+                             consistencySpec: { ...consistency, cameraAngles: parseList(e.target.value) }
+                          })}
+                          className="w-full bg-white border-2 border-black p-3 text-xs font-bold min-h-[60px]"
+                          placeholder="Eye-level\n3/4 profile"
+                        />
+                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Lighting Notes</label>
+                        <input
+                          value={consistency.lightingNotes || ''}
+                          onChange={(e) => setIdentity({
+                             ...identity,
+                             consistencySpec: { ...consistency, lightingNotes: e.target.value }
+                          })}
+                          className="w-full bg-white border-2 border-black p-3 text-xs font-bold"
+                          placeholder="Soft daylight, warm key"
+                        />
+                     </div>
+                     <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2">Voice Guidelines</label>
+                        <textarea
+                          value={(consistency.voiceGuidelines || []).join('\n')}
+                          onChange={(e) => setIdentity({
+                             ...identity,
+                             consistencySpec: { ...consistency, voiceGuidelines: parseList(e.target.value) }
+                          })}
+                          className="w-full bg-white border-2 border-black p-3 text-xs font-bold min-h-[60px]"
+                          placeholder="Confident, warm\nNo slang"
+                        />
+                     </div>
                   </div>
                </div>
             </div>

@@ -13,7 +13,8 @@ import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset } from './types';
-import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch } from './services/geminiService';
+import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
+import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
 import {
   getBoards,
@@ -533,13 +534,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           const fc = part.functionCall as FunctionCall;
           if (fc.name === 'generate_image') {
             setProcessingStatus(`Queuing image generation...`);
+            const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
+            const traceId = crypto.randomUUID();
             const res = await fetch('/api/jobs', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 boardId: activeBoardId,
                 type: 'generate_image',
-                payload: { prompt: fc.args['prompt'], aspectRatio: fc.args['aspectRatio'] || '1:1' }
+                payload: {
+                  prompt: fc.args['prompt'],
+                  aspectRatio: fc.args['aspectRatio'] || '1:1',
+                  productId,
+                  traceId
+                }
               })
             });
             const job = await res.json();
@@ -615,6 +623,31 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         let jobCount = 0;
         for (const pack of packQueue) {
           for (const item of pack.items) {
+            const traceId = crypto.randomUUID();
+            if (item.caption || item.hook || item.title) {
+              try {
+                const validated = await validateCopyConsistency(
+                  { title: item.title, hook: item.hook, caption: item.caption },
+                  {
+                    brandIdentity: activeBoard.brandIdentity,
+                    avatarIdentity: activeBoard.avatarIdentity,
+                    products: activeBoard.products || [],
+                    productId: item.productId,
+                    traceId
+                  }
+                );
+                if (validated.changed) {
+                  item.title = validated.title || item.title;
+                  item.hook = validated.hook || item.hook;
+                  item.caption = validated.caption || item.caption;
+                }
+                if (validated.issues.length > 0) {
+                  console.warn(`[COPY VALIDATOR ${traceId}] Issues detected:`, validated.issues);
+                }
+              } catch (error) {
+                console.warn(`[COPY VALIDATOR ${traceId}] Failed to validate copy`, error);
+              }
+            }
             setProcessingStatus(`Queuing ${item.title}...`);
             if (item.type === 'carousel') {
               // TODO: Add carousel support to job runner
@@ -622,7 +655,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               try {
                 const slides: string[] = [];
                 for (const p of item.carousel_prompts) {
-                  const slide = await generateMarketingImage(p, item.aspectRatio || AspectRatio.SQUARE);
+                  const compiled = buildIdentityConstraints({
+                    basePrompt: p,
+                    brandIdentity: activeBoard.brandIdentity,
+                    avatarIdentity: activeBoard.avatarIdentity,
+                    products: activeBoard.products || [],
+                    productId: item.productId
+                  });
+                  const slide = await generateMarketingImage(compiled.prompt, item.aspectRatio || AspectRatio.SQUARE);
                   slides.push(slide);
                 }
                 const carouselItem: CanvasItem = { id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
@@ -635,7 +675,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             } else {
               // Use background jobs for images and videos in packs
               const jobType = item.type === 'video' ? 'generate_video' : 'generate_image';
-              const traceId = crypto.randomUUID();
               const res = await fetch('/api/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -647,6 +686,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                     aspectRatio: item.aspectRatio || (item.type === 'video' ? '16:9' : '1:1'),
                     resolution: '720p',
                     title: item.title,
+                    caption: item.caption,
+                    hook: item.hook,
+                    archetype: item.archetype,
                     productId: item.productId,
                     ingredientAssetIds: item.ingredientAssetIds,
                     traceId

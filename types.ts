@@ -65,6 +65,7 @@ export interface AvatarIdentity {
   };
   name?: string;
   referenceImages: string[]; // Array of base64 shots (Front, Side, etc)
+  consistencySpec?: AvatarConsistencySpec;
 }
 
 export interface Board {
@@ -99,6 +100,38 @@ export type ProductAssetRole =
   | 'ui'
   | 'other';
 
+export interface AvatarConsistencySpec {
+  styleKeywords?: string[];
+  wardrobe?: string;
+  accessories?: string[];
+  doNotChange?: string[];
+  cameraAngles?: string[];
+  lightingNotes?: string;
+  voiceGuidelines?: string[];
+}
+
+export interface ProductVisualSpec {
+  dominantColors?: string[];
+  materials?: string[];
+  formFactor?: string;
+  packagingGeometry?: string;
+  labelText?: string[];
+  logoPlacement?: string;
+  distinctiveMarkers?: string[];
+  usageContexts?: string[];
+  doNotChange?: string[];
+}
+
+export interface ProductCopySpec {
+  canonicalName?: string;
+  tagline?: string;
+  allowedClaims?: string[];
+  disallowedClaims?: string[];
+  proofPoints?: string[];
+  toneDirectives?: string[];
+  requiredPhrases?: string[];
+}
+
 export interface Product {
   id: string;
   boardId: string;
@@ -111,6 +144,8 @@ export interface Product {
   keyFeatures?: string[] | null;
   variants?: string[] | null;
   complianceNotes?: string | null;
+  visualSpec?: ProductVisualSpec | null;
+  copySpec?: ProductCopySpec | null;
   assets?: ProductAsset[];
   createdAt?: number;
 }
@@ -141,6 +176,12 @@ export interface AssetAutoTags {
 
 export interface AssetMetadata {
   autoTags?: AssetAutoTags;
+  vision?: {
+    ocrText?: string[];
+    visualSummary?: string;
+    dominantColors?: string[];
+    tags?: string[];
+  };
 }
 
 export enum AspectRatio {

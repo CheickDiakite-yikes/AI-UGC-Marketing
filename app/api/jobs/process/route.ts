@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPendingJobs, claimJob, updateJobStatus } from '../../../../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../../../../services/geminiService';
+import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
+import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
 import { uploadGeneratedItem } from '../../../../services/objectStorageService';
 import { db } from '../../../../db';
@@ -32,14 +34,22 @@ interface JobResult {
 }
 
 async function processImageJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string };
-  const { prompt, aspectRatio, title } = payload;
+  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string };
+  const { prompt, aspectRatio, title, caption, hook, archetype, productId } = payload;
+  const traceId = payload.traceId || crypto.randomUUID();
   
   const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.SQUARE;
   
-  console.log(`[API JOB PROCESSOR] Generating image...`);
+  const compiled = await compileVisualPromptWithIdentity({
+    boardId: job.boardId,
+    basePrompt: prompt,
+    productId,
+    traceId
+  });
+
+  console.log(`[API JOB PROCESSOR ${traceId}] Generating image...`);
   
-  const imageResult = await generateMarketingImage(prompt, aspectRatioValue);
+  const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue);
   
   const itemId = crypto.randomUUID();
   let storageKey: string | null = null;
@@ -58,7 +68,16 @@ async function processImageJob(job: Job): Promise<JobResult> {
     content: contentToStore,
     storageKey: storageKey,
     title: title || 'Generated Image',
-    metadata: { aspectRatio, jobId: job.id, prompt: prompt.substring(0, 200) },
+    metadata: {
+      aspectRatio,
+      jobId: job.id,
+      prompt: compiled.prompt.substring(0, 200),
+      productId: compiled.productIdUsed || productId || null,
+      caption: caption || null,
+      hook: hook || null,
+      archetype: archetype || null,
+      traceId
+    },
   }).returning();
   
   await db.update(users)
@@ -80,11 +99,14 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     aspectRatio?: string;
     resolution?: string;
     title?: string;
+    caption?: string;
+    hook?: string;
+    archetype?: string;
     productId?: string;
     ingredientAssetIds?: string[];
     traceId?: string;
   };
-  const { prompt, aspectRatio, resolution, title, productId, ingredientAssetIds } = payload;
+  const { prompt, aspectRatio, resolution, title, caption, hook, archetype, productId, ingredientAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
   
   const config: VeoConfig = {
@@ -122,11 +144,18 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     console.warn(`[API JOB PROCESSOR ${traceId}] Skipping ingredients: aspect ratio ${config.aspectRatio} is not supported for reference images`);
   }
   
+  const compiled = await compileVisualPromptWithIdentity({
+    boardId: job.boardId,
+    basePrompt: prompt,
+    productId: productIdUsed || productId || null,
+    traceId
+  });
+
   let videoResult: string;
   let ingredientFailure: string | null = null;
   try {
     videoResult = await generateVeoVideo(
-      prompt,
+      compiled.prompt,
       config,
       useIngredients ? { referenceImages, traceId } : { traceId }
     );
@@ -137,7 +166,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     ingredientFailure = error?.message || 'Ingredient video generation failed';
     console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient generation failed, retrying without references: ${ingredientFailure}`);
     videoResult = await generateVeoVideo(
-      prompt,
+      compiled.prompt,
       config,
       { traceId }
     );
@@ -164,9 +193,12 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       aspectRatio,
       resolution,
       jobId: job.id,
-      prompt: prompt.substring(0, 200),
+      prompt: compiled.prompt.substring(0, 200),
       productId: productIdUsed || productId || null,
       ingredientAssetIds: selectedIngredientIds,
+      caption: caption || null,
+      hook: hook || null,
+      archetype: archetype || null,
       ingredientFallback: !!ingredientFailure,
       ingredientError: ingredientFailure,
       traceId

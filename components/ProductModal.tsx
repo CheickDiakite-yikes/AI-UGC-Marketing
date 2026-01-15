@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Product, ProductAsset, ProjectAsset, ProductAssetRole, ProductType } from '../types';
+import { Product, ProductAsset, ProjectAsset, ProductAssetRole, ProductType, ProductVisualSpec, ProductCopySpec } from '../types';
 
 type ProductInput = Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>;
 type ProductAssetInput = Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>;
@@ -15,6 +15,8 @@ type ProductAnalysisResult = {
   keyFeatures?: string[];
   variants?: string[];
   complianceNotes?: string;
+  visualSpec?: ProductVisualSpec;
+  copySpec?: ProductCopySpec;
   assetAssignments?: ProductAssetInput[];
 };
 
@@ -114,6 +116,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, assets, onUploadPr
   const [keyFeatures, setKeyFeatures] = useState((product?.keyFeatures || []).join('\n'));
   const [variants, setVariants] = useState((product?.variants || []).join('\n'));
   const [complianceNotes, setComplianceNotes] = useState(product?.complianceNotes || '');
+  const [visualSpec, setVisualSpec] = useState<ProductVisualSpec>(product?.visualSpec || {});
+  const [copySpec, setCopySpec] = useState<ProductCopySpec>(product?.copySpec || {});
   const [error, setError] = useState('');
 
   const initialAssignments = useMemo(() => {
@@ -145,6 +149,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, assets, onUploadPr
     setKeyFeatures((product?.keyFeatures || []).join('\n'));
     setVariants((product?.variants || []).join('\n'));
     setComplianceNotes(product?.complianceNotes || '');
+    setVisualSpec(product?.visualSpec || {});
+    setCopySpec(product?.copySpec || {});
     setAssignments(initialAssignments);
     setError('');
   }, [product, initialAssignments]);
@@ -212,6 +218,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, assets, onUploadPr
       if (result.keyFeatures && result.keyFeatures.length > 0) setKeyFeatures(result.keyFeatures.join('\n'));
       if (result.variants && result.variants.length > 0) setVariants(result.variants.join('\n'));
       if (result.complianceNotes) setComplianceNotes(result.complianceNotes);
+      if (result.visualSpec) setVisualSpec(result.visualSpec);
+      if (result.copySpec) setCopySpec(result.copySpec);
 
       if (result.assetAssignments && result.assetAssignments.length > 0) {
         setAssignments((prev) => {
@@ -293,7 +301,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, assets, onUploadPr
       digitalSubtype: digitalSubtype.trim() || null,
       keyFeatures: parseList(keyFeatures),
       variants: parseList(variants),
-      complianceNotes: complianceNotes.trim() || null
+      complianceNotes: complianceNotes.trim() || null,
+      visualSpec,
+      copySpec
     };
 
     const assignmentList = Object.values(assignments);
@@ -460,6 +470,181 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, assets, onUploadPr
               className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
               placeholder="Claims or language to avoid."
             />
+          </div>
+
+          <div className="border-t-2 border-black pt-4 space-y-4">
+            <div>
+              <h3 className="font-bold text-sm uppercase tracking-widest text-gray-600">Identity Pack (Optional)</h3>
+              <p className="text-[10px] text-gray-500">Use these to lock visual and copy consistency across campaigns.</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Dominant Colors</label>
+                <textarea
+                  value={(visualSpec.dominantColors || []).join('\n')}
+                  onChange={(e) => setVisualSpec((prev) => ({ ...prev, dominantColors: parseList(e.target.value) }))}
+                  className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                  placeholder="Color 1\nColor 2"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Materials</label>
+                <textarea
+                  value={(visualSpec.materials || []).join('\n')}
+                  onChange={(e) => setVisualSpec((prev) => ({ ...prev, materials: parseList(e.target.value) }))}
+                  className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                  placeholder="Glass\nMatte plastic"
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Form Factor</label>
+                <input
+                  value={visualSpec.formFactor || ''}
+                  onChange={(e) => setVisualSpec((prev) => ({ ...prev, formFactor: e.target.value }))}
+                  className="w-full border-2 border-black p-2 text-sm"
+                  placeholder="Short cylinder bottle"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Packaging Geometry</label>
+                <input
+                  value={visualSpec.packagingGeometry || ''}
+                  onChange={(e) => setVisualSpec((prev) => ({ ...prev, packagingGeometry: e.target.value }))}
+                  className="w-full border-2 border-black p-2 text-sm"
+                  placeholder="Rectangular box with rounded corners"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Label / UI Text (Exact)</label>
+              <textarea
+                value={(visualSpec.labelText || []).join('\n')}
+                onChange={(e) => setVisualSpec((prev) => ({ ...prev, labelText: parseList(e.target.value) }))}
+                className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                placeholder="Exact words from packaging or UI"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Logo Placement</label>
+              <input
+                value={visualSpec.logoPlacement || ''}
+                onChange={(e) => setVisualSpec((prev) => ({ ...prev, logoPlacement: e.target.value }))}
+                className="w-full border-2 border-black p-2 text-sm"
+                placeholder="Center label, upper-left, etc."
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Distinctive Markers</label>
+                <textarea
+                  value={(visualSpec.distinctiveMarkers || []).join('\n')}
+                  onChange={(e) => setVisualSpec((prev) => ({ ...prev, distinctiveMarkers: parseList(e.target.value) }))}
+                  className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                  placeholder="Diagonal logo stripe\nGold cap"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Do Not Change</label>
+                <textarea
+                  value={(visualSpec.doNotChange || []).join('\n')}
+                  onChange={(e) => setVisualSpec((prev) => ({ ...prev, doNotChange: parseList(e.target.value) }))}
+                  className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                  placeholder="Logo placement\nPrimary color blocks"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Usage Contexts</label>
+              <textarea
+                value={(visualSpec.usageContexts || []).join('\n')}
+                onChange={(e) => setVisualSpec((prev) => ({ ...prev, usageContexts: parseList(e.target.value) }))}
+                className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                placeholder="Bathroom vanity\nGym locker"
+              />
+            </div>
+
+            <div className="border-t-2 border-dashed border-black pt-4 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Canonical Product Name</label>
+                  <input
+                    value={copySpec.canonicalName || ''}
+                    onChange={(e) => setCopySpec((prev) => ({ ...prev, canonicalName: e.target.value }))}
+                    className="w-full border-2 border-black p-2 text-sm"
+                    placeholder="Exact product name"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Tagline</label>
+                  <input
+                    value={copySpec.tagline || ''}
+                    onChange={(e) => setCopySpec((prev) => ({ ...prev, tagline: e.target.value }))}
+                    className="w-full border-2 border-black p-2 text-sm"
+                    placeholder="Short brand promise"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Allowed Claims</label>
+                  <textarea
+                    value={(copySpec.allowedClaims || []).join('\n')}
+                    onChange={(e) => setCopySpec((prev) => ({ ...prev, allowedClaims: parseList(e.target.value) }))}
+                    className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                    placeholder="Claim 1\nClaim 2"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Disallowed Claims</label>
+                  <textarea
+                    value={(copySpec.disallowedClaims || []).join('\n')}
+                    onChange={(e) => setCopySpec((prev) => ({ ...prev, disallowedClaims: parseList(e.target.value) }))}
+                    className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                    placeholder="Avoid this claim"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Proof Points</label>
+                  <textarea
+                    value={(copySpec.proofPoints || []).join('\n')}
+                    onChange={(e) => setCopySpec((prev) => ({ ...prev, proofPoints: parseList(e.target.value) }))}
+                    className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                    placeholder="Clinical study\nCustomer reviews"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Tone Directives</label>
+                  <textarea
+                    value={(copySpec.toneDirectives || []).join('\n')}
+                    onChange={(e) => setCopySpec((prev) => ({ ...prev, toneDirectives: parseList(e.target.value) }))}
+                    className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                    placeholder="Calm, clinical\nConfident, minimal"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1 block">Required Phrases</label>
+                <textarea
+                  value={(copySpec.requiredPhrases || []).join('\n')}
+                  onChange={(e) => setCopySpec((prev) => ({ ...prev, requiredPhrases: parseList(e.target.value) }))}
+                  className="w-full border-2 border-black p-2 text-sm min-h-[70px]"
+                  placeholder="Must include phrase"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="border-t-2 border-black pt-4">

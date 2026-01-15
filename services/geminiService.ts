@@ -2,6 +2,21 @@ import { ProjectAsset, AspectRatio, ImageSize, VeoConfig, BrandIdentity, AvatarI
 import { generateContentServer, generateImagesServer, generateContentWithSearch, generateVideoServer } from "../app/actions";
 import { FunctionDeclaration, Type, Part, VideoGenerationReferenceImage } from "@google/genai";
 
+const limitList = (items?: string[] | null, max: number = 8): string[] => {
+  if (!items) return [];
+  return items.filter(Boolean).slice(0, max);
+};
+
+const listToText = (items?: string[] | null, max: number = 8): string => {
+  const limited = limitList(items, max);
+  return limited.length > 0 ? limited.join(", ") : "None";
+};
+
+const listToLines = (items?: string[] | null, max: number = 8): string => {
+  const limited = limitList(items, max);
+  return limited.length > 0 ? limited.map(item => `- ${item}`).join("\n") : "- None";
+};
+
 // --- Tool Definitions ---
 
 const generateImageTool: FunctionDeclaration = {
@@ -12,7 +27,8 @@ const generateImageTool: FunctionDeclaration = {
     properties: {
       prompt: { type: Type.STRING, description: "Detailed visual description." },
       aspectRatio: { type: Type.STRING, description: "Aspect ratio (e.g., '1:1', '16:9', '9:16'). Default '1:1'." },
-      imageSize: { type: Type.STRING, description: "Resolution (e.g., '1K', '2K'). Default '1K'." }
+      imageSize: { type: Type.STRING, description: "Resolution (e.g., '1K', '2K'). Default '1K'." },
+      productId: { type: Type.STRING, description: "Optional product ID to bind identity constraints for visuals." }
     },
     required: ["prompt"]
   }
@@ -121,6 +137,8 @@ export const analyzeAvatarImage = async (base64Images: string[]): Promise<Avatar
     2. Facial Geometry: Bone structure, jawline sharpness, forehead height.
     3. Eyes: Exact shape (e.g., deep-set almond), iris depth, lash density.
     4. Hair: Precise strand texture, hairline shape, specific highlights.
+    5. Consistency Rules: Identify 5-10 "do not change" traits for perfect match.
+    6. Wardrobe & styling: Clothing, accessories, camera angles, lighting notes.
     
     Output a structured JSON specification.
   `});
@@ -146,6 +164,18 @@ export const analyzeAvatarImage = async (base64Images: string[]): Promise<Avatar
             distinctiveFeatures: { type: Type.STRING }
           },
           required: ["faceShape", "eyes", "nose", "lips", "skin", "hair", "distinctiveFeatures"]
+        },
+        consistencySpec: {
+          type: Type.OBJECT,
+          properties: {
+            styleKeywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+            wardrobe: { type: Type.STRING },
+            accessories: { type: Type.ARRAY, items: { type: Type.STRING } },
+            doNotChange: { type: Type.ARRAY, items: { type: Type.STRING } },
+            cameraAngles: { type: Type.ARRAY, items: { type: Type.STRING } },
+            lightingNotes: { type: Type.STRING },
+            voiceGuidelines: { type: Type.ARRAY, items: { type: Type.STRING } }
+          }
         }
       },
       required: ["name", "description", "traits", "atomicTraits"]
@@ -154,7 +184,12 @@ export const analyzeAvatarImage = async (base64Images: string[]): Promise<Avatar
 
   if (response.text) {
     const data = JSON.parse(response.text);
-    return { ...data, referenceImages: base64Images } as AvatarIdentity;
+    const normalized = {
+      ...data,
+      traits: Array.isArray(data.traits) ? data.traits : [],
+      consistencySpec: data.consistencySpec || {}
+    };
+    return { ...normalized, referenceImages: base64Images } as AvatarIdentity;
   }
   throw new Error("Failed to calibrate avatar");
 };
@@ -259,9 +294,25 @@ export const chatWithMarketingAgent = async (
   ` : "";
 
   let avatarInstruction = avatarIdentity ? `
-    AVATAR/SPOKESPERSON (use ONLY when visuals require a person):
-    Name: ${avatarIdentity.name}
-    Technical Spec: ${avatarIdentity.description}
+    AVATAR IDENTITY PACK (use ONLY when visuals require a person):
+    Name: ${avatarIdentity.name || "Unspecified"}
+    Visual DNA: ${avatarIdentity.description}
+    Atomic Traits:
+    - Face Shape: ${avatarIdentity.atomicTraits.faceShape}
+    - Eyes: ${avatarIdentity.atomicTraits.eyes}
+    - Nose: ${avatarIdentity.atomicTraits.nose}
+    - Lips: ${avatarIdentity.atomicTraits.lips}
+    - Skin: ${avatarIdentity.atomicTraits.skin}
+    - Hair: ${avatarIdentity.atomicTraits.hair}
+    - Distinctive Features: ${avatarIdentity.atomicTraits.distinctiveFeatures}
+    Style Keywords: ${listToText(avatarIdentity.consistencySpec?.styleKeywords)}
+    Wardrobe: ${avatarIdentity.consistencySpec?.wardrobe || "Unspecified"}
+    Accessories: ${listToText(avatarIdentity.consistencySpec?.accessories)}
+    Do Not Change:
+    ${listToLines(avatarIdentity.consistencySpec?.doNotChange)}
+    Camera Angles: ${listToText(avatarIdentity.consistencySpec?.cameraAngles)}
+    Lighting Notes: ${avatarIdentity.consistencySpec?.lightingNotes || "Unspecified"}
+    Voice Guidelines: ${listToText(avatarIdentity.consistencySpec?.voiceGuidelines)}
     Note: Only use avatar for content that specifically needs a human face/spokesperson.
   ` : "";
 
@@ -273,6 +324,8 @@ export const chatWithMarketingAgent = async (
         : "None";
       const featureText = product.keyFeatures && product.keyFeatures.length > 0 ? product.keyFeatures.join(", ") : "None";
       const variantText = product.variants && product.variants.length > 0 ? product.variants.join(", ") : "None";
+      const visualSpec = product.visualSpec || {};
+      const copySpec = product.copySpec || {};
       return `
     [PRODUCT ${product.id}]
     Name: ${product.name}
@@ -284,6 +337,25 @@ export const chatWithMarketingAgent = async (
     Key Features: ${featureText}
     Variants: ${variantText}
     Compliance Notes: ${product.complianceNotes || "None"}
+    Visual Spec:
+    - Dominant Colors: ${listToText(visualSpec.dominantColors)}
+    - Materials: ${listToText(visualSpec.materials)}
+    - Form Factor: ${visualSpec.formFactor || "Unspecified"}
+    - Packaging Geometry: ${visualSpec.packagingGeometry || "Unspecified"}
+    - Label Text: ${listToText(visualSpec.labelText, 12)}
+    - Logo Placement: ${visualSpec.logoPlacement || "Unspecified"}
+    - Distinctive Markers: ${listToText(visualSpec.distinctiveMarkers)}
+    - Usage Contexts: ${listToText(visualSpec.usageContexts)}
+    - Do Not Change:
+    ${listToLines(visualSpec.doNotChange)}
+    Copy Spec:
+    - Canonical Name: ${copySpec.canonicalName || "Unspecified"}
+    - Tagline: ${copySpec.tagline || "Unspecified"}
+    - Allowed Claims: ${listToText(copySpec.allowedClaims)}
+    - Disallowed Claims: ${listToText(copySpec.disallowedClaims)}
+    - Proof Points: ${listToText(copySpec.proofPoints)}
+    - Tone Directives: ${listToText(copySpec.toneDirectives)}
+    - Required Phrases: ${listToText(copySpec.requiredPhrases)}
     Assets:
     ${assetLines}
     `;
@@ -297,7 +369,10 @@ export const chatWithMarketingAgent = async (
     - If the user mentions a product or requests visuals, select the correct product.
     - If multiple products exist and the user did not specify, ask a clarifying question before generating.
     - For video generation, include ingredientAssetIds (max 3) or productId when product assets are available.
+    - For image generation, include productId when the visual is product-specific.
     - Do not invent product claims beyond the Product Catalog and Source Documents.
+    - Enforce Copy Spec: use canonical names, approved claims, and required phrases; avoid disallowed claims.
+    - Enforce Visual Spec: do not alter brand colors, packaging geometry, logo placement, or distinctive markers.
     `;
   } else {
     productInstruction = `
@@ -333,7 +408,8 @@ export const chatWithMarketingAgent = async (
     - Extract the company/product name from source docs and use it in all content
     - Match the tone, language, and positioning from the source documents
     - Don't use Search and Function Calling in the same turn
-    
+    - Keep product and avatar identity consistent across ALL assets and copy
+
     VIDEO GENERATION GUIDELINES:
     - Use generate_video for cinematic UGC-style videos, viral shorts, or Reels content
     - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
@@ -459,5 +535,97 @@ Be specific with dates, numbers, and examples. This needs to be actionable for c
   return {
     text: response.text || 'No trends found.',
     sources
+  };
+};
+
+export const validateCopyConsistency = async (
+  copy: { title?: string; hook?: string; caption?: string },
+  context: {
+    brandIdentity?: BrandIdentity | null;
+    avatarIdentity?: AvatarIdentity | null;
+    products?: Product[] | null;
+    productId?: string | null;
+    traceId?: string;
+  }
+): Promise<{ title?: string; hook?: string; caption?: string; issues: string[]; changed: boolean }> => {
+  const traceId = context.traceId || 'no-trace';
+  const productList = context.products || [];
+  let selectedProduct: Product | undefined;
+
+  if (context.productId) {
+    selectedProduct = productList.find(product => product.id === context.productId) || undefined;
+  } else if (productList.length === 1) {
+    selectedProduct = productList[0];
+  }
+
+  const visualSpec = selectedProduct?.visualSpec || {};
+  const copySpec = selectedProduct?.copySpec || {};
+
+  const prompt = `
+You are a copy consistency validator for marketing content.
+Check the provided copy against the Product Identity Pack and Brand DNA.
+If any inconsistencies exist, rewrite the copy to comply while keeping tone and length similar.
+
+PRODUCT CONTEXT:
+Name: ${selectedProduct?.name || 'Unspecified'}
+Type: ${selectedProduct?.productType || 'Unspecified'}
+Description: ${selectedProduct?.description || 'None'}
+Key Features: ${selectedProduct?.keyFeatures?.join(', ') || 'None'}
+Compliance Notes: ${selectedProduct?.complianceNotes || 'None'}
+Copy Spec:
+- Canonical Name: ${copySpec.canonicalName || 'Unspecified'}
+- Tagline: ${copySpec.tagline || 'Unspecified'}
+- Allowed Claims: ${copySpec.allowedClaims?.join(', ') || 'None'}
+- Disallowed Claims: ${copySpec.disallowedClaims?.join(', ') || 'None'}
+- Proof Points: ${copySpec.proofPoints?.join(', ') || 'None'}
+- Tone Directives: ${copySpec.toneDirectives?.join(', ') || 'None'}
+- Required Phrases: ${copySpec.requiredPhrases?.join(', ') || 'None'}
+
+BRAND DNA:
+Colors: ${context.brandIdentity?.colors?.join(', ') || 'Unspecified'}
+Vibe: ${context.brandIdentity?.vibe || 'Unspecified'}
+
+COPY TO VALIDATE:
+Title: ${copy.title || ''}
+Hook: ${copy.hook || ''}
+Caption: ${copy.caption || ''}
+
+Rules:
+- Use canonical product name if provided.
+- Only include claims that are in Allowed Claims or Key Features.
+- Do NOT include Disallowed Claims or anything conflicting with Compliance Notes.
+- Preserve tone directives if provided.
+- Insert required phrases naturally when possible.
+- Return corrected copy and list of issues.
+`;
+
+  console.log(`[COPY VALIDATOR ${traceId}] Running copy consistency check`);
+
+  const response: any = await generateContentServer('gemini-2.5-flash', [{ role: 'user', parts: [{ text: prompt }] }], {
+    responseMimeType: 'application/json',
+    responseSchema: {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        hook: { type: Type.STRING },
+        caption: { type: Type.STRING },
+        issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+        changed: { type: Type.BOOLEAN }
+      },
+      required: ['issues', 'changed']
+    }
+  });
+
+  if (!response.text) {
+    return { ...copy, issues: ['Validator returned empty response'], changed: false };
+  }
+
+  const parsed = JSON.parse(response.text);
+  return {
+    title: parsed.title || copy.title,
+    hook: parsed.hook || copy.hook,
+    caption: parsed.caption || copy.caption,
+    issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+    changed: !!parsed.changed
   };
 };
