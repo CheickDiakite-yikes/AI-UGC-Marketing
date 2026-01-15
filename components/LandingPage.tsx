@@ -134,50 +134,51 @@ const StoryBlock = ({
   accentClass?: string 
 }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const progress = useElementScrollProgress(ref);
+  const isVisible = useOnScreen(ref, "-100px");
   const hasMounted = useHasMounted();
-  const isActive = hasMounted ? (progress > 0.2 && progress < 0.8) : true;
+  const isActive = !hasMounted || isVisible;
   
   return (
     <div 
       ref={ref}
-      className={`min-h-[80vh] flex items-center py-16 md:py-24 transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-40'}`}
+      className="py-16 md:py-24"
     >
       <div className="max-w-7xl mx-auto px-6 md:px-12 w-full">
         <div className={`flex flex-col ${step % 2 === 0 ? 'md:flex-row-reverse' : 'md:flex-row'} gap-8 md:gap-16 items-center`}>
           <div className="md:w-1/2">
             <div 
-              className={`inline-block ${accentClass} border-4 border-black px-4 py-2 font-display font-black text-2xl md:text-4xl mb-4 shadow-neo transform transition-transform duration-500`}
+              className={`inline-block ${accentClass} border-4 border-black px-4 py-2 font-display font-black text-2xl md:text-4xl mb-4 shadow-neo transition-all duration-700`}
               style={{ 
-                transform: `rotate(${isActive ? -2 : -8}deg) scale(${isActive ? 1 : 0.9})`,
+                transform: isActive ? 'rotate(-2deg) scale(1) translateY(0)' : 'rotate(-8deg) scale(0.8) translateY(30px)',
+                opacity: isActive ? 1 : 0
               }}
             >
               STEP {step}
             </div>
             <h3 
-              className="font-display font-black text-3xl md:text-5xl mb-4 text-neo-black transition-all duration-500"
+              className="font-display font-black text-3xl md:text-5xl mb-4 text-neo-black transition-all duration-700 delay-100"
               style={{
-                transform: `translateX(${isActive ? 0 : -20}px)`,
-                opacity: isActive ? 1 : 0.5
+                transform: isActive ? 'translateX(0) translateY(0)' : 'translateX(-30px) translateY(20px)',
+                opacity: isActive ? 1 : 0
               }}
             >
               {title}
             </h3>
             <p 
-              className="text-lg md:text-xl font-medium text-gray-700 leading-relaxed transition-all duration-700"
+              className="text-lg md:text-xl font-medium text-gray-700 leading-relaxed transition-all duration-700 delay-200"
               style={{
-                transform: `translateX(${isActive ? 0 : -30}px)`,
-                opacity: isActive ? 1 : 0.3
+                transform: isActive ? 'translateX(0) translateY(0)' : 'translateX(-20px) translateY(20px)',
+                opacity: isActive ? 1 : 0
               }}
             >
               {description}
             </p>
           </div>
           <div 
-            className="md:w-1/2 transition-all duration-500"
+            className="md:w-1/2 transition-all duration-700 delay-300"
             style={{
-              transform: hasMounted ? `scale(${0.8 + progress * 0.2}) rotate(${isActive ? 0 : (step % 2 === 0 ? 3 : -3)}deg)` : 'scale(1)',
-              opacity: hasMounted ? 0.5 + progress * 0.5 : 1
+              transform: isActive ? 'scale(1) rotate(0deg) translateY(0)' : `scale(0.85) rotate(${step % 2 === 0 ? 5 : -5}deg) translateY(40px)`,
+              opacity: isActive ? 1 : 0
             }}
           >
             {visual}
