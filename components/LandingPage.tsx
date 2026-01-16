@@ -284,11 +284,11 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </Reveal>
 
         <Reveal delay={200}>
-          <h1 className="font-display font-black text-[clamp(2rem,10vw,8rem)] leading-[0.95] md:leading-[0.85] mb-6 md:mb-8 text-neo-black drop-shadow-sm max-w-full px-2">
+          <h1 className="font-display font-black text-[clamp(1.75rem,8vw,8rem)] leading-[1] mb-6 md:mb-8 text-neo-black drop-shadow-sm max-w-full px-2">
             MARKETING <br/>
-            <span className="relative inline-block mt-1 md:mt-2">
-               <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none" aria-hidden="true">ON AUTOPILOT.</span>
-               <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
+            <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
+               <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none whitespace-nowrap" aria-hidden="true">ON AUTOPILOT.</span>
+               <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan whitespace-nowrap" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
             </span>
           </h1>
         </Reveal>
