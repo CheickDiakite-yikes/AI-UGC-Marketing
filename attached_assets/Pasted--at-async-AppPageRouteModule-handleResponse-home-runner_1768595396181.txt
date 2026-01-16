@@ -1,0 +1,54 @@
+ at async AppPageRouteModule.handleResponse (/home/runner/workspace/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:41:57305)\n' +
+      '    at async handleResponse (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader/index.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=%2Fhome%2Frunner%2Fworkspace%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Frunner%2Fworkspace&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D&isGlobalNotFoundEnabled=!:565:32)\n' +
+      '    at async handler (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader/index.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=%2Fhome%2Frunner%2Fworkspace%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Frunner%2Fworkspace&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D&isGlobalNotFoundEnabled=!:943:20)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1422:9)\n' +
+      '    at async DevServer.renderPageComponent (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1474:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1514:32)\n' +
+      '    at async DevServer.pipeImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1025:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/home/runner/workspace/node_modules/next/dist/server/next-server.js:393:17)\n' +
+      '    at async DevServer.handleRequestImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:916:17)\n' +
+      '    at async /home/runner/workspace/node_modules/next/dist/server/dev/next-dev-server.js:399:20\n' +
+      '    at async Span.traceAsyncFn (/home/runner/workspace/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/home/runner/workspace/node_modules/next/dist/server/dev/next-dev-server.js:395:24)\n' +
+      '    at async invokeRender (/home/runner/workspace/node_modules/next/dist/server/lib/router-server.js:240:21)\n' +
+      '    at async handleRequest (/home/runner/workspace/node_modules/next/dist/server/lib/router-server.js:437:24)\n' +
+      '    at async requestHandlerImpl (/home/runner/workspace/node_modules/next/dist/server/lib/router-server.js:485:13)\n' +
+      '    at async Server.requestListener (/home/runner/workspace/node_modules/next/dist/server/lib/start-server.js:226:13)'
+  }
+}
+ POST / 200 in 29ms
+Auth login failed {
+  email: 'zo***@gmail.com',
+  error: {
+    message: 'Failed query: select "id", "email", "password_hash", "name", "company", "job_title", "referral_source", "avatar_url", "website_url", "overview", "images_generated", "videos_generated", "onboarding_completed", "onboarding_completed_at", "created_at" from "users" "users" where "users"."email" = $1 limit $2\n' +
+      'params: zorovt18@gmail.com,1',
+    stack: 'Error: Failed query: select "id", "email", "password_hash", "name", "company", "job_title", "referral_source", "avatar_url", "website_url", "overview", "images_generated", "videos_generated", "onboarding_completed", "onboarding_completed_at", "created_at" from "users" "users" where "users"."email" = $1 limit $2\n' +
+      'params: zorovt18@gmail.com,1\n' +
+      '    at NodePgPreparedQuery.queryWithCache (webpack-internal:///(action-browser)/./node_modules/drizzle-orm/pg-core/session.js:53:15)\n' +
+      '    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n' +
+      '    at async eval (webpack-internal:///(action-browser)/./node_modules/drizzle-orm/node-postgres/session.js:134:22)\n' +
+      '    at async login (webpack-internal:///(action-browser)/./app/actions/authActions.ts:122:22)\n' +
+      '    at async executeActionAndPrepareForRender (/home/runner/workspace/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:34:3117)\n' +
+      '    at async /home/runner/workspace/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:34:958\n' +
+      '    at async handleAction (/home/runner/workspace/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:32:22931)\n' +
+      '    at async renderToHTMLOrFlightImpl (/home/runner/workspace/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:39:39993)\n' +
+      '    at async doRender (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader/index.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=%2Fhome%2Frunner%2Fworkspace%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Frunner%2Fworkspace&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D&isGlobalNotFoundEnabled=!:413:28)\n' +
+      '    at async AppPageRouteModule.handleResponse (/home/runner/workspace/node_modules/next/dist/compiled/next-server/app-page.runtime.dev.js:41:57305)\n' +
+      '    at async handleResponse (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader/index.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=%2Fhome%2Frunner%2Fworkspace%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Frunner%2Fworkspace&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D&isGlobalNotFoundEnabled=!:565:32)\n' +
+      '    at async handler (webpack-internal:///(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader/index.js?name=app%2Fpage&page=%2Fpage&appPaths=%2Fpage&pagePath=private-next-app-dir%2Fpage.tsx&appDir=%2Fhome%2Frunner%2Fworkspace%2Fapp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=%2Fhome%2Frunner%2Fworkspace&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D&isGlobalNotFoundEnabled=!:943:20)\n' +
+      '    at async DevServer.renderToResponseWithComponentsImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1422:9)\n' +
+      '    at async DevServer.renderPageComponent (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1474:24)\n' +
+      '    at async DevServer.renderToResponseImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1514:32)\n' +
+      '    at async DevServer.pipeImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:1025:25)\n' +
+      '    at async NextNodeServer.handleCatchallRenderRequest (/home/runner/workspace/node_modules/next/dist/server/next-server.js:393:17)\n' +
+      '    at async DevServer.handleRequestImpl (/home/runner/workspace/node_modules/next/dist/server/base-server.js:916:17)\n' +
+      '    at async /home/runner/workspace/node_modules/next/dist/server/dev/next-dev-server.js:399:20\n' +
+      '    at async Span.traceAsyncFn (/home/runner/workspace/node_modules/next/dist/trace/trace.js:157:20)\n' +
+      '    at async DevServer.handleRequest (/home/runner/workspace/node_modules/next/dist/server/dev/next-dev-server.js:395:24)\n' +
+      '    at async invokeRender (/home/runner/workspace/node_modules/next/dist/server/lib/router-server.js:240:21)\n' +
+      '    at async handleRequest (/home/runner/workspace/node_modules/next/dist/server/lib/router-server.js:437:24)\n' +
+      '    at async requestHandlerImpl (/home/runner/workspace/node_modules/next/dist/server/lib/router-server.js:485:13)\n' +
+      '    at async Server.requestListener (/home/runner/workspace/node_modules/next/dist/server/lib/start-server.js:226:13)'
+  }
+}
+ POST / 200 in 58ms

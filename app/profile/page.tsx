@@ -108,6 +108,11 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   const library = await getProfileLibrary();
   const favoritesByBoard = await getFavoritesByBoardAction();
+  const favoriteItems = favoritesByBoard.flatMap(board => board.items.map(item => ({
+    ...item,
+    boardId: board.boardId,
+    boardName: board.boardName,
+  })));
 
   const banner = getBanner(searchParams);
   const initials = getInitials(profile.name, profile.email);
@@ -319,46 +324,39 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display font-black text-xl">Favorites</h2>
               <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
-                {favoritesByBoard.length} Boards
+                {favoriteItems.length} Items
               </span>
             </div>
-            {favoritesByBoard.length === 0 ? (
+            {favoriteItems.length === 0 ? (
               <div className="mt-4 border-2 border-dashed border-black/30 p-4 text-xs font-bold uppercase tracking-widest text-gray-400">
                 No favorites yet
               </div>
             ) : (
-              <div className="space-y-4">
-                {favoritesByBoard.map(board => (
-                  <div key={board.boardId} className="border-2 border-black bg-gray-50 p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-bold truncate">{board.boardName}</h3>
-                      <span className="text-[10px] uppercase font-bold text-gray-500">{board.items.length} items</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {board.items.map(item => (
-                        <div key={item.id} className="border-2 border-black bg-white overflow-hidden">
-                          {item.previewUrl ? (
-                            item.type === 'video' ? (
-                              <video
-                                src={item.previewUrl}
-                                className="w-full h-24 object-cover"
-                                muted
-                                playsInline
-                                preload="metadata"
-                              />
-                            ) : (
-                              <img src={item.previewUrl} alt={item.title} className="w-full h-24 object-cover" />
-                            )
-                          ) : (
-                            <div className="h-24 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                              No preview
-                            </div>
-                          )}
-                          <div className="border-t-2 border-black px-2 py-1 text-[10px] font-bold uppercase tracking-widest truncate">
-                            {item.title}
-                          </div>
-                        </div>
-                      ))}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                {favoriteItems.map(item => (
+                  <div key={`${item.boardId}-${item.id}`} className="border-2 border-black bg-white overflow-hidden">
+                    {item.previewUrl ? (
+                      item.type === 'video' ? (
+                        <video
+                          src={item.previewUrl}
+                          className="w-full h-24 object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img src={item.previewUrl} alt={item.title} className="w-full h-24 object-cover" />
+                      )
+                    ) : (
+                      <div className="h-24 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        No preview
+                      </div>
+                    )}
+                    <div className="border-t-2 border-black px-2 py-1">
+                      <div className="text-[10px] font-bold uppercase tracking-widest truncate">{item.title}</div>
+                      <div className="text-[9px] uppercase tracking-widest text-gray-500 truncate">
+                        {item.boardName}
+                      </div>
                     </div>
                   </div>
                 ))}

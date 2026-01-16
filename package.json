@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "prestart": "npm run db:push",
+    "prestart": "npm run db:migrate",
     "start": "next start",
     "start:jobs": "npx tsx server/jobRunner.ts",
     "lint": "next lint",
     "test": "vitest",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "drizzle-kit generate --name init",
+    "db:migrate": "npx tsx scripts/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "smoke": "npx tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

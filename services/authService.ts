@@ -2,8 +2,17 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
+let warnedMissingSecret = false;
+
 function getSecretKey() {
-    const secret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'default-dev-secret-do-not-use-in-prod';
+    const secret = process.env.SESSION_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+        if (!warnedMissingSecret && process.env.NODE_ENV === 'production') {
+            console.error('Missing SESSION_SECRET/JWT_SECRET in production; falling back to insecure default.');
+            warnedMissingSecret = true;
+        }
+        return new TextEncoder().encode('default-dev-secret-do-not-use-in-prod');
+    }
     return new TextEncoder().encode(secret);
 }
 
