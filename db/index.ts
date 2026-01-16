@@ -1,22 +1,33 @@
 
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 
-const connectionString = process.env.DATABASE_URL!;
-
-// Check if we are in a browser environment to prevent accidents, though this file should only be imported on server.
 if (typeof window !== 'undefined') {
     throw new Error('This file should not be imported on the client.');
 }
 
-// Global pool handling for Next.js hot reloading in dev
 const globalForDb = globalThis as unknown as {
-    conn: Pool | undefined;
+    pool: Pool | undefined;
+    db: NodePgDatabase<typeof schema> | undefined;
 };
 
-const pool = globalForDb.conn ?? new Pool({ connectionString });
+function getDb(): NodePgDatabase<typeof schema> {
+    if (!globalForDb.db) {
+        const connectionString = process.env.DATABASE_URL;
+        if (!connectionString) {
+            throw new Error('DATABASE_URL environment variable is not set');
+        }
+        if (!globalForDb.pool) {
+            globalForDb.pool = new Pool({ connectionString });
+        }
+        globalForDb.db = drizzle(globalForDb.pool, { schema });
+    }
+    return globalForDb.db;
+}
 
-if (process.env.NODE_ENV !== 'production') globalForDb.conn = pool;
-
-export const db = drizzle(pool, { schema });
+export const db = new Proxy({} as NodePgDatabase<typeof schema>, {
+    get(_, prop) {
+        return (getDb() as any)[prop];
+    }
+});
