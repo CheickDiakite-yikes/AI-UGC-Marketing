@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { getSchemaIssues } from './schemaCheck';
 
 const requiredEnv = ['DATABASE_URL'];
 const missingEnv = requiredEnv.filter((key) => !process.env[key]);
@@ -16,59 +17,19 @@ if (!process.env.SESSION_SECRET && !process.env.JWT_SECRET) {
 const connectionString = process.env.DATABASE_URL as string;
 const pool = new Pool({ connectionString });
 
-const requiredTables = [
-  'users',
-  'boards',
-  'generated_items',
-  'favorites',
-  'jobs',
-];
-
-const requiredUserColumns = [
-  'email',
-  'password_hash',
-  'name',
-  'company',
-  'job_title',
-  'referral_source',
-  'avatar_url',
-  'website_url',
-  'overview',
-];
-
 async function run() {
   const client = await pool.connect();
   try {
     await client.query('select 1 as ok');
     const errors: string[] = [];
-
-    const tablesResult = await client.query(
-      `select table_name
-       from information_schema.tables
-       where table_schema = 'public'
-         and table_name = any($1::text[])`,
-      [requiredTables],
-    );
-
-    const tableSet = new Set(tablesResult.rows.map((row) => row.table_name));
-    const missingTables = requiredTables.filter((table) => !tableSet.has(table));
+    const { missingTables, missingUserColumns } = await getSchemaIssues(client);
 
     if (missingTables.length > 0) {
       errors.push(`Missing required tables: ${missingTables.join(', ')}`);
     }
 
-    const columnsResult = await client.query(
-      `select column_name
-       from information_schema.columns
-       where table_schema = 'public'
-         and table_name = 'users'`,
-    );
-
-    const columnSet = new Set(columnsResult.rows.map((row) => row.column_name));
-    const missingColumns = requiredUserColumns.filter((column) => !columnSet.has(column));
-
-    if (missingColumns.length > 0) {
-      errors.push(`Missing users columns: ${missingColumns.join(', ')}`);
+    if (missingUserColumns.length > 0) {
+      errors.push(`Missing users columns: ${missingUserColumns.join(', ')}`);
     }
 
     if (errors.length > 0) {

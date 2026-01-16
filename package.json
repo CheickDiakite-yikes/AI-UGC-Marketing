@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "predev": "npm run db:migrate",
     "build": "next build",
     "prestart": "npm run db:migrate",
     "start": "next start",
