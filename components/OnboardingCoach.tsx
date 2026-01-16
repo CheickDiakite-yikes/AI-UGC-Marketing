@@ -59,26 +59,44 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
   useEffect(() => {
     if (!calloutRef.current) return;
     const calloutBox = calloutRef.current.getBoundingClientRect();
+    const safeAreaTop = 16;
+    const safeAreaBottom = 100; // Extra space for mobile keyboards/nav bars
+    const safeAreaSide = 12;
+    
     if (!targetRect) {
+      // Center the callout when no target
       setCalloutPos({
-        top: 120,
-        left: clamp((window.innerWidth - calloutBox.width) / 2, 16, window.innerWidth - calloutBox.width - 16)
+        top: Math.min(120, window.innerHeight / 3),
+        left: clamp((window.innerWidth - calloutBox.width) / 2, safeAreaSide, window.innerWidth - calloutBox.width - safeAreaSide)
       });
       return;
     }
 
+    // Try to position below the target first
     let top = targetRect.bottom + 12;
-    if (top + calloutBox.height > window.innerHeight - 16) {
+    
+    // If it doesn't fit below, try above
+    if (top + calloutBox.height > window.innerHeight - safeAreaBottom) {
       top = targetRect.top - calloutBox.height - 12;
+    }
+    
+    // If it still doesn't fit (target too high), position at safe area
+    if (top < safeAreaTop) {
+      top = safeAreaTop;
+    }
+    
+    // Ensure it doesn't go below visible area
+    if (top + calloutBox.height > window.innerHeight - safeAreaBottom) {
+      top = window.innerHeight - calloutBox.height - safeAreaBottom;
     }
 
     const left = clamp(
       targetRect.left,
-      16,
-      window.innerWidth - calloutBox.width - 16
+      safeAreaSide,
+      window.innerWidth - calloutBox.width - safeAreaSide
     );
 
-    setCalloutPos({ top: Math.max(16, top), left });
+    setCalloutPos({ top: Math.max(safeAreaTop, top), left });
   }, [targetRect, stepIndex]);
 
   if (!step || hidden) return null;
@@ -101,7 +119,7 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
       )}
       <div
         ref={calloutRef}
-        className="fixed pointer-events-auto bg-white border-4 border-black shadow-neo p-4 w-[min(340px,90vw)]"
+        className="fixed pointer-events-auto bg-white border-4 border-black shadow-neo p-3 sm:p-4 w-[min(320px,calc(100vw-24px))] max-h-[calc(100vh-120px)] overflow-y-auto"
         style={{ top: calloutPos.top, left: calloutPos.left }}
       >
         <div className="flex items-center justify-between mb-2">
@@ -117,7 +135,7 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
             {onDismiss && (
               <button
                 onClick={onDismiss}
-                className="text-gray-400 hover:text-black text-lg leading-none"
+                className="text-gray-400 hover:text-black text-xl leading-none p-1 -mr-1"
                 title="Dismiss tutorial"
               >
                 ×
@@ -125,37 +143,36 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
             )}
           </div>
         </div>
-        <h4 className="font-display font-black text-lg mb-1">{step.title}</h4>
-        <p className="text-xs text-gray-700 mb-3">{step.description}</p>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-2">
-            {step.onAction && step.actionLabel && (
-              <button
-                onClick={step.onAction}
-                className="text-[10px] font-black uppercase tracking-widest bg-neo-yellow border-2 border-black px-3 py-1.5 hover:bg-black hover:text-white transition-all"
-              >
-                {step.actionLabel}
-              </button>
-            )}
-            {showSkip && (
-              <button
-                onClick={onSkip}
-                className="text-[10px] font-black uppercase tracking-widest bg-white border-2 border-black px-3 py-1.5 hover:bg-gray-100 transition-all"
-              >
-                Skip
-              </button>
-            )}
-          </div>
+        <h4 className="font-display font-black text-base sm:text-lg mb-1">{step.title}</h4>
+        <p className="text-xs text-gray-700 mb-3 leading-relaxed">{step.description}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {step.onAction && step.actionLabel && (
+            <button
+              onClick={step.onAction}
+              className="text-[10px] font-black uppercase tracking-widest bg-neo-yellow border-2 border-black px-3 py-2 active:bg-black active:text-white transition-all"
+            >
+              {step.actionLabel}
+            </button>
+          )}
+          {showSkip && (
+            <button
+              onClick={onSkip}
+              className="text-[10px] font-black uppercase tracking-widest bg-white border-2 border-black px-3 py-2 active:bg-gray-100 transition-all"
+            >
+              Skip
+            </button>
+          )}
+          <div className="flex-1" />
           {showNext ? (
             <button
               onClick={onNext}
-              className="text-[10px] font-black uppercase tracking-widest bg-neo-pink border-2 border-black px-3 py-1.5 hover:bg-black hover:text-white transition-all"
+              className="text-[10px] font-black uppercase tracking-widest bg-neo-pink border-2 border-black px-3 py-2 active:bg-black active:text-white transition-all"
             >
               Next
             </button>
           ) : (
             <button
-              className="text-[10px] font-black uppercase tracking-widest bg-gray-100 border-2 border-black px-3 py-1.5 text-gray-400"
+              className="text-[10px] font-black uppercase tracking-widest bg-gray-100 border-2 border-black px-3 py-2 text-gray-400"
               disabled
             >
               Do this step
