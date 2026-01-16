@@ -6,17 +6,24 @@ interface Props {
   item: CanvasItem;
   onExpand?: (item: CanvasItem) => void;
   onDelete?: (itemId: string) => void;
+  onToggleFavorite?: (itemId: string, nextState: boolean) => void;
 }
 
-const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
+const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFavorite }) => {
   const [copied, setCopied] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const isFavorite = Boolean(item.isFavorite);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm(`Delete "${item.title}"? This action cannot be undone.`)) {
       onDelete?.(item.id);
     }
+  };
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFavorite?.(item.id, !isFavorite);
   };
 
   const copyCaption = () => {
@@ -83,6 +90,17 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete }) => {
       <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden group/header">
         <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
         <div className="flex items-center gap-2 z-10 relative">
+          {onToggleFavorite && isContentReady && (
+            <button
+              onClick={handleToggleFavorite}
+              className={`p-1 border-2 border-black rounded transition-colors ${isFavorite ? 'bg-neo-lime text-black' : 'bg-white text-black hover:bg-neo-lime'}`}
+              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill={isFavorite ? 'currentColor' : 'none'}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a1 1 0 011.04 0l2.63 1.62 3.01.1a1 1 0 01.88 1.45l-1.05 2.83 1.82 2.35a1 1 0 01-.53 1.58l-2.93.82-1.68 2.52a1 1 0 01-1.66 0l-1.68-2.52-2.93-.82a1 1 0 01-.53-1.58l1.82-2.35-1.05-2.83a1 1 0 01.88-1.45l3.01-.1 2.63-1.62z" />
+              </svg>
+            </button>
+          )}
           {onDelete && isContentReady && (
             <button
               onClick={handleDelete}

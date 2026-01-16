@@ -17,11 +17,13 @@ interface OnboardingCoachProps {
   isStepComplete: boolean;
   onNext: () => void;
   onSkip: () => void;
+  onDismiss?: () => void;
+  hidden?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, totalSteps, isStepComplete, onNext, onSkip }) => {
+const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, totalSteps, isStepComplete, onNext, onSkip, onDismiss, hidden }) => {
   const calloutRef = useRef<HTMLDivElement>(null);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [calloutPos, setCalloutPos] = useState({ top: 80, left: 16 });
@@ -29,7 +31,7 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
   const targetSelector = step?.targetSelector || '';
 
   useEffect(() => {
-    if (!step || !targetSelector) {
+    if (!step || !targetSelector || hidden) {
       setTargetRect(null);
       return;
     }
@@ -40,7 +42,6 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
         setTargetRect(null);
         return;
       }
-      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
       setTargetRect(el.getBoundingClientRect());
     };
 
@@ -53,7 +54,7 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
       window.removeEventListener('resize', handle);
       window.removeEventListener('scroll', handle, true);
     };
-  }, [step, targetSelector]);
+  }, [step, targetSelector, hidden]);
 
   useEffect(() => {
     if (!calloutRef.current) return;
@@ -80,7 +81,7 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
     setCalloutPos({ top: Math.max(16, top), left });
   }, [targetRect, stepIndex]);
 
-  if (!step) return null;
+  if (!step || hidden) return null;
 
   const showNext = isStepComplete;
   const showSkip = step.optional && !isStepComplete;
@@ -89,7 +90,7 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
     <div className="fixed inset-0 z-[60] pointer-events-none">
       {targetRect && (
         <div
-          className="fixed border-4 border-neo-pink shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] rounded-md pointer-events-none"
+          className="fixed border-4 border-neo-pink rounded-md pointer-events-none"
           style={{
             top: targetRect.top - 6,
             left: targetRect.left - 6,
@@ -107,11 +108,22 @@ const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, tota
           <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">
             Step {stepIndex + 1} of {totalSteps}
           </span>
-          {step.optional && (
-            <span className="text-[9px] uppercase bg-black text-white px-1.5 py-0.5 tracking-widest">
-              Optional
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {step.optional && (
+              <span className="text-[9px] uppercase bg-black text-white px-1.5 py-0.5 tracking-widest">
+                Optional
+              </span>
+            )}
+            {onDismiss && (
+              <button
+                onClick={onDismiss}
+                className="text-gray-400 hover:text-black text-lg leading-none"
+                title="Dismiss tutorial"
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
         <h4 className="font-display font-black text-lg mb-1">{step.title}</h4>
         <p className="text-xs text-gray-700 mb-3">{step.description}</p>

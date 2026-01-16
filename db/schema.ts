@@ -1,5 +1,5 @@
 
-import { pgTable, text, timestamp, boolean, jsonb, uuid, integer, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, jsonb, uuid, integer, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // --- Enums ---
@@ -32,6 +32,8 @@ export const users = pgTable('users', {
   jobTitle: text('job_title'),
   referralSource: text('referral_source'),
   avatarUrl: text('avatar_url'),
+  websiteUrl: text('website_url'),
+  overview: text('overview'),
   imagesGenerated: integer('images_generated').default(0).notNull(),
   videosGenerated: integer('videos_generated').default(0).notNull(),
   onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
@@ -137,6 +139,45 @@ export const productAssets = pgTable('product_assets', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const profileAssets = pgTable('profile_assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  type: assetTypeEnum('type').notNull(),
+  name: text('name').notNull(),
+  content: text('content'),
+  storageKey: text('storage_key'),
+  mimeType: text('mime_type'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const profileProducts = pgTable('profile_products', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  productType: productTypeEnum('product_type').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const profileProductAssets = pgTable('profile_product_assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  profileProductId: uuid('profile_product_id').references(() => profileProducts.id, { onDelete: 'cascade' }),
+  profileAssetId: uuid('profile_asset_id').references(() => profileAssets.id, { onDelete: 'cascade' }),
+  role: productAssetRoleEnum('role').notNull(),
+  isPrimary: boolean('is_primary').default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const favorites = pgTable('favorites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  generatedItemId: uuid('generated_item_id').references(() => generatedItems.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, table => ({
+  userItemUnique: uniqueIndex('favorites_user_item_unique').on(table.userId, table.generatedItemId),
+}));
+
 export const jobs = pgTable('jobs', {
   id: uuid('id').defaultRandom().primaryKey(),
   boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }),
@@ -201,6 +242,50 @@ export const productAssetsRelations = relations(productAssets, ({ one }) => ({
   asset: one(assets, {
     fields: [productAssets.assetId],
     references: [assets.id],
+  }),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  profileAssets: many(profileAssets),
+  profileProducts: many(profileProducts),
+  favorites: many(favorites),
+}));
+
+export const profileAssetsRelations = relations(profileAssets, ({ one, many }) => ({
+  user: one(users, {
+    fields: [profileAssets.userId],
+    references: [users.id],
+  }),
+  productAssets: many(profileProductAssets),
+}));
+
+export const profileProductsRelations = relations(profileProducts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [profileProducts.userId],
+    references: [users.id],
+  }),
+  productAssets: many(profileProductAssets),
+}));
+
+export const profileProductAssetsRelations = relations(profileProductAssets, ({ one }) => ({
+  profileProduct: one(profileProducts, {
+    fields: [profileProductAssets.profileProductId],
+    references: [profileProducts.id],
+  }),
+  profileAsset: one(profileAssets, {
+    fields: [profileProductAssets.profileAssetId],
+    references: [profileAssets.id],
+  }),
+}));
+
+export const favoritesRelations = relations(favorites, ({ one }) => ({
+  user: one(users, {
+    fields: [favorites.userId],
+    references: [users.id],
+  }),
+  item: one(generatedItems, {
+    fields: [favorites.generatedItemId],
+    references: [generatedItems.id],
   }),
 }));
 

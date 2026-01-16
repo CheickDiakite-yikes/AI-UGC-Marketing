@@ -2,12 +2,12 @@
 'use server';
 
 import { db } from '@/db';
-import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs } from '@/db/schema';
+import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs, favorites, profileAssets, profileProducts, profileProductAssets } from '@/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole } from '@/types';
+import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection } from '@/types';
 import { getSession } from './authActions';
-import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset } from '@/services/objectStorageService';
+import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset, downloadAsset } from '@/services/objectStorageService';
 import { processImageForGemini } from '@/services/imageProcessingService';
 import { generateContentServer } from '@/app/actions';
 import { Type } from '@google/genai';
@@ -83,7 +83,157 @@ export async function getBoards() {
     }));
 }
 
-export async function createBoard(name: string) {
+async function resolveProfileAssetContent(asset: { content: string | null; storageKey: string | null }) {
+    if (asset.content) {
+        return asset.content;
+    }
+
+    if (asset.storageKey) {
+        const downloaded = await downloadAsset(asset.storageKey);
+        if (downloaded.success && downloaded.data) {
+            return downloaded.data.toString('base64');
+        }
+    }
+
+    return null;
+}
+
+async function importProfileLibraryToBoard(
+    boardId: string,
+    userId: string,
+    profileImport: ProfileImportSelection
+) {
+    const assetIds = Array.from(new Set(profileImport.assetIds || []));
+    const productIds = Array.from(new Set(profileImport.productIds || []));
+    const importedAssetMap = new Map<string, string>();
+
+    if (profileImport.includeWebsite || profileImport.includeOverview) {
+        const user = await db.query.users.findFirst({
+            where: eq(users.id, userId),
+            columns: { websiteUrl: true, overview: true },
+        });
+
+        if (profileImport.includeWebsite && user?.websiteUrl) {
+            await saveAsset(boardId, {
+                id: crypto.randomUUID(),
+                type: 'link',
+                name: 'Website',
+                content: user.websiteUrl,
+                mimeType: undefined,
+            });
+        }
+
+        if (profileImport.includeOverview && user?.overview) {
+            await saveAsset(boardId, {
+                id: crypto.randomUUID(),
+                type: 'text',
+                name: 'Company Overview',
+                content: user.overview,
+                mimeType: 'text/plain',
+            });
+        }
+    }
+
+    if (assetIds.length > 0) {
+        const profileAssetsToImport = await db.query.profileAssets.findMany({
+            where: and(eq(profileAssets.userId, userId), inArray(profileAssets.id, assetIds)),
+        });
+
+        for (const asset of profileAssetsToImport) {
+            const content = await resolveProfileAssetContent({
+                content: asset.content,
+                storageKey: asset.storageKey,
+            });
+
+            if (!content) {
+                continue;
+            }
+
+            const saved = await saveAsset(boardId, {
+                id: asset.id,
+                type: asset.type as ProjectAsset['type'],
+                name: asset.name,
+                content,
+                mimeType: asset.mimeType || undefined,
+            });
+
+            importedAssetMap.set(asset.id, saved.id);
+        }
+    }
+
+    if (productIds.length > 0) {
+        const profileProductsToImport = await db.query.profileProducts.findMany({
+            where: and(eq(profileProducts.userId, userId), inArray(profileProducts.id, productIds)),
+        });
+
+        const profileProductAssetsToImport = await db.select({
+            profileProductId: profileProductAssets.profileProductId,
+            profileAssetId: profileProductAssets.profileAssetId,
+            role: profileProductAssets.role,
+            isPrimary: profileProductAssets.isPrimary,
+            assetName: profileAssets.name,
+            assetType: profileAssets.type,
+            assetContent: profileAssets.content,
+            assetStorageKey: profileAssets.storageKey,
+            assetMimeType: profileAssets.mimeType,
+        })
+            .from(profileProductAssets)
+            .innerJoin(profileAssets, eq(profileProductAssets.profileAssetId, profileAssets.id))
+            .where(inArray(profileProductAssets.profileProductId, productIds));
+
+        for (const profileProduct of profileProductsToImport) {
+            const [createdProduct] = await db.insert(products).values({
+                boardId,
+                name: profileProduct.name,
+                description: profileProduct.description,
+                productType: profileProduct.productType,
+            }).returning();
+
+            const productAssetsForProduct = profileProductAssetsToImport.filter(
+                asset => asset.profileProductId === profileProduct.id
+            );
+
+            for (const profileProductAsset of productAssetsForProduct) {
+                let boardAssetId = importedAssetMap.get(profileProductAsset.profileAssetId);
+
+                if (!boardAssetId) {
+                    const content = await resolveProfileAssetContent({
+                        content: profileProductAsset.assetContent,
+                        storageKey: profileProductAsset.assetStorageKey,
+                    });
+
+                    if (!content) {
+                        continue;
+                    }
+
+                    const saved = await saveAsset(boardId, {
+                        id: profileProductAsset.profileAssetId,
+                        type: profileProductAsset.assetType as ProjectAsset['type'],
+                        name: profileProductAsset.assetName,
+                        content,
+                        mimeType: profileProductAsset.assetMimeType || undefined,
+                    });
+
+                    boardAssetId = saved.id;
+                    importedAssetMap.set(profileProductAsset.profileAssetId, boardAssetId);
+                }
+
+                await db.insert(productAssets).values({
+                    id: crypto.randomUUID(),
+                    productId: createdProduct.id,
+                    assetId: boardAssetId,
+                    role: profileProductAsset.role,
+                    isPrimary: profileProductAsset.isPrimary ?? false,
+                    variant: null,
+                    notes: null,
+                    tags: null,
+                });
+            }
+        }
+    }
+}
+
+export async function createBoard(name: string, profileImport?: ProfileImportSelection) {
     const session = await getSession();
     if (!session || !session.userId) {
         throw new Error('Unauthorized: Must be logged in to create a board');
@@ -100,6 +250,16 @@ export async function createBoard(name: string) {
         role: 'model',
         text: `Campaign "${name}" initialized. How can I help you dominate your market today?`
     });
+
+    if (profileImport) {
+        const hasImports = profileImport.includeWebsite
+            || profileImport.includeOverview
+            || (profileImport.assetIds && profileImport.assetIds.length > 0)
+            || (profileImport.productIds && profileImport.productIds.length > 0);
+        if (hasImports) {
+            await importProfileLibraryToBoard(newBoard.id, session.userId as string, profileImport);
+        }
+    }
 
     revalidatePath('/');
     return newBoard;
@@ -125,6 +285,22 @@ export async function getBoardDetails(boardId: string) {
     
     if (!board || board.userId !== session.userId) {
         return null;
+    }
+
+    if (board && board.generatedItems && board.generatedItems.length > 0) {
+        const itemIds = board.generatedItems.map(item => item.id);
+        const favoriteRows = await db.select({ generatedItemId: favorites.generatedItemId })
+            .from(favorites)
+            .where(and(
+                eq(favorites.userId, session.userId as string),
+                inArray(favorites.generatedItemId, itemIds)
+            ));
+
+        const favoriteSet = new Set(favoriteRows.map(row => row.generatedItemId));
+        board.generatedItems = board.generatedItems.map(item => ({
+            ...item,
+            isFavorite: favoriteSet.has(item.id)
+        }));
     }
     
     if (board && board.assets) {

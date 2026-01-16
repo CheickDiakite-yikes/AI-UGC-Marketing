@@ -14,7 +14,7 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { IMAGE_LIMIT, VIDEO_LIMIT, getRemainingImages, getRemainingVideos } from './services/usageLimits';
@@ -41,6 +41,7 @@ import {
   analyzeProductImagesAction,
   getOnboardingStateAction
 } from './app/actions/boardActions';
+import { toggleFavoriteAction } from './app/actions/favoriteActions';
 
 
 interface WorkspaceProps {
@@ -134,7 +135,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             description: gi.description,
             meta: gi.metadata,
             x: gi.x,
-            y: gi.y
+            y: gi.y,
+            isFavorite: gi.isFavorite
           })),
           assets: b.assets as ProjectAsset[],
           messages: b.messages as ChatMessage[],
@@ -186,17 +188,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     if (b) {
       const mappedBoard: Board = {
         ...b,
-        items: b.generatedItems.map((gi: any) => ({
-          id: gi.id,
-          type: gi.type,
-          content: gi.content,
-          carouselUrls: gi.carouselUrls,
-          title: gi.title,
-          description: gi.description,
-          meta: gi.metadata,
-          x: gi.x,
-          y: gi.y
-        })),
+          items: b.generatedItems.map((gi: any) => ({
+            id: gi.id,
+            type: gi.type,
+            content: gi.content,
+            carouselUrls: gi.carouselUrls,
+            title: gi.title,
+            description: gi.description,
+            meta: gi.metadata,
+            x: gi.x,
+            y: gi.y,
+            isFavorite: gi.isFavorite
+          })),
         assets: b.assets as ProjectAsset[],
         messages: b.messages as ChatMessage[],
         brandIdentity: b.brandIdentity as BrandIdentity | null,
@@ -384,6 +387,24 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   };
 
+  const handleToggleFavorite = async (itemId: string, nextState: boolean) => {
+    try {
+      const result = await toggleFavoriteAction(itemId);
+      if (result.success) {
+        updateActiveBoard(b => ({
+          ...b,
+          items: b.items.map(item =>
+            item.id === itemId ? { ...item, isFavorite: result.isFavorite ?? nextState } : item
+          )
+        }));
+      } else {
+        showError('Failed to update favorite.');
+      }
+    } catch (error) {
+      showError('Failed to update favorite.');
+    }
+  };
+
   const handleCameraFinish = async (images: { data: string, label: string }[]) => {
     setIsCameraActive(false);
     setIsAnalyzingLogo(true);
@@ -414,7 +435,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const mappedBoard: Board = {
         ...updated,
         items: updated.generatedItems.map((gi: any) => ({
-          id: gi.id, type: gi.type, content: gi.content, carouselUrls: gi.carouselUrls, title: gi.title, description: gi.description, meta: gi.metadata, x: gi.x, y: gi.y
+          id: gi.id,
+          type: gi.type,
+          content: gi.content,
+          carouselUrls: gi.carouselUrls,
+          title: gi.title,
+          description: gi.description,
+          meta: gi.metadata,
+          x: gi.x,
+          y: gi.y,
+          isFavorite: gi.isFavorite
         })),
         assets: updated.assets as ProjectAsset[],
         messages: updated.messages as ChatMessage[],
@@ -443,7 +473,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const mappedBoard: Board = {
         ...updated,
         items: updated.generatedItems.map((gi: any) => ({
-          id: gi.id, type: gi.type, content: gi.content, carouselUrls: gi.carouselUrls, title: gi.title, description: gi.description, meta: gi.metadata, x: gi.x, y: gi.y
+          id: gi.id,
+          type: gi.type,
+          content: gi.content,
+          carouselUrls: gi.carouselUrls,
+          title: gi.title,
+          description: gi.description,
+          meta: gi.metadata,
+          x: gi.x,
+          y: gi.y,
+          isFavorite: gi.isFavorite
         })),
         assets: updated.assets as ProjectAsset[],
         messages: updated.messages as ChatMessage[],
@@ -605,6 +644,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       return next;
     });
   }, [onboardingSteps.length]);
+
+  const handleDismissOnboarding = useCallback(() => {
+    setShowOnboardingGuide(false);
+  }, []);
+
+  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null || sidebarOpen;
 
   useEffect(() => {
     if (!onboardingState) return;
@@ -1232,8 +1277,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setFailedJobs(prev => prev.filter(j => j.id !== jobId));
   };
 
-  const handleCreateBoard = async (name: string) => {
-    const newBoard = await createBoard(name);
+  const handleCreateBoard = async (name: string, profileImport: ProfileImportSelection) => {
+    const newBoard = await createBoard(name, profileImport);
     // Refresh boards list
     getBoards().then(bs => setBoards(bs as any));
     setActiveBoardId(newBoard.id);
@@ -1363,7 +1408,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             </div>
           )}
           {[...pendingItems, ...activeBoard.items].map(item => (
-            <CanvasItemCard key={item.id} item={item} onExpand={setSelectedItem} onDelete={handleDeleteItem} />
+            <CanvasItemCard
+              key={item.id}
+              item={item}
+              onExpand={setSelectedItem}
+              onDelete={handleDeleteItem}
+              onToggleFavorite={handleToggleFavorite}
+            />
           ))}
         </div>
       </div>
@@ -1455,6 +1506,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           isStepComplete={isActiveStepComplete}
           onNext={handleAdvanceOnboardingStep}
           onSkip={handleSkipOnboardingStep}
+          onDismiss={handleDismissOnboarding}
+          hidden={anyModalOpen}
         />
       )}
     </div>

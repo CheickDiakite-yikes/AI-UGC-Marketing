@@ -67,6 +67,37 @@ export async function uploadAsset(
   }
 }
 
+export async function uploadProfileAsset(
+  userId: string,
+  assetId: string,
+  data: string,
+  mimeType: string
+): Promise<UploadResult> {
+  try {
+    const extension = mimeType.split('/')[1] || 'bin';
+    const storageKey = `users/${userId}/profile/${assetId}.${extension}`;
+    
+    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const binaryData = Buffer.from(base64Data, 'base64');
+    
+    const validation = validateImageBuffer(binaryData, 'any');
+    if (!validation.valid) {
+      console.error(`[UPLOAD BLOCKED] Profile asset validation failed: ${validation.error}`);
+      return { success: false, error: validation.error };
+    }
+    
+    const { ok, error } = await client.uploadFromBytes(storageKey, binaryData);
+    
+    if (!ok) {
+      return { success: false, error: error?.message || 'Upload failed' };
+    }
+    
+    return { success: true, storageKey };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
 function detectMimeFromBuffer(buffer: Buffer): string {
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) return 'image/png';
   if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg';

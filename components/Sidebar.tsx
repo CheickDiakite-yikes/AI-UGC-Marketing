@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
+import Link from 'next/link';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product } from '../types';
 import { IMAGE_LIMIT, VIDEO_LIMIT } from '../services/usageLimits';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
+import { getUserProfile } from '../app/actions/userActions';
 import SourcePreviewModal, { getParseStatus, getStatusColor } from './SourcePreviewModal';
 
 interface SidebarProps {
@@ -49,6 +51,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isScrapingLink, setIsScrapingLink] = useState(false);
   const [extractingAssets, setExtractingAssets] = useState<Set<string>>(new Set());
   const [previewAsset, setPreviewAsset] = useState<ProjectAsset | null>(null);
+  const [userProfile, setUserProfile] = useState<{ name: string | null; email: string | null; avatarUrl: string | null } | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   const getAssetPreviewSrc = (asset: ProjectAsset) => {
     if (!asset.content) return '';
@@ -113,6 +117,30 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     window.addEventListener('open-link-modal', handleOpenLinkModal);
     return () => window.removeEventListener('open-link-modal', handleOpenLinkModal);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      try {
+        const profile = await getUserProfile();
+        if (isMounted) {
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error('Failed to load user profile', error);
+      } finally {
+        if (isMounted) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    loadProfile();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const ALLOWED_IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/heic,image/heif";
@@ -204,6 +232,32 @@ const Sidebar: React.FC<SidebarProps> = ({
       setIsScrapingLink(false);
     }
   };
+
+  const getProfileInitials = (name?: string | null, email?: string | null) => {
+    const safeName = name?.trim();
+    if (safeName) {
+      const parts = safeName.split(/\s+/).filter(Boolean);
+      const initials = parts.slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('');
+      return initials || '?';
+    }
+    if (email && email.length > 0) {
+      return email[0].toUpperCase();
+    }
+    return '?';
+  };
+
+  const profileInitials = getProfileInitials(userProfile?.name, userProfile?.email);
+  const profileDisplayName = (() => {
+    const name = userProfile?.name?.trim();
+    if (name) {
+      return name.split(/\s+/)[0];
+    }
+    const email = userProfile?.email?.trim();
+    if (email) {
+      return email.split('@')[0];
+    }
+    return 'Profile';
+  })();
 
   return (
     <div className="h-full flex flex-col bg-neo-yellow border-r-4 border-black shadow-neo md:shadow-none overflow-hidden">
@@ -499,13 +553,31 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* User / Logout */}
       <div className="p-3 bg-black text-white border-t border-white/20">
-        <button
-          onClick={() => logout()}
-          className="w-full text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 flex items-center gap-2 transition-colors"
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-          Sign Out
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/profile"
+            className="group flex items-center gap-2 max-w-[65%]"
+            aria-label="Open profile"
+          >
+            <div className="w-9 h-9 rounded-full border-2 border-white bg-white text-black flex items-center justify-center font-black text-xs overflow-hidden">
+              {userProfile?.avatarUrl ? (
+                <img src={userProfile.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span>{profileInitials}</span>
+              )}
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300 group-hover:text-white transition-colors truncate">
+              {isProfileLoading ? 'Profile' : profileDisplayName}
+            </span>
+          </Link>
+          <button
+            onClick={() => logout()}
+            className="ml-auto text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 flex items-center gap-2 transition-colors"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {/* Link URL Modal */}

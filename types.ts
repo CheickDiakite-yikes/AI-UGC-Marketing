@@ -29,6 +29,7 @@ export interface CanvasItem {
   };
   x?: number; // For future drag/drop
   y?: number;
+  isFavorite?: boolean;
 }
 
 export interface ChatMessage {
@@ -198,6 +199,49 @@ export interface AssetMetadata {
     dominantColors?: string[];
     tags?: string[];
   };
+}
+
+export interface ProfileAsset {
+  id: string;
+  type: ProjectAsset['type'];
+  name: string;
+  mimeType?: string | null;
+  previewUrl?: string | null;
+  category?: string | null;
+  createdAt?: number;
+}
+
+export interface ProfileProductAsset {
+  id: string;
+  assetId: string;
+  role: ProductAssetRole;
+  isPrimary?: boolean | null;
+  previewUrl?: string | null;
+}
+
+export interface ProfileProduct {
+  id: string;
+  name: string;
+  description?: string | null;
+  productType: ProductType;
+  assets?: ProfileProductAsset[];
+  createdAt?: number;
+}
+
+export interface ProfileLibrary {
+  profile: {
+    websiteUrl?: string | null;
+    overview?: string | null;
+  };
+  assets: ProfileAsset[];
+  products: ProfileProduct[];
+}
+
+export interface ProfileImportSelection {
+  includeWebsite: boolean;
+  includeOverview: boolean;
+  assetIds: string[];
+  productIds: string[];
 }
 
 export enum AspectRatio {
