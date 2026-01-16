@@ -275,7 +275,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </div>
       </nav>
 
-      <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-4 sm:px-6 md:px-16 lg:px-24 max-w-7xl mx-auto flex flex-col items-center text-center overflow-x-hidden">
+      <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-6 sm:px-8 md:px-16 lg:px-24 max-w-7xl mx-auto flex flex-col items-center text-center">
         
         <Reveal delay={100}>
           <div className="inline-block bg-neo-lime border-2 border-black px-4 py-1.5 md:px-6 md:py-2 font-bold text-xs md:text-sm uppercase tracking-widest mb-6 md:mb-8 shadow-neo hover:rotate-2 transition-transform cursor-default">
@@ -284,7 +284,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
         </Reveal>
 
         <Reveal delay={200}>
-          <h1 className="font-display font-black text-[clamp(1.5rem,7vw,8rem)] leading-[1] mb-6 md:mb-8 text-neo-black drop-shadow-sm w-full overflow-hidden">
+          <h1 className="font-display font-black text-[clamp(1.4rem,6.5vw,8rem)] leading-[1] mb-6 md:mb-8 text-neo-black drop-shadow-sm w-full px-2">
             MARKETING <br/>
             <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
                <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none whitespace-nowrap" aria-hidden="true">ON AUTOPILOT.</span>
