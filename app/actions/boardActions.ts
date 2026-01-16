@@ -743,10 +743,10 @@ export async function getOnboardingStateAction() {
     };
 }
 
-export async function dismissOnboardingAction() {
+export async function dismissOnboardingAction(): Promise<void> {
     const session = await getSession();
     if (!session || !session.userId) {
-        return { success: false, error: 'Unauthorized' };
+        return;
     }
 
     await db.update(users)
@@ -755,13 +755,12 @@ export async function dismissOnboardingAction() {
 
     revalidatePath('/');
     revalidatePath('/profile');
-    return { success: true };
 }
 
-export async function resumeOnboardingAction() {
+export async function resumeOnboardingAction(): Promise<void> {
     const session = await getSession();
     if (!session || !session.userId) {
-        return { success: false, error: 'Unauthorized' };
+        return;
     }
 
     await db.update(users)
@@ -770,13 +769,12 @@ export async function resumeOnboardingAction() {
 
     revalidatePath('/');
     revalidatePath('/profile');
-    return { success: true };
 }
 
-export async function completeOnboardingAction() {
+export async function completeOnboardingAction(): Promise<void> {
     const session = await getSession();
     if (!session || !session.userId) {
-        return { success: false, error: 'Unauthorized' };
+        return;
     }
 
     await db.update(users)
@@ -785,13 +783,12 @@ export async function completeOnboardingAction() {
 
     revalidatePath('/');
     revalidatePath('/profile');
-    return { success: true };
 }
 
-export async function resetOnboardingAction() {
+export async function resetOnboardingAction(): Promise<void> {
     const session = await getSession();
     if (!session || !session.userId) {
-        return { success: false, error: 'Unauthorized' };
+        return;
     }
 
     await db.update(users)
@@ -800,7 +797,6 @@ export async function resetOnboardingAction() {
 
     revalidatePath('/');
     revalidatePath('/profile');
-    return { success: true };
 }
 
 export async function renameBoard(boardId: string, newName: string) {

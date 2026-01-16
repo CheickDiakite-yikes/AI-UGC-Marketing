@@ -52,7 +52,7 @@ const getOverlapArea = (a: DOMRect, b: DOMRect) => {
   return xOverlap * yOverlap;
 };
 
-const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, totalSteps, isStepComplete, onNext, onSkip, onDismiss, hidden }) => {
+const OnboardingCoach: React.FC<OnboardingCoachProps> = ({ step, stepIndex, totalSteps, isStepComplete, onNext, onSkip, onSkipAll, onSnooze, onDismiss, hidden }) => {
   const calloutRef = useRef<HTMLDivElement>(null);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
