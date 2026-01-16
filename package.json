@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prestart": "npm run db:push",
     "start": "next start",
     "start:jobs": "npx tsx server/jobRunner.ts",
     "lint": "next lint",
