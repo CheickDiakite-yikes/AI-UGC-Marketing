@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
-const SECRET_KEY = process.env.JWT_SECRET || 'default-dev-secret-do-not-use-in-prod';
+const SECRET_KEY = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'default-dev-secret-do-not-use-in-prod';
 const key = new TextEncoder().encode(SECRET_KEY);
 
 export async function hashPassword(password: string): Promise<string> {
