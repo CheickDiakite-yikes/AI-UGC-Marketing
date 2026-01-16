@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getFavoritesByBoardAction } from '@/app/actions/favoriteActions';
+import { getOnboardingStateAction, dismissOnboardingAction, resumeOnboardingAction, completeOnboardingAction, resetOnboardingAction } from '@/app/actions/boardActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 import { getUserProfile, updateProfileBasics, updateUserPassword, updateUserProfile } from '@/app/actions/userActions';
 
@@ -108,6 +109,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
   const library = await getProfileLibrary();
   const favoritesByBoard = await getFavoritesByBoardAction();
+  const onboardingState = await getOnboardingStateAction();
   const favoriteItems = favoritesByBoard.flatMap(board => board.items.map(item => ({
     ...item,
     boardId: board.boardId,
@@ -379,6 +381,60 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             </div>
           </section>
         </div>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display font-black text-xl">Onboarding Tutorial</h2>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
+              {onboardingState.completed ? 'Complete' : (onboardingState.dismissed ? 'Paused' : 'Active')}
+            </span>
+          </div>
+          <p className="text-sm text-gray-600">
+            Control the guided setup checklist. You can pause it or restart any time.
+          </p>
+          <div className="flex flex-wrap gap-2 mt-4">
+            {!onboardingState.completed && !onboardingState.dismissed && (
+              <>
+                <form action={dismissOnboardingAction}>
+                  <button
+                    type="submit"
+                    className="bg-white border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
+                  >
+                    Later
+                  </button>
+                </form>
+                <form action={completeOnboardingAction}>
+                  <button
+                    type="submit"
+                    className="bg-neo-pink border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+                  >
+                    Skip Tutorial
+                  </button>
+                </form>
+              </>
+            )}
+            {!onboardingState.completed && onboardingState.dismissed && (
+              <form action={resumeOnboardingAction}>
+                <button
+                  type="submit"
+                  className="bg-neo-lime border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+                >
+                  Resume Tutorial
+                </button>
+              </form>
+            )}
+            {onboardingState.completed && (
+              <form action={resetOnboardingAction}>
+                <button
+                  type="submit"
+                  className="bg-neo-yellow border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+                >
+                  Restart Tutorial
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
 
         <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
           <div className="flex items-center justify-between mb-4">

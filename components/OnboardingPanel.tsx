@@ -7,6 +7,8 @@ interface OnboardingPanelProps {
   onOpenChat: () => void;
   onOpenBoards?: () => void;
   onOpenProduct?: () => void;
+  onSnooze?: () => void;
+  onSkipTutorial?: () => void;
 }
 
 interface StepRowProps {
@@ -43,7 +45,7 @@ const StepRow: React.FC<StepRowProps> = ({ label, done, required, actionLabel, o
   </div>
 );
 
-const OnboardingPanel: React.FC<OnboardingPanelProps> = ({ state, onOpenLinkModal, onOpenChat, onOpenBoards, onOpenProduct }) => {
+const OnboardingPanel: React.FC<OnboardingPanelProps> = ({ state, onOpenLinkModal, onOpenChat, onOpenBoards, onOpenProduct, onSnooze, onSkipTutorial }) => {
   const requiredSteps = [
     {
       label: 'Add your website link',
@@ -59,7 +61,7 @@ const OnboardingPanel: React.FC<OnboardingPanelProps> = ({ state, onOpenLinkModa
       required: true,
       actionLabel: 'Open Chat',
       onAction: onOpenChat,
-      hint: 'Try the Product Launch chip.'
+      hint: 'Pick any chip or type your own prompt.'
     }
   ];
 
@@ -83,13 +85,31 @@ const OnboardingPanel: React.FC<OnboardingPanelProps> = ({ state, onOpenLinkModa
           <p className="text-xs font-black uppercase tracking-widest text-gray-700">First-time Setup</p>
           <h3 className="font-display font-black text-xl">Build your brand context</h3>
         </div>
-        <div className="text-xs font-bold uppercase tracking-widest bg-white border-2 border-black px-2 py-1 w-fit">
-          {requiredDone}/{requiredTotal} required
+        <div className="flex flex-wrap items-center gap-2">
+          {onSnooze && (
+            <button
+              onClick={onSnooze}
+              className="text-[10px] font-black uppercase tracking-widest bg-white border-2 border-black px-2 py-1 hover:bg-gray-100 transition-all"
+            >
+              Later
+            </button>
+          )}
+          {onSkipTutorial && (
+            <button
+              onClick={onSkipTutorial}
+              className="text-[10px] font-black uppercase tracking-widest bg-white border-2 border-black px-2 py-1 hover:bg-gray-100 transition-all"
+            >
+              Skip Tutorial
+            </button>
+          )}
+          <div className="text-xs font-bold uppercase tracking-widest bg-white border-2 border-black px-2 py-1 w-fit">
+            {requiredDone}/{requiredTotal} required
+          </div>
         </div>
       </div>
 
       <div className="w-full bg-white/70 border-2 border-black h-3 mb-4">
-        <div className="bg-neo-pink h-full transition-all" style={{ width: `${progress}%` }} />
+        <div className="bg-neo-pink h-full transition-all duration-300" style={{ width: `${progress}%` }} />
       </div>
 
       <div className="space-y-2">

@@ -18,6 +18,7 @@ const requiredUserColumns = [
   'avatar_url',
   'website_url',
   'overview',
+  'onboarding_dismissed_at',
 ];
 
 export async function getSchemaIssues(client: PoolClient) {

@@ -9,6 +9,8 @@ import BrandAnalysisSkeleton from './components/BrandAnalysisSkeleton';
 import ProductModal from './components/ProductModal';
 import OnboardingPanel from './components/OnboardingPanel';
 import OnboardingCoach, { CoachStep } from './components/OnboardingCoach';
+import WorkspaceSkeleton from './components/WorkspaceSkeleton';
+import OnboardingPanelSkeleton from './components/OnboardingPanelSkeleton';
 import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
@@ -39,7 +41,9 @@ import {
   setProductAssetsAction,
   autoTagAssetAction,
   analyzeProductImagesAction,
-  getOnboardingStateAction
+  getOnboardingStateAction,
+  dismissOnboardingAction,
+  completeOnboardingAction
 } from './app/actions/boardActions';
 import { toggleFavoriteAction } from './app/actions/favoriteActions';
 
@@ -64,7 +68,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [isOnboardingLoading, setIsOnboardingLoading] = useState(false);
   const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
   const [skippedOnboardingSteps, setSkippedOnboardingSteps] = useState<string[]>([]);
-  const [activeOnboardingStepIndex, setActiveOnboardingStepIndex] = useState(0);
+  const [activeOnboardingStepId, setActiveOnboardingStepId] = useState<string | null>(null);
 
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string>('');
@@ -517,7 +521,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   }, []);
 
   const onboardingSteps: CoachStep[] = React.useMemo(() => {
-    if (!onboardingState) return [];
+    if (!onboardingState || onboardingState.completed || onboardingState.dismissed) return [];
     const isSkipped = (id: string) => skippedOnboardingSteps.includes(id);
     const isComplete = (id: string) => {
       switch (id) {
@@ -591,8 +595,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {
         id: 'campaign',
         title: 'Create your first campaign',
-        description: 'Tap Product Launch or type a request to generate assets.',
-        targetSelector: '[data-tour="product-launch-chip"], [data-tour="chat-input"]',
+        description: 'Pick any chip or type your own request to generate assets.',
+        targetSelector: '[data-tour="chat-input"], [data-tour="chat-chips"]',
         actionLabel: 'Open Chat',
         onAction: handleOpenChat
       }
@@ -605,7 +609,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     });
   }, [handleOpenChat, handleOpenLinkModal, handleOpenProductModal, onboardingState, skippedOnboardingSteps]);
 
-  const activeOnboardingStep = onboardingSteps[activeOnboardingStepIndex] || null;
+  const activeOnboardingStepIndex = activeOnboardingStepId
+    ? onboardingSteps.findIndex(step => step.id === activeOnboardingStepId)
+    : 0;
+  const resolvedOnboardingStepIndex = activeOnboardingStepIndex === -1 ? 0 : activeOnboardingStepIndex;
+  const activeOnboardingStep = onboardingSteps[resolvedOnboardingStepIndex] || null;
   const isActiveStepComplete = React.useMemo(() => {
     if (!activeOnboardingStep || !onboardingState) return false;
     const { required, optional } = onboardingState;
@@ -632,28 +640,48 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const handleSkipOnboardingStep = useCallback(() => {
     if (!activeOnboardingStep?.optional) return;
     setSkippedOnboardingSteps(prev => [...prev, activeOnboardingStep.id]);
-    setActiveOnboardingStepIndex(prev => Math.max(0, prev));
-  }, [activeOnboardingStep]);
+    setActiveOnboardingStepId((currentId) => {
+      if (!currentId) return null;
+      const index = onboardingSteps.findIndex(step => step.id === currentId);
+      const nextStep = onboardingSteps[index + 1];
+      return nextStep ? nextStep.id : null;
+    });
+  }, [activeOnboardingStep, onboardingSteps]);
 
   const handleAdvanceOnboardingStep = useCallback(() => {
-    setActiveOnboardingStepIndex(prev => {
-      const next = prev + 1;
-      if (next >= onboardingSteps.length) {
-        return prev;
+    setActiveOnboardingStepId((currentId) => {
+      if (!currentId) {
+        return onboardingSteps[0]?.id ?? null;
       }
-      return next;
+      const index = onboardingSteps.findIndex(step => step.id === currentId);
+      const nextStep = onboardingSteps[index + 1];
+      return nextStep ? nextStep.id : currentId;
     });
-  }, [onboardingSteps.length]);
+  }, [onboardingSteps]);
 
   const handleDismissOnboarding = useCallback(() => {
-    setShowOnboardingGuide(false);
-  }, []);
+    dismissOnboardingAction()
+      .then(() => refreshOnboardingState())
+      .catch((error) => console.error('[ONBOARDING] Failed to snooze:', error))
+      .finally(() => setShowOnboardingGuide(false));
+  }, [refreshOnboardingState]);
 
-  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null || sidebarOpen;
+  const handleSkipOnboarding = useCallback(() => {
+    completeOnboardingAction()
+      .then(() => refreshOnboardingState())
+      .catch((error) => console.error('[ONBOARDING] Failed to skip:', error))
+      .finally(() => setShowOnboardingGuide(false));
+  }, [refreshOnboardingState]);
+
+  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null;
 
   useEffect(() => {
     if (!onboardingState) return;
-    if (!showOnboardingGuide && !onboardingState.completed) {
+    if (onboardingState.dismissed && showOnboardingGuide) {
+      setShowOnboardingGuide(false);
+      return;
+    }
+    if (!showOnboardingGuide && !onboardingState.completed && !onboardingState.dismissed) {
       setShowOnboardingGuide(true);
     }
   }, [onboardingState, showOnboardingGuide]);
@@ -662,12 +690,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     if (!showOnboardingGuide) return;
     if (onboardingSteps.length === 0) {
       setShowOnboardingGuide(false);
+      setActiveOnboardingStepId(null);
       return;
     }
-    if (activeOnboardingStepIndex >= onboardingSteps.length) {
-      setActiveOnboardingStepIndex(0);
+    if (!activeOnboardingStepId || activeOnboardingStepIndex === -1) {
+      setActiveOnboardingStepId(onboardingSteps[0].id);
     }
-  }, [activeOnboardingStepIndex, onboardingSteps.length, showOnboardingGuide]);
+  }, [activeOnboardingStepId, activeOnboardingStepIndex, onboardingSteps, showOnboardingGuide]);
 
   useEffect(() => {
     if (!showOnboardingGuide || !activeOnboardingStep) return;
@@ -1319,7 +1348,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   };
 
-  if (!activeBoard) return <div className="flex h-screen items-center justify-center font-display text-xl animate-pulse">Loading Workspace...</div>;
+  if (!activeBoard) return <WorkspaceSkeleton />;
 
   const editingProduct = activeBoard.products?.find(p => p.id === editingProductId) || null;
 
@@ -1380,13 +1409,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
       {/* Main Content */}
       <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 pb-32 md:pt-0">
-        {!isOnboardingLoading && onboardingState && !onboardingState.completed && (
+        {isOnboardingLoading && <OnboardingPanelSkeleton />}
+        {!isOnboardingLoading && onboardingState && !onboardingState.completed && !onboardingState.dismissed && activeOnboardingStep?.id !== 'campaign' && (
           <OnboardingPanel
             state={onboardingState}
             onOpenLinkModal={handleOpenLinkModal}
             onOpenChat={handleOpenChat}
             onOpenBoards={() => setShowBoardListModal(true)}
             onOpenProduct={() => handleOpenProductModal()}
+            onSnooze={handleDismissOnboarding}
+            onSkipTutorial={handleSkipOnboarding}
           />
         )}
         {/* Desktop Header - Hidden on mobile */}
@@ -1498,14 +1530,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {showNewBoardModal && <NewBoardModal onCreate={handleCreateBoard} onCancel={() => setShowNewBoardModal(false)} />}
       {showBoardListModal && <BoardListModal boards={boards} activeBoardId={activeBoardId} onSwitch={setActiveBoardId} onClose={() => setShowBoardListModal(false)} onCreateNew={() => setShowNewBoardModal(true)} onRename={handleRenameBoard} onDelete={handleDeleteBoard} />}
       {selectedItem && <LightboxModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
-      {showOnboardingGuide && activeOnboardingStep && (
+      {showOnboardingGuide && activeOnboardingStep && onboardingState && !onboardingState.dismissed && (
         <OnboardingCoach
           step={activeOnboardingStep}
-          stepIndex={activeOnboardingStepIndex}
+          stepIndex={resolvedOnboardingStepIndex}
           totalSteps={onboardingSteps.length}
           isStepComplete={isActiveStepComplete}
           onNext={handleAdvanceOnboardingStep}
           onSkip={handleSkipOnboardingStep}
+          onSkipAll={handleSkipOnboarding}
+          onSnooze={handleDismissOnboarding}
           onDismiss={handleDismissOnboarding}
           hidden={anyModalOpen}
         />

@@ -262,7 +262,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
       </div>
 
       {!isProcessing && (
-        <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-none mask-fade-right">
+        <div className="px-4 py-2 flex gap-2 overflow-x-auto scrollbar-none mask-fade-right" data-tour="chat-chips">
            {SMART_CHIPS.map((chip, i) => (
              <button
                key={i}

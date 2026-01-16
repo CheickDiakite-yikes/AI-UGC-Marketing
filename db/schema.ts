@@ -38,6 +38,7 @@ export const users = pgTable('users', {
   videosGenerated: integer('videos_generated').default(0).notNull(),
   onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
   onboardingCompletedAt: timestamp('onboarding_completed_at'),
+  onboardingDismissedAt: timestamp('onboarding_dismissed_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

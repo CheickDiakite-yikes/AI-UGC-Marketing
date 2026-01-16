@@ -13,7 +13,7 @@
     "lint": "next lint",
     "test": "vitest",
     "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate --name init",
+    "db:generate": "drizzle-kit generate",
     "db:migrate": "npx tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "smoke": "npx tsx scripts/smoke.ts"

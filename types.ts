@@ -90,6 +90,7 @@ export interface UsageStats {
 
 export interface OnboardingState {
   completed: boolean;
+  dismissed?: boolean;
   required: {
     websiteLink: boolean;
     campaignCreated: boolean;

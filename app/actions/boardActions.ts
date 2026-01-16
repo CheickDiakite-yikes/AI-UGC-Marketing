@@ -671,6 +671,7 @@ export async function getOnboardingStateAction() {
     if (!session || !session.userId) {
         return {
             completed: true,
+            dismissed: false,
             required: { websiteLink: true, campaignCreated: true },
             optional: { logo: true, avatar: true, product: true, sources: true, multipleBoards: true }
         };
@@ -678,7 +679,7 @@ export async function getOnboardingStateAction() {
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, session.userId as string),
-        columns: { onboardingCompleted: true }
+        columns: { onboardingCompleted: true, onboardingDismissedAt: true }
     });
 
     const userBoards = await db.query.boards.findMany({
@@ -720,13 +721,14 @@ export async function getOnboardingStateAction() {
 
     if (!completed && requiredComplete) {
         await db.update(users)
-            .set({ onboardingCompleted: true, onboardingCompletedAt: new Date() })
+            .set({ onboardingCompleted: true, onboardingCompletedAt: new Date(), onboardingDismissedAt: null })
             .where(eq(users.id, session.userId as string));
         completed = true;
     }
 
     return {
         completed,
+        dismissed: Boolean(user?.onboardingDismissedAt) && !completed,
         required: {
             websiteLink: hasWebsiteLink,
             campaignCreated: hasCampaign
@@ -739,6 +741,66 @@ export async function getOnboardingStateAction() {
             multipleBoards: hasMultipleBoards
         }
     };
+}
+
+export async function dismissOnboardingAction() {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    await db.update(users)
+        .set({ onboardingDismissedAt: new Date() })
+        .where(eq(users.id, session.userId as string));
+
+    revalidatePath('/');
+    revalidatePath('/profile');
+    return { success: true };
+}
+
+export async function resumeOnboardingAction() {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    await db.update(users)
+        .set({ onboardingDismissedAt: null })
+        .where(eq(users.id, session.userId as string));
+
+    revalidatePath('/');
+    revalidatePath('/profile');
+    return { success: true };
+}
+
+export async function completeOnboardingAction() {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    await db.update(users)
+        .set({ onboardingCompleted: true, onboardingCompletedAt: new Date(), onboardingDismissedAt: null })
+        .where(eq(users.id, session.userId as string));
+
+    revalidatePath('/');
+    revalidatePath('/profile');
+    return { success: true };
+}
+
+export async function resetOnboardingAction() {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
+    await db.update(users)
+        .set({ onboardingCompleted: false, onboardingCompletedAt: null, onboardingDismissedAt: null })
+        .where(eq(users.id, session.userId as string));
+
+    revalidatePath('/');
+    revalidatePath('/profile');
+    return { success: true };
 }
 
 export async function renameBoard(boardId: string, newName: string) {
