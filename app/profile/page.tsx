@@ -8,10 +8,10 @@ import { getSubscriptionStateAction } from '@/app/actions/subscriptionActions';
 import BillingControls from '@/components/BillingControls';
 
 type ProfilePageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     updated?: string;
     error?: string;
-  };
+  }>;
 };
 
 type Banner = {
@@ -19,9 +19,9 @@ type Banner = {
   message: string;
 } | null;
 
-const getBanner = (searchParams?: ProfilePageProps['searchParams']): Banner => {
-  const error = searchParams?.error;
-  const updated = searchParams?.updated;
+const getBanner = (searchParamsData?: { updated?: string; error?: string }): Banner => {
+  const error = searchParamsData?.error;
+  const updated = searchParamsData?.updated;
 
   const errorMessages: Record<string, string> = {
     missing_name: 'Please enter a name before saving your profile.',
@@ -119,7 +119,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     boardName: board.boardName,
   })));
 
-  const banner = getBanner(searchParams);
+  const searchParamsData = searchParams ? await searchParams : undefined;
+  const banner = getBanner(searchParamsData);
   const initials = getInitials(profile.name, profile.email);
   const assets = library?.assets ?? [];
   const products = library?.products ?? [];
