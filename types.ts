@@ -85,6 +85,7 @@ export interface Board {
 export interface UsageStats {
   imagesGenerated: number;
   videosGenerated: number;
+  creditBalance: number;
   lastResetDate: number; // timestamp
 }
 
@@ -103,6 +104,8 @@ export interface OnboardingState {
     multipleBoards: boolean;
   };
 }
+
+export type PlanTier = 'free' | 'basic' | 'pro' | 'enterprise';
 
 export type ProductType = 'physical_product' | 'software' | 'service' | 'digital_product' | 'hardware';
 

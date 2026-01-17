@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection } from '@/types';
 import { getSession } from './authActions';
 import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset, downloadAsset } from '@/services/objectStorageService';
+import { consumeUsage } from '@/services/usageConsumption';
 import { processImageForGemini } from '@/services/imageProcessingService';
 import { generateContentServer } from '@/app/actions';
 import { Type } from '@google/genai';
@@ -605,14 +606,12 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
 
     const session = await getSession();
     if (session && session.userId) {
-        if (item.type === 'video') {
-            await db.update(users)
-                .set({ videosGenerated: sql`${users.videosGenerated} + 1` })
-                .where(eq(users.id, session.userId as string));
-        } else {
-            await db.update(users)
-                .set({ imagesGenerated: sql`${users.imagesGenerated} + 1` })
-                .where(eq(users.id, session.userId as string));
+        const usageType = item.type === 'video' ? 'video' : 'image';
+        const count = item.type === 'carousel' && item.carouselUrls ? item.carouselUrls.length : 1;
+        try {
+            await consumeUsage(session.userId as string, usageType, count);
+        } catch (error) {
+            console.warn('[SAVE ITEM] Failed to apply usage charge', error);
         }
     }
 
@@ -648,20 +647,22 @@ export async function saveGeneratedItemAction(boardId: string, item: any) {
 export async function getUserUsageAction() {
     const session = await getSession();
     if (!session || !session.userId) {
-        return { imagesGenerated: 0, videosGenerated: 0, lastResetDate: Date.now() };
+        return { imagesGenerated: 0, videosGenerated: 0, creditBalance: 0, lastResetDate: Date.now() };
     }
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, session.userId as string),
         columns: {
             imagesGenerated: true,
-            videosGenerated: true
+            videosGenerated: true,
+            creditBalance: true
         }
     });
 
     return {
         imagesGenerated: user?.imagesGenerated || 0,
         videosGenerated: user?.videosGenerated || 0,
+        creditBalance: user?.creditBalance || 0,
         lastResetDate: Date.now() // We could store this in DB too if needed
     };
 }

@@ -6,6 +6,7 @@ const requiredTables = [
   'generated_items',
   'favorites',
   'jobs',
+  'credit_transactions',
 ];
 
 const requiredUserColumns = [
@@ -19,6 +20,14 @@ const requiredUserColumns = [
   'website_url',
   'overview',
   'onboarding_dismissed_at',
+  'plan_tier',
+  'stripe_customer_id',
+  'stripe_subscription_id',
+  'stripe_subscription_status',
+  'stripe_price_id',
+  'subscription_current_period_end',
+  'trial_ends_at',
+  'credit_balance',
 ];
 
 export async function getSchemaIssues(client: PoolClient) {

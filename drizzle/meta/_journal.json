@@ -15,6 +15,20 @@
       "when": 1768600040999,
       "tag": "0001_add_onboarding_dismissed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768608289456,
+      "tag": "0002_add_plan_tier",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768609722236,
+      "tag": "0003_add_billing_credits",
+      "breakpoints": true
     }
   ]
 }

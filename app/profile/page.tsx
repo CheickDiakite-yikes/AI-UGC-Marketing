@@ -4,6 +4,8 @@ import { getFavoritesByBoardAction } from '@/app/actions/favoriteActions';
 import { getOnboardingStateAction, dismissOnboardingAction, resumeOnboardingAction, completeOnboardingAction, resetOnboardingAction } from '@/app/actions/boardActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 import { getUserProfile, updateProfileBasics, updateUserPassword, updateUserProfile } from '@/app/actions/userActions';
+import { getSubscriptionStateAction } from '@/app/actions/subscriptionActions';
+import BillingControls from '@/components/BillingControls';
 
 type ProfilePageProps = {
   searchParams?: {
@@ -110,6 +112,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const library = await getProfileLibrary();
   const favoritesByBoard = await getFavoritesByBoardAction();
   const onboardingState = await getOnboardingStateAction();
+  const subscriptionState = await getSubscriptionStateAction();
   const favoriteItems = favoritesByBoard.flatMap(board => board.items.map(item => ({
     ...item,
     boardId: board.boardId,
@@ -370,14 +373,18 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display font-black text-xl">Subscriptions and Billing</h2>
               <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
-                Stripe Soon
+                Live
               </span>
             </div>
             <p className="text-sm text-gray-600">
-              Manage plans, payment methods, and cancellations here. Stripe integration is planned for this section.
+              Manage plans, payment methods, and add-on credits.
             </p>
-            <div className="mt-4 border-2 border-black p-4 text-xs font-bold uppercase tracking-widest text-gray-500">
-              Billing controls coming soon
+            <div className="mt-4 border-2 border-black p-4">
+              <BillingControls
+                planTier={subscriptionState.planTier}
+                creditBalance={subscriptionState.creditBalance}
+                subscriptionStatus={subscriptionState.subscriptionStatus}
+              />
             </div>
           </section>
         </div>

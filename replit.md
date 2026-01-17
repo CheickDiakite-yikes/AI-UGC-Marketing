@@ -140,6 +140,15 @@ All media files (images, videos, carousels) are stored in Replit Object Storage 
 ### Environment Variables for SEO
 - `NEXT_PUBLIC_SITE_URL` - Production URL for canonical links (defaults to https://predi.ai)
 
+### Billing Environment Variables
+- `STRIPE_SECRET_KEY` - Stripe secret key for API calls
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+- `STRIPE_PRICE_BASIC` - Stripe price ID for Basic monthly plan
+- `STRIPE_PRICE_PRO` - Stripe price ID for Pro monthly plan
+- `STRIPE_PRICE_CREDITS_50` - Stripe price ID for 50-credit pack
+- `STRIPE_PRICE_CREDITS_100` - Stripe price ID for 100-credit pack
+- `STRIPE_PRICE_CREDITS_200` - Stripe price ID for 200-credit pack
+
 ## AI Features
 
 ### Gemini Models Used

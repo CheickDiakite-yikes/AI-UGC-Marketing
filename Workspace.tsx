@@ -11,6 +11,7 @@ import OnboardingPanel from './components/OnboardingPanel';
 import OnboardingCoach, { CoachStep } from './components/OnboardingCoach';
 import WorkspaceSkeleton from './components/WorkspaceSkeleton';
 import OnboardingPanelSkeleton from './components/OnboardingPanelSkeleton';
+import PaywallModal from './components/PaywallModal';
 import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
@@ -19,7 +20,8 @@ import { useToast } from './components/Toast';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
-import { IMAGE_LIMIT, VIDEO_LIMIT, getRemainingImages, getRemainingVideos } from './services/usageLimits';
+import { getRemainingImages, getRemainingVideos } from './services/usageLimits';
+import { getPlanLimits } from './services/subscriptionPlans';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
 import {
   getBoards,
@@ -45,7 +47,9 @@ import {
   dismissOnboardingAction,
   completeOnboardingAction
 } from './app/actions/boardActions';
+import { getSubscriptionStateAction, createCheckoutSessionAction, createCreditsCheckoutSessionAction } from './app/actions/subscriptionActions';
 import { toggleFavoriteAction } from './app/actions/favoriteActions';
+import type { PlanTier } from './types';
 
 
 interface WorkspaceProps {
@@ -62,7 +66,12 @@ interface FailedJob {
 
 const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const { showError, showSuccess, showToast } = useToast();
-  const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, lastResetDate: 0 });
+  const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, creditBalance: 0, lastResetDate: 0 });
+  const [planTier, setPlanTier] = useState<PlanTier>('free');
+  const [paywallState, setPaywallState] = useState<{ isOpen: boolean; reason: 'image_limit' | 'video_limit' | 'video_locked' | null }>({
+    isOpen: false,
+    reason: null,
+  });
   const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
   const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
   const [isOnboardingLoading, setIsOnboardingLoading] = useState(false);
@@ -73,10 +82,67 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string>('');
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
+  const planLimits = getPlanLimits(planTier);
+  const isVideoLocked = planLimits.videoLimit <= 0;
+
+  const openPaywall = useCallback((reason: 'image_limit' | 'video_limit' | 'video_locked') => {
+    setPaywallState((prev) => (prev.isOpen ? prev : { isOpen: true, reason }));
+  }, []);
+
+  const closePaywall = useCallback(() => {
+    setPaywallState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const handleSelectPlan = useCallback(async (tier: PlanTier) => {
+    if (tier === 'free') {
+      closePaywall();
+      return;
+    }
+    if (tier === 'enterprise') {
+      closePaywall();
+      if (typeof window !== 'undefined') {
+        window.location.href = 'mailto:hello@predi.ai?subject=Predi%20AI%20Enterprise';
+      }
+      return;
+    }
+
+    try {
+      const result = await createCheckoutSessionAction(tier);
+      if (result?.url && typeof window !== 'undefined') {
+        window.location.href = result.url;
+        return;
+      }
+      showError('Checkout link unavailable. Please try again.');
+    } catch (error) {
+      console.error('Checkout failed', error);
+      showError('Unable to start checkout. Please try again.');
+    } finally {
+      closePaywall();
+    }
+  }, [closePaywall, showError]);
+
+  const handleSelectCredits = useCallback(async (credits: number) => {
+    try {
+      const result = await createCreditsCheckoutSessionAction(credits);
+      if (result?.url && typeof window !== 'undefined') {
+        window.location.href = result.url;
+        return;
+      }
+      showError('Checkout link unavailable. Please try again.');
+    } catch (error) {
+      console.error('Credit checkout failed', error);
+      showError('Unable to start checkout. Please try again.');
+    } finally {
+      closePaywall();
+    }
+  }, [closePaywall, showError]);
 
   // Initial Load (Boards + Usage)
   React.useEffect(() => {
     getUserUsageAction().then(setUsage);
+    getSubscriptionStateAction()
+      .then((state) => setPlanTier(state.planTier))
+      .catch(() => setPlanTier('free'));
     getBoards().then(async (bs) => {
       if (bs.length > 0) {
         const boardsWithDefaults = bs.map((b: any) => ({
@@ -832,8 +898,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
       const pendingImageCount = pendingItems.filter(item => item.type === 'image').length;
       const pendingVideoCount = pendingItems.filter(item => item.type === 'video').length;
-      let remainingImages = getRemainingImages(usage.imagesGenerated + pendingImageCount);
-      let remainingVideos = getRemainingVideos(usage.videosGenerated + pendingVideoCount);
+      const imageLimit = planLimits.imageLimit;
+      const videoLimit = planLimits.videoLimit;
+      let remainingImages = getRemainingImages(usage.imagesGenerated + pendingImageCount, imageLimit, usage.creditBalance);
+      let remainingVideos = getRemainingVideos(usage.videosGenerated + pendingVideoCount, videoLimit, usage.creditBalance);
 
       const modelParts = response.candidates[0].content.parts || [];
       let responseText = response.text || "";
@@ -848,8 +916,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
             const traceId = crypto.randomUUID();
             if (remainingImages <= 0) {
-              const message = `Image quota reached (${usage.imagesGenerated}/${IMAGE_LIMIT}).`;
+              const message = `Image quota reached (${usage.imagesGenerated}/${imageLimit}).`;
               showError(message);
+              openPaywall('image_limit');
               continue;
             }
             const res = await fetch('/api/jobs', {
@@ -869,6 +938,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const job = await res.json().catch(() => null);
             if (!res.ok || !job?.id) {
               const message = job?.error || 'Image generation request failed.';
+              if (job?.code === 'QUOTA_EXCEEDED') {
+                openPaywall('image_limit');
+              } else if (job?.code === 'PLAN_REQUIRED') {
+                openPaywall('video_locked');
+              }
               showError(message);
               continue;
             }
@@ -891,9 +965,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
             const traceId = crypto.randomUUID();
+            if (isVideoLocked) {
+              showError('Video generation requires a subscription.');
+              openPaywall('video_locked');
+              continue;
+            }
             if (remainingVideos <= 0) {
-              const message = `Video quota reached (${usage.videosGenerated}/${VIDEO_LIMIT}).`;
+              const message = `Video quota reached (${usage.videosGenerated}/${videoLimit}).`;
               showError(message);
+              openPaywall('video_limit');
               continue;
             }
             const res = await fetch('/api/jobs', {
@@ -915,6 +995,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const job = await res.json().catch(() => null);
             if (!res.ok || !job?.id) {
               const message = job?.error || 'Video generation request failed.';
+              if (job?.code === 'QUOTA_EXCEEDED') {
+                openPaywall('video_limit');
+              } else if (job?.code === 'PLAN_REQUIRED') {
+                openPaywall('video_locked');
+              }
               showError(message);
               continue;
             }
@@ -1077,6 +1162,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 const safePrompts = prompts.length > 0 ? prompts : [`Hero slide for ${item.title || 'product'} with bold headline.`];
                 const slidesToGenerate = Math.min(safePrompts.length, remainingImages);
                 if (slidesToGenerate <= 0) {
+                  openPaywall('image_limit');
                   skippedCount++;
                   skippedReasons.push('Not enough image quota for carousel.');
                   continue;
@@ -1110,12 +1196,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             } else {
               // Use background jobs for images and videos in packs
               if (item.type === 'video') {
+                if (isVideoLocked) {
+                  openPaywall('video_locked');
+                  skippedCount++;
+                  skippedReasons.push('Video generation requires a subscription.');
+                  continue;
+                }
                 if (remainingVideos <= 0) {
+                  openPaywall('video_limit');
                   skippedCount++;
                   skippedReasons.push('Not enough video quota.');
                   continue;
                 }
               } else if (remainingImages <= 0) {
+                openPaywall('image_limit');
                 skippedCount++;
                 skippedReasons.push('Not enough image quota.');
                 continue;
@@ -1146,6 +1240,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               if (!res.ok || !job?.id) {
                 const message = job?.error || 'Generation request failed.';
                 if (job?.code === 'QUOTA_EXCEEDED') {
+                  openPaywall(item.type === 'video' ? 'video_limit' : 'image_limit');
+                  skippedCount++;
+                  skippedReasons.push(message);
+                } else if (job?.code === 'PLAN_REQUIRED') {
+                  openPaywall('video_locked');
                   skippedCount++;
                   skippedReasons.push(message);
                 } else {
@@ -1403,6 +1502,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           onStartCapture={() => { setIsCameraActive(true); setSidebarOpen(false); }}
           onClose={() => setSidebarOpen(false)}
           onExitApp={onExitApp} usageStats={usage}
+          planTier={planTier}
           boardId={activeBoardId}
         />
       </div>
@@ -1510,6 +1610,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           </div>
         </div>
       )}
+      <PaywallModal
+        isOpen={paywallState.isOpen}
+        reason={paywallState.reason}
+        usage={usage}
+        planTier={planTier}
+        imageLimit={planLimits.imageLimit}
+        videoLimit={planLimits.videoLimit}
+        onClose={closePaywall}
+        onSelectPlan={handleSelectPlan}
+        onSelectCredits={handleSelectCredits}
+      />
       {isAnalyzingLogo && <BrandAnalysisSkeleton />}
       {showBrandModal && pendingScannedIdentity && <BrandIdentityModal initialIdentity={pendingScannedIdentity} logoUrl={pendingLogoAsset?.content || ""} onSave={handleSaveIdentity} onClose={() => setShowBrandModal(false)} />}
       {showAvatarModal && pendingScannedAvatar && <AvatarAnalysisModal initialIdentity={pendingScannedAvatar} onSave={handleSaveAvatar} onClose={() => setShowAvatarModal(false)} />}

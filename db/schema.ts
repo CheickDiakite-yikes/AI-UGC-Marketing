@@ -39,6 +39,14 @@ export const users = pgTable('users', {
   onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
   onboardingCompletedAt: timestamp('onboarding_completed_at'),
   onboardingDismissedAt: timestamp('onboarding_dismissed_at'),
+  planTier: text('plan_tier').default('free').notNull(),
+  stripeCustomerId: text('stripe_customer_id'),
+  stripeSubscriptionId: text('stripe_subscription_id'),
+  stripeSubscriptionStatus: text('stripe_subscription_status'),
+  stripePriceId: text('stripe_price_id'),
+  subscriptionCurrentPeriodEnd: timestamp('subscription_current_period_end'),
+  trialEndsAt: timestamp('trial_ends_at'),
+  creditBalance: integer('credit_balance').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -194,6 +202,23 @@ export const jobs = pgTable('jobs', {
   completedAt: timestamp('completed_at'),
 });
 
+export const creditTransactions = pgTable(
+  'credit_transactions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    amount: integer('amount').notNull(),
+    reason: text('reason').notNull(),
+    stripeSessionId: text('stripe_session_id'),
+    stripeEventId: text('stripe_event_id'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    stripeSessionIdIdx: uniqueIndex('credit_transactions_stripe_session_id_idx').on(table.stripeSessionId),
+    stripeEventIdIdx: uniqueIndex('credit_transactions_stripe_event_id_idx').on(table.stripeEventId),
+  }),
+);
+
 // --- Relations ---
 
 export const boardsRelations = relations(boards, ({ many, one }) => ({
@@ -250,6 +275,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   profileAssets: many(profileAssets),
   profileProducts: many(profileProducts),
   favorites: many(favorites),
+  creditTransactions: many(creditTransactions),
 }));
 
 export const profileAssetsRelations = relations(profileAssets, ({ one, many }) => ({
@@ -304,6 +330,13 @@ export const jobsRelations = relations(jobs, ({ one }) => ({
   }),
   user: one(users, {
     fields: [jobs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const creditTransactionsRelations = relations(creditTransactions, ({ one }) => ({
+  user: one(users, {
+    fields: [creditTransactions.userId],
     references: [users.id],
   }),
 }));

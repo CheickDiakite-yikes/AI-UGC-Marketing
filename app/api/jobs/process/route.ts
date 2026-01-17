@@ -6,9 +6,11 @@ import { resolveVideoIngredients } from '../../../../services/videoIngredientSer
 import { uploadGeneratedItem } from '../../../../services/objectStorageService';
 import { db } from '../../../../db';
 import { generatedItems, users } from '../../../../db/schema';
-import { eq, sql } from 'drizzle-orm';
-import { AspectRatio, VeoConfig } from '../../../../types';
-import { IMAGE_LIMIT, VIDEO_LIMIT } from '../../../../services/usageLimits';
+import { eq } from 'drizzle-orm';
+import { AspectRatio, VeoConfig, PlanTier } from '../../../../types';
+import { getPlanLimits } from '../../../../services/subscriptionPlans';
+import { getRemainingImages, getRemainingVideos } from '../../../../services/usageLimits';
+import { consumeUsage } from '../../../../services/usageConsumption';
 
 interface Job {
   id: string;
@@ -36,12 +38,14 @@ interface JobResult {
 const assertImageQuota = async (userId: string, count: number = 1) => {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
-    columns: { imagesGenerated: true }
+    columns: { imagesGenerated: true, planTier: true, creditBalance: true }
   });
   if (!user) {
     throw new Error('User not found for quota check');
   }
-  if (user.imagesGenerated + count > IMAGE_LIMIT) {
+  const { imageLimit } = getPlanLimits((user.planTier as PlanTier) || 'free');
+  const remaining = getRemainingImages(user.imagesGenerated, imageLimit, user.creditBalance || 0);
+  if (remaining < count) {
     throw new Error('Image quota exceeded');
   }
 };
@@ -49,12 +53,17 @@ const assertImageQuota = async (userId: string, count: number = 1) => {
 const assertVideoQuota = async (userId: string, count: number = 1) => {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
-    columns: { videosGenerated: true }
+    columns: { videosGenerated: true, planTier: true, creditBalance: true }
   });
   if (!user) {
     throw new Error('User not found for quota check');
   }
-  if (user.videosGenerated + count > VIDEO_LIMIT) {
+  const { videoLimit } = getPlanLimits((user.planTier as PlanTier) || 'free');
+  if (videoLimit <= 0) {
+    throw new Error('Video generation requires a subscription');
+  }
+  const remaining = getRemainingVideos(user.videosGenerated, videoLimit, user.creditBalance || 0);
+  if (remaining < count) {
     throw new Error('Video quota exceeded');
   }
 };
@@ -108,9 +117,11 @@ async function processImageJob(job: Job): Promise<JobResult> {
     },
   }).returning();
   
-  await db.update(users)
-    .set({ imagesGenerated: sql`${users.imagesGenerated} + 1` })
-    .where(eq(users.id, job.userId));
+  try {
+    await consumeUsage(job.userId, 'image', 1);
+  } catch (error) {
+    console.warn('[API JOB PROCESSOR] Failed to apply image usage charge', error);
+  }
   
   console.log(`[API JOB PROCESSOR] Saved image ${itemId}`);
   
@@ -235,9 +246,11 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     },
   }).returning();
   
-  await db.update(users)
-    .set({ videosGenerated: sql`${users.videosGenerated} + 1` })
-    .where(eq(users.id, job.userId));
+  try {
+    await consumeUsage(job.userId, 'video', 1);
+  } catch (error) {
+    console.warn('[API JOB PROCESSOR] Failed to apply video usage charge', error);
+  }
   
   console.log(`[API JOB PROCESSOR ${traceId}] Saved video ${itemId}`);
   
@@ -301,9 +314,11 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
     metadata: { ...metadata, aspectRatio, jobId: job.id, slideCount: slides.length },
   }).returning();
   
-  await db.update(users)
-    .set({ imagesGenerated: sql`${users.imagesGenerated} + ${slides.length}` })
-    .where(eq(users.id, job.userId));
+  try {
+    await consumeUsage(job.userId, 'image', slides.length);
+  } catch (error) {
+    console.warn('[API JOB PROCESSOR] Failed to apply carousel usage charge', error);
+  }
   
   console.log(`[API JOB PROCESSOR] Saved carousel ${itemId} with ${slideUrls.length} slides`);
   

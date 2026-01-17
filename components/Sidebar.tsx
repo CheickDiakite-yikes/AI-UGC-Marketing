@@ -2,8 +2,8 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product } from '../types';
-import { IMAGE_LIMIT, VIDEO_LIMIT } from '../services/usageLimits';
+import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product, PlanTier } from '../types';
+import { getPlanLimits, formatLimit, VIDEO_AVG_SECONDS } from '../services/subscriptionPlans';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
 import { getUserProfile } from '../app/actions/userActions';
@@ -23,6 +23,7 @@ interface SidebarProps {
   onClose?: () => void;
   onExitApp?: () => void;
   usageStats?: UsageStats;
+  planTier?: PlanTier;
   boardId?: string;
 }
 
@@ -40,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   onExitApp,
   usageStats,
+  planTier,
   boardId
 }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -149,8 +151,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   // --- PRECISE UNIT ECONOMICS (Ref: Oct 2025 Pricing) ---
   // Nano Banana Pro: $0.15 per 4K image
   const COST_PER_IMAGE = 0.15;
-  // Veo 3.1 Fast: $0.15 per second (Average marketing clip = 5 seconds)
-  const COST_PER_VIDEO = 0.75;
+  // Veo 3.1 Fast: $0.15 per second (Average marketing clip = 8 seconds)
+  const COST_PER_VIDEO = 0.15 * VIDEO_AVG_SECONDS;
 
   // Market Value Equivalents (Agency Proxy)
   const VALUE_PER_IMAGE = 75.00;  // Professional customized creative
@@ -247,6 +249,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const profileInitials = getProfileInitials(userProfile?.name, userProfile?.email);
+  const { imageLimit, videoLimit } = getPlanLimits(planTier || 'free');
+  const imageLimitLabel = formatLimit(imageLimit);
+  const videoLimitLabel = videoLimit <= 0 ? 'Locked' : formatLimit(videoLimit);
+  const imageProgress = Number.isFinite(imageLimit) && imageLimit > 0
+    ? Math.min(100, ((usageStats?.imagesGenerated || 0) / imageLimit) * 100)
+    : 0;
+  const videoProgress = Number.isFinite(videoLimit) && videoLimit > 0
+    ? Math.min(100, ((usageStats?.videosGenerated || 0) / videoLimit) * 100)
+    : 0;
   const profileDisplayName = (() => {
     const name = userProfile?.name?.trim();
     if (name) {
@@ -518,19 +529,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex-1">
               <div className="flex justify-between text-[9px] mb-0.5">
                 <span className="text-gray-400">IMAGES</span>
-                <span className="text-white font-bold">{usageStats?.imagesGenerated || 0}/{IMAGE_LIMIT}</span>
+                <span className="text-white font-bold">{usageStats?.imagesGenerated || 0}/{imageLimitLabel}</span>
               </div>
               <div className="w-full bg-white/20 h-1.5 rounded-full">
-                <div className="bg-neo-pink h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, ((usageStats?.imagesGenerated || 0) / IMAGE_LIMIT) * 100)}%` }}></div>
+                <div className="bg-neo-pink h-1.5 rounded-full transition-all" style={{ width: `${imageProgress}%` }}></div>
               </div>
             </div>
             <div className="flex-1">
               <div className="flex justify-between text-[9px] mb-0.5">
                 <span className="text-gray-400">VIDEOS</span>
-                <span className="text-white font-bold">{usageStats?.videosGenerated || 0}/{VIDEO_LIMIT}</span>
+                <span className="text-white font-bold">{usageStats?.videosGenerated || 0}/{videoLimitLabel}</span>
               </div>
               <div className="w-full bg-white/20 h-1.5 rounded-full">
-                <div className="bg-neo-cyan h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, ((usageStats?.videosGenerated || 0) / VIDEO_LIMIT) * 100)}%` }}></div>
+                <div className="bg-neo-cyan h-1.5 rounded-full transition-all" style={{ width: `${videoProgress}%` }}></div>
               </div>
             </div>
           </div>
@@ -547,6 +558,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="bg-neo-lime text-black px-2 py-0.5 font-black text-[9px] uppercase">
               +${savings.toLocaleString('en-US')}
             </div>
+          </div>
+          <div className="mt-1 text-[9px] text-gray-400 uppercase tracking-widest">
+            Credits: <span className="text-white font-bold">{usageStats?.creditBalance ?? 0}</span>
           </div>
         </div>
       </div>

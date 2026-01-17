@@ -4,7 +4,9 @@ import { getSession } from '@/app/actions/authActions';
 import { db } from '@/db';
 import { boards, jobs, users } from '@/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
-import { IMAGE_LIMIT, VIDEO_LIMIT, getRemainingImages, getRemainingVideos } from '@/services/usageLimits';
+import { getRemainingImages, getRemainingVideos } from '@/services/usageLimits';
+import { getPlanLimits } from '@/services/subscriptionPlans';
+import type { PlanTier } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +39,9 @@ export async function POST(request: NextRequest) {
         where: eq(users.id, session.userId as string),
         columns: {
           imagesGenerated: true,
-          videosGenerated: true
+          videosGenerated: true,
+          planTier: true,
+          creditBalance: true,
         }
       });
 
@@ -45,35 +49,49 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'User not found' }, { status: 404 });
       }
 
-      if (type === 'generate_image' && user.imagesGenerated >= IMAGE_LIMIT) {
+      const planTier = (user.planTier as PlanTier) || 'free';
+      const { imageLimit, videoLimit } = getPlanLimits(planTier);
+      const credits = user.creditBalance || 0;
+      const remainingImages = getRemainingImages(user.imagesGenerated, imageLimit, credits);
+      const remainingVideos = getRemainingVideos(user.videosGenerated, videoLimit, credits);
+
+      if (type === 'generate_video' && videoLimit <= 0) {
         return NextResponse.json({
-          error: 'Image quota exceeded',
-          code: 'QUOTA_EXCEEDED',
-          limit: IMAGE_LIMIT,
-          used: user.imagesGenerated,
-          remaining: getRemainingImages(user.imagesGenerated)
+          error: 'Video generation requires a subscription.',
+          code: 'PLAN_REQUIRED',
+          plan: 'basic',
         }, { status: 402 });
       }
 
-      if (type === 'generate_video' && user.videosGenerated >= VIDEO_LIMIT) {
+      if (type === 'generate_image' && remainingImages <= 0) {
+        return NextResponse.json({
+          error: 'Image quota exceeded',
+          code: 'QUOTA_EXCEEDED',
+          limit: imageLimit,
+          used: user.imagesGenerated,
+          remaining: remainingImages
+        }, { status: 402 });
+      }
+
+      if (type === 'generate_video' && remainingVideos <= 0) {
         return NextResponse.json({
           error: 'Video quota exceeded',
           code: 'QUOTA_EXCEEDED',
-          limit: VIDEO_LIMIT,
+          limit: videoLimit,
           used: user.videosGenerated,
-          remaining: getRemainingVideos(user.videosGenerated)
+          remaining: remainingVideos
         }, { status: 402 });
       }
 
       if (type === 'generate_carousel') {
         const slides = Array.isArray(payload?.slides) ? payload.slides.length : 0;
-        if (slides > 0 && user.imagesGenerated + slides > IMAGE_LIMIT) {
+        if (slides > 0 && slides > remainingImages) {
           return NextResponse.json({
             error: 'Image quota exceeded',
             code: 'QUOTA_EXCEEDED',
-            limit: IMAGE_LIMIT,
+            limit: imageLimit,
             used: user.imagesGenerated,
-            remaining: getRemainingImages(user.imagesGenerated)
+            remaining: remainingImages
           }, { status: 402 });
         }
       }
