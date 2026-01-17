@@ -55,6 +55,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [previewAsset, setPreviewAsset] = useState<ProjectAsset | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string | null; email: string | null; avatarUrl: string | null } | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isNavigatingToProfile, setIsNavigatingToProfile] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const getAssetPreviewSrc = (asset: ProjectAsset) => {
     if (!asset.content) return '';
@@ -570,6 +572,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-3">
           <Link
             href="/profile"
+            onClick={() => setIsNavigatingToProfile(true)}
             className="group flex items-center gap-2 max-w-[65%]"
             aria-label="Open profile"
           >
@@ -581,18 +584,51 @@ const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300 group-hover:text-white transition-colors truncate">
-              {isProfileLoading ? 'Profile' : profileDisplayName}
+              {isNavigatingToProfile ? 'Loading...' : (isProfileLoading ? 'Profile' : profileDisplayName)}
             </span>
           </Link>
           <button
-            onClick={() => logout()}
-            className="ml-auto text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 flex items-center gap-2 transition-colors"
+            onClick={async () => {
+              setIsSigningOut(true);
+              await logout();
+            }}
+            disabled={isSigningOut}
+            className="ml-auto text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-red-400 flex items-center gap-2 transition-colors disabled:opacity-50"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-            Sign Out
+            {isSigningOut ? (
+              <>
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Signing Out...
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                Sign Out
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Full-screen loading overlay */}
+      {(isNavigatingToProfile || isSigningOut) && (
+        <div className="fixed inset-0 z-[100] bg-neo-yellow flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 border-4 border-black rounded-full border-t-neo-pink animate-spin"></div>
+            <p className="font-display font-bold text-xl">
+              {isSigningOut ? 'Signing out...' : 'Loading profile...'}
+            </p>
+            <div className="mt-6 max-w-xs mx-auto space-y-3">
+              <div className="h-4 bg-black/10 rounded animate-pulse"></div>
+              <div className="h-4 bg-black/10 rounded animate-pulse w-3/4 mx-auto"></div>
+              <div className="h-4 bg-black/10 rounded animate-pulse w-1/2 mx-auto"></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Link URL Modal */}
       {showLinkModal && (
