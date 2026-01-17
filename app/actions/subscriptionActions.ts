@@ -56,28 +56,45 @@ export async function getSubscriptionStateAction() {
 }
 
 export async function createCheckoutSessionAction(tier: PlanTier) {
-  const session = await getSession();
-  if (!session?.userId) {
-    throw new Error('Unauthorized');
+  try {
+    const session = await getSession();
+    if (!session?.userId) {
+      throw new Error('Unauthorized');
+    }
+
+    console.log('[Checkout] Starting checkout for tier:', tier, 'user:', session.userId);
+    console.log('[Checkout] REPLIT_DEPLOYMENT:', process.env.REPLIT_DEPLOYMENT);
+    console.log('[Checkout] STRIPE_PRICE_BASIC set:', !!process.env.STRIPE_PRICE_BASIC);
+    console.log('[Checkout] STRIPE_PRICE_PRO set:', !!process.env.STRIPE_PRICE_PRO);
+
+    const priceId = getPlanPriceId(tier);
+    console.log('[Checkout] Got price ID:', priceId);
+
+    const stripe = await getStripe();
+    console.log('[Checkout] Got Stripe client');
+
+    const stripeCustomerId = await getOrCreateStripeCustomerId(session.userId as string);
+    console.log('[Checkout] Got Stripe customer:', stripeCustomerId);
+
+    const checkoutSession = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: stripeCustomerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${siteUrl}/profile?billing=success`,
+      cancel_url: `${siteUrl}/profile?billing=cancel`,
+      client_reference_id: session.userId as string,
+      allow_promotion_codes: true,
+      subscription_data: tier === 'basic' ? { trial_period_days: 3 } : undefined,
+      metadata: { userId: session.userId as string, tier, priceId },
+    });
+
+    console.log('[Checkout] Created session:', checkoutSession.id);
+    return { url: checkoutSession.url };
+  } catch (error: any) {
+    console.error('[Checkout] Error creating checkout session:', error?.message || error);
+    console.error('[Checkout] Full error:', JSON.stringify(error, null, 2));
+    throw error;
   }
-
-  const priceId = getPlanPriceId(tier);
-  const stripe = await getStripe();
-  const stripeCustomerId = await getOrCreateStripeCustomerId(session.userId as string);
-
-  const checkoutSession = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    customer: stripeCustomerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${siteUrl}/profile?billing=success`,
-    cancel_url: `${siteUrl}/profile?billing=cancel`,
-    client_reference_id: session.userId as string,
-    allow_promotion_codes: true,
-    subscription_data: tier === 'basic' ? { trial_period_days: 3 } : undefined,
-    metadata: { userId: session.userId as string, tier, priceId },
-  });
-
-  return { url: checkoutSession.url };
 }
 
 export async function createCreditsCheckoutSessionAction(credits: number) {

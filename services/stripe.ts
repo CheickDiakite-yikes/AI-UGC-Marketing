@@ -4,6 +4,10 @@ let connectionSettings: any;
 
 async function getCredentials() {
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  console.log('[Stripe] REPLIT_CONNECTORS_HOSTNAME:', hostname);
+  console.log('[Stripe] REPL_IDENTITY set:', !!process.env.REPL_IDENTITY);
+  console.log('[Stripe] WEB_REPL_RENEWAL set:', !!process.env.WEB_REPL_RENEWAL);
+  
   const xReplitToken = process.env.REPL_IDENTITY
     ? 'repl ' + process.env.REPL_IDENTITY
     : process.env.WEB_REPL_RENEWAL
@@ -11,12 +15,14 @@ async function getCredentials() {
       : null;
 
   if (!xReplitToken) {
+    console.error('[Stripe] No auth token available');
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
   const connectorName = 'stripe';
   const isProduction = process.env.REPLIT_DEPLOYMENT === '1';
   const targetEnvironment = isProduction ? 'production' : 'development';
+  console.log('[Stripe] Target environment:', targetEnvironment);
 
   const url = new URL(`https://${hostname}/api/v2/connection`);
   url.searchParams.set('include_secrets', 'true');
@@ -31,13 +37,17 @@ async function getCredentials() {
   });
 
   const data = await response.json();
+  console.log('[Stripe] Connector response status:', response.status);
+  console.log('[Stripe] Connector items count:', data.items?.length || 0);
   
   connectionSettings = data.items?.[0];
 
-  if (!connectionSettings || (!connectionSettings.settings.publishable || !connectionSettings.settings.secret)) {
+  if (!connectionSettings || (!connectionSettings.settings?.publishable || !connectionSettings.settings?.secret)) {
+    console.error('[Stripe] Connection not found or missing keys. Settings:', connectionSettings?.settings ? 'exists' : 'missing');
     throw new Error(`Stripe ${targetEnvironment} connection not found`);
   }
 
+  console.log('[Stripe] Successfully got credentials for', targetEnvironment);
   return {
     publishableKey: connectionSettings.settings.publishable,
     secretKey: connectionSettings.settings.secret,
