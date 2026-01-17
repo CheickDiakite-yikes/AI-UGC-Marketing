@@ -1,4 +1,4 @@
-export const IMAGE_LIMIT = Number(process.env.NEXT_PUBLIC_IMAGE_LIMIT || 20);
+export const IMAGE_LIMIT = Number(process.env.NEXT_PUBLIC_IMAGE_LIMIT || 10);
 export const VIDEO_LIMIT = Number(process.env.NEXT_PUBLIC_VIDEO_LIMIT || 5);
 
 export const VIDEO_AVG_SECONDS = 8;

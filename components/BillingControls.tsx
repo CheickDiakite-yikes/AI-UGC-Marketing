@@ -30,7 +30,7 @@ const SparkleIcon = () => (
 );
 
 const featureMatrix = [
-  { label: 'Image generations', free: '20', basic: '50', pro: '150' },
+  { label: 'Image generations', free: '10', basic: '50', pro: '150' },
   { label: 'Video generations', free: false, basic: '4 videos', pro: '12 videos' },
   { label: 'Campaign packs', free: false, basic: true, pro: true },
   { label: 'Carousel creation', free: false, basic: true, pro: true },
@@ -284,6 +284,7 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
           </div>
           <button
             type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="text-gray-500 text-xs hover:text-white transition-colors underline-offset-2 hover:underline"
           >
             Continue with Free
