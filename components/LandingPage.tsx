@@ -669,6 +669,171 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
          </div>
       </section>
 
+      <section className="py-16 md:py-24 px-6 md:px-12 relative overflow-hidden bg-white">
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="text-center mb-12 md:mb-16">
+            <Reveal>
+              <div className="inline-block bg-neo-cyan border-4 border-black px-6 py-2 font-bold text-sm uppercase tracking-widest mb-6 transform rotate-1 shadow-neo">
+                Simple Pricing
+              </div>
+              <h2 className="font-display font-black text-4xl md:text-6xl text-neo-black mb-4">
+                PICK YOUR <br className="hidden md:block" />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-neo-cyan to-neo-lime">POWER LEVEL</span>
+              </h2>
+              <p className="text-lg md:text-xl font-medium text-gray-600 max-w-2xl mx-auto">
+                Start free. Scale when you're ready. No hidden fees.
+              </p>
+            </Reveal>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            <Reveal delay={0}>
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col relative group hover:shadow-neo-lg hover:-translate-y-1 transition-all duration-300">
+                <div className="absolute -top-3 -left-3 w-8 h-8 bg-neo-yellow border-4 border-black transform rotate-12"></div>
+                
+                <div className="mb-6">
+                  <h3 className="font-display font-black text-2xl md:text-3xl text-neo-black mb-2">FREE</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display font-black text-5xl md:text-6xl text-neo-black">$0</span>
+                    <span className="text-gray-500 font-bold">/mo</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-3 mb-8 flex-1">
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-lime border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    10 image generations
+                  </li>
+                  <li className="flex items-center gap-3 font-medium text-gray-400">
+                    <span className="w-6 h-6 bg-gray-100 border-2 border-gray-300 flex items-center justify-center text-sm shrink-0">✕</span>
+                    No video generation
+                  </li>
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-lime border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    Core brand context builder
+                  </li>
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-lime border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    Community support
+                  </li>
+                </ul>
+
+                <button 
+                  onClick={onLogin}
+                  className="w-full bg-white text-neo-black border-4 border-black py-3 md:py-4 font-bold shadow-neo hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all hover:bg-neo-yellow"
+                >
+                  Start Free
+                </button>
+              </div>
+            </Reveal>
+
+            <Reveal delay={150}>
+              <div className="bg-neo-pink border-4 border-black p-6 md:p-8 shadow-neo-lg h-full flex flex-col relative group hover:-translate-y-2 transition-all duration-300 transform md:scale-105 z-10">
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 -rotate-2">
+                  <div className="bg-neo-black text-white px-4 py-1 font-bold text-xs md:text-sm uppercase tracking-wider border-4 border-black shadow-neo whitespace-nowrap">
+                    ⭐ MOST POPULAR
+                  </div>
+                </div>
+                <div className="absolute -top-3 -right-3 w-10 h-10 bg-neo-cyan border-4 border-black transform -rotate-6"></div>
+                
+                <div className="mb-6 mt-4">
+                  <h3 className="font-display font-black text-2xl md:text-3xl text-neo-black mb-2">BASIC</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display font-black text-5xl md:text-6xl text-neo-black">$29</span>
+                    <span className="text-neo-black/70 font-bold">/mo</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-3 mb-8 flex-1">
+                  <li className="flex items-center gap-3 font-bold">
+                    <span className="w-6 h-6 bg-neo-black text-white border-2 border-black flex items-center justify-center text-sm shrink-0">✓</span>
+                    50 image generations
+                  </li>
+                  <li className="flex items-center gap-3 font-bold">
+                    <span className="w-6 h-6 bg-neo-black text-white border-2 border-black flex items-center justify-center text-sm shrink-0">✓</span>
+                    4 videos (avg 8s)
+                  </li>
+                  <li className="flex items-center gap-3 font-bold">
+                    <span className="w-6 h-6 bg-neo-black text-white border-2 border-black flex items-center justify-center text-sm shrink-0">✓</span>
+                    Campaign packs + carousels
+                  </li>
+                  <li className="flex items-center gap-3 font-bold">
+                    <span className="w-6 h-6 bg-neo-black text-white border-2 border-black flex items-center justify-center text-sm shrink-0">✓</span>
+                    Priority queue
+                  </li>
+                </ul>
+
+                <div className="bg-neo-yellow border-2 border-black px-3 py-2 mb-4 transform -rotate-1 text-center">
+                  <span className="font-bold text-sm">🎉 3-day free trial included!</span>
+                </div>
+
+                <button 
+                  onClick={onLogin}
+                  className="w-full bg-neo-black text-white border-4 border-black py-3 md:py-4 font-bold shadow-neo hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all hover:bg-neo-cyan hover:text-black"
+                >
+                  Start 3-Day Trial
+                </button>
+              </div>
+            </Reveal>
+
+            <Reveal delay={300}>
+              <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo h-full flex flex-col relative group hover:shadow-neo-lg hover:-translate-y-1 transition-all duration-300">
+                <div className="absolute -top-4 right-4 transform rotate-6">
+                  <div className="bg-neo-lime text-neo-black px-3 py-1 font-bold text-xs uppercase tracking-wider border-4 border-black shadow-neo">
+                    🚀 SCALE MODE
+                  </div>
+                </div>
+                <div className="absolute -top-3 -left-3 w-8 h-8 bg-neo-pink border-4 border-black transform rotate-45"></div>
+                
+                <div className="mb-6 mt-4">
+                  <h3 className="font-display font-black text-2xl md:text-3xl text-neo-black mb-2">PRO</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="font-display font-black text-5xl md:text-6xl text-neo-black">$79</span>
+                    <span className="text-gray-500 font-bold">/mo</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-3 mb-8 flex-1">
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-cyan border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    150 image generations
+                  </li>
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-cyan border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    12 videos (avg 8s)
+                  </li>
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-cyan border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    Advanced brand consistency
+                  </li>
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-cyan border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    Faster turnaround
+                  </li>
+                </ul>
+
+                <button 
+                  onClick={onLogin}
+                  className="w-full bg-neo-black text-white border-4 border-black py-3 md:py-4 font-bold shadow-neo hover:shadow-none hover:translate-x-1 hover:translate-y-1 transition-all hover:bg-neo-pink"
+                >
+                  Go Pro
+                </button>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal delay={400}>
+            <div className="mt-12 text-center">
+              <p className="text-gray-500 font-medium">
+                All plans include commercial usage rights • Cancel anytime • No credit card required for free tier
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
       <section className="py-16 md:py-24 px-6 text-center bg-black text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-neo-pink opacity-20 blur-3xl animate-pulse"></div>
         <div className="relative z-10 max-w-4xl mx-auto">
