@@ -23,7 +23,7 @@ const getOrCreateStripeCustomerId = async (userId: string) => {
     throw new Error('User not found');
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const customer = await stripe.customers.create({
     email: user.email || undefined,
     name: user.name || undefined,
@@ -62,7 +62,7 @@ export async function createCheckoutSessionAction(tier: PlanTier) {
   }
 
   const priceId = getPlanPriceId(tier);
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const stripeCustomerId = await getOrCreateStripeCustomerId(session.userId as string);
 
   const checkoutSession = await stripe.checkout.sessions.create({
@@ -87,7 +87,7 @@ export async function createCreditsCheckoutSessionAction(credits: number) {
   }
 
   const priceId = getCreditsPriceId(credits);
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const stripeCustomerId = await getOrCreateStripeCustomerId(session.userId as string);
 
   const checkoutSession = await stripe.checkout.sessions.create({
@@ -118,7 +118,7 @@ export async function createBillingPortalSessionAction() {
     throw new Error('No billing profile found.');
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const portalSession = await stripe.billingPortal.sessions.create({
     customer: user.stripeCustomerId,
     return_url: `${siteUrl}/profile`,

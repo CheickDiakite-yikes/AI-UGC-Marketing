@@ -46,7 +46,7 @@ const updateSubscriptionForCustomer = async (customerId: string, subscription: S
 };
 
 const handleCreditPurchase = async (session: Stripe.Checkout.Session, eventId: string) => {
-  const stripe = getStripe();
+  const stripe = await getStripe();
   const userId = await resolveUserIdFromSession(session);
   if (!userId) {
     console.warn('[STRIPE] Credit purchase missing user mapping', { sessionId: session.id });
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    const stripe = getStripe();
+    const stripe = await getStripe();
     const payload = await request.text();
     event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
   } catch (error) {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           await handleCreditPurchase(session, event.id);
         }
         if (session.mode === 'subscription' && session.subscription) {
-          const stripe = getStripe();
+          const stripe = await getStripe();
           const subscriptionId = typeof session.subscription === 'string'
             ? session.subscription
             : session.subscription.id;

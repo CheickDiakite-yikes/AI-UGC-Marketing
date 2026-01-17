@@ -60,7 +60,8 @@ export async function consumeUsage(userId: string, type: UsageType, count: numbe
     }
 
     const creditBalance = user.creditBalance ?? 0;
-    const { planUsed, creditsNeeded } = calculateCharges({ ...user, creditBalance }, type, count);
+    const planTier = (user.planTier || 'free') as PlanTier;
+    const { planUsed, creditsNeeded } = calculateCharges({ ...user, creditBalance, planTier }, type, count);
 
     if (creditsNeeded > creditBalance) {
       throw new Error('QUOTA_EXCEEDED');
