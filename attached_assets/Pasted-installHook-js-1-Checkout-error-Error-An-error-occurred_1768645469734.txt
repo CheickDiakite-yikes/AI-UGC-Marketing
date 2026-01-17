@@ -1,0 +1,43 @@
+installHook.js:1 Checkout error Error: An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details. A digest property is included on this error instance which may provide additional details about the nature of the error.
+overrideMethod	@	installHook.js:1
+
+493-52548a022eb6d2c8.js:1 
+ POST https://prediai.replit.app/profile 500 (Internal Server Error)
+M	@	493-52548a022eb6d2c8.js:1
+await in M		
+A	@	493-52548a022eb6d2c8.js:1
+f	@	493-52548a022eb6d2c8.js:1
+action	@	493-52548a022eb6d2c8.js:1
+p	@	493-52548a022eb6d2c8.js:1
+(anonymous)	@	493-52548a022eb6d2c8.js:1
+dispatch	@	493-52548a022eb6d2c8.js:1
+o	@	493-52548a022eb6d2c8.js:1
+l	@	493-52548a022eb6d2c8.js:1
+(anonymous)	@	493-52548a022eb6d2c8.js:1
+t.startTransition	@	493-52548a022eb6d2c8.js:1
+(anonymous)	@	493-52548a022eb6d2c8.js:1
+l	@	493-52548a022eb6d2c8.js:1
+r	@	493-52548a022eb6d2c8.js:1
+(anonymous)	@	page-490cddc2ca3b3203.js:1
+aX	@	4bd1b696-c023c6e3521b1417.js:1
+f	@	page-490cddc2ca3b3203.js:1
+onClick	@	page-490cddc2ca3b3203.js:1
+i8	@	4bd1b696-c023c6e3521b1417.js:1
+(anonymous)	@	4bd1b696-c023c6e3521b1417.js:1
+nz	@	4bd1b696-c023c6e3521b1417.js:1
+sn	@	4bd1b696-c023c6e3521b1417.js:1
+cc	@	4bd1b696-c023c6e3521b1417.js:1
+ci	@	4bd1b696-c023c6e3521b1417.js:1
+installHook.js:1 Checkout error Error: An error occurred in the Server Components render. The specific message is omitted in production builds to avoid leaking sensitive details. A digest property is included on this error instance which may provide additional details about the nature of the error.
+overrideMethod	@	installHook.js:1
+(anonymous)	@	page-490cddc2ca3b3203.js:1
+await in (anonymous)		
+aX	@	4bd1b696-c023c6e3521b1417.js:1
+f	@	page-490cddc2ca3b3203.js:1
+onClick	@	page-490cddc2ca3b3203.js:1
+i8	@	4bd1b696-c023c6e3521b1417.js:1
+(anonymous)	@	4bd1b696-c023c6e3521b1417.js:1
+nz	@	4bd1b696-c023c6e3521b1417.js:1
+sn	@	4bd1b696-c023c6e3521b1417.js:1
+cc	@	4bd1b696-c023c6e3521b1417.js:1
+ci	@	4bd1b696-c023c6e3521b1417.js:1
