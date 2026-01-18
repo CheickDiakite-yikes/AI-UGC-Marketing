@@ -753,7 +753,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
                   </li>
                   <li className="flex items-center gap-3 font-bold">
                     <span className="w-6 h-6 bg-neo-black text-white border-2 border-black flex items-center justify-center text-sm shrink-0">✓</span>
-                    4 videos (avg 8s)
+                    3 videos (avg 8s)
                   </li>
                   <li className="flex items-center gap-3 font-bold">
                     <span className="w-6 h-6 bg-neo-black text-white border-2 border-black flex items-center justify-center text-sm shrink-0">✓</span>
@@ -802,7 +802,7 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
                   </li>
                   <li className="flex items-center gap-3 font-medium">
                     <span className="w-6 h-6 bg-neo-cyan border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
-                    12 videos (avg 8s)
+                    10 videos (avg 8s)
                   </li>
                   <li className="flex items-center gap-3 font-medium">
                     <span className="w-6 h-6 bg-neo-cyan border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>

@@ -19,7 +19,7 @@ const shouldUseAvatar = (prompt: string): boolean => {
   const text = prompt.toLowerCase();
   const blockAvatar = /no (people|person|faces|human|avatar|model)/.test(text) || /product\s*only/.test(text);
   if (blockAvatar) return false;
-  return /(person|woman|man|people|face|spokesperson|model|creator|founder)/.test(text);
+  return /(person|woman|man|people|face|spokesperson|model|creator|founder|influencer|ugc)/.test(text);
 };
 
 const buildBrandBlock = (brand?: BrandIdentity | null): string | null => {

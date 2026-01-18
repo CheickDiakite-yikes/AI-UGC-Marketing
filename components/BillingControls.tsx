@@ -31,7 +31,7 @@ const SparkleIcon = () => (
 
 const featureMatrix = [
   { label: 'Image generations', free: '10', basic: '50', pro: '150' },
-  { label: 'Video generations', free: false, basic: '4 videos', pro: '12 videos' },
+  { label: 'Video generations', free: false, basic: '3 videos', pro: '10 videos' },
   { label: 'Campaign packs', free: false, basic: true, pro: true },
   { label: 'Carousel creation', free: false, basic: true, pro: true },
   { label: 'Priority queue', free: false, basic: true, pro: true },

@@ -10,6 +10,8 @@ interface ChatInterfaceProps {
   isProcessing: boolean;
   processingStatus?: string;
   hasAssets: boolean;
+  videoQualityMode: boolean;
+  onToggleVideoQuality: () => void;
 }
 
 // Helper to format long URLs into readable short versions
@@ -32,7 +34,16 @@ const formatUrl = (url: string): string => {
   }
 };
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, onDismissResearch, isProcessing, processingStatus, hasAssets }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({
+  messages,
+  onSendMessage,
+  onDismissResearch,
+  isProcessing,
+  processingStatus,
+  hasAssets,
+  videoQualityMode,
+  onToggleVideoQuality
+}) => {
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -139,6 +150,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
           <div>
             <h3 className="font-display font-bold text-gray-900 leading-none">Marketing Agent</h3>
             <p className="text-[10px] text-gray-700 font-bold uppercase mt-1">Real-Time Search Enabled</p>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[9px] font-bold uppercase tracking-wide text-gray-600">Quality Mode</span>
+              <button
+                type="button"
+                onClick={onToggleVideoQuality}
+                aria-pressed={videoQualityMode}
+                className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border-2 transition-all ${
+                  videoQualityMode
+                    ? 'bg-neo-black text-white border-black'
+                    : 'bg-white/70 text-gray-700 border-black/30'
+                }`}
+              >
+                {videoQualityMode ? 'On' : 'Off'}
+              </button>
+            </div>
           </div>
         </div>
         <button 

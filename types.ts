@@ -26,6 +26,10 @@ export interface CanvasItem {
     archetype?: string; // Creative style
     hook?: string; // Marketing hook
     status?: 'queued' | 'processing' | 'failed';
+    qualityMode?: boolean;
+    referenceCount?: number;
+    autoReferenceUsed?: boolean;
+    slideCount?: number;
   };
   x?: number; // For future drag/drop
   y?: number;
@@ -266,4 +270,5 @@ export interface VeoConfig {
   resolution: '720p' | '1080p';
   aspectRatio: '16:9' | '9:16';
   durationSeconds?: 4 | 6 | 8;
+  qualityMode?: boolean;
 }

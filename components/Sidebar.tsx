@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product, PlanTier } from '../types';
+import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product, PlanTier, CanvasItem } from '../types';
 import { getPlanLimits, formatLimit, VIDEO_AVG_SECONDS } from '../services/subscriptionPlans';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
@@ -25,6 +25,8 @@ interface SidebarProps {
   usageStats?: UsageStats;
   planTier?: PlanTier;
   boardId?: string;
+  videoQualityMode?: boolean;
+  items?: CanvasItem[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -42,7 +44,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onExitApp,
   usageStats,
   planTier,
-  boardId
+  boardId,
+  videoQualityMode,
+  items
 }) => {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -151,17 +155,61 @@ const Sidebar: React.FC<SidebarProps> = ({
   const ALLOWED_DOC_TYPES = ".pdf,text/plain";
 
   // --- PRECISE UNIT ECONOMICS (Ref: Oct 2025 Pricing) ---
-  // Nano Banana Pro: $0.15 per 4K image
+  // Nano Banana Pro: $0.15 per image (reference frame included in Quality Mode)
   const COST_PER_IMAGE = 0.15;
-  // Veo 3.1 Fast: $0.15 per second (Average marketing clip = 8 seconds)
-  const COST_PER_VIDEO = 0.15 * VIDEO_AVG_SECONDS;
+  // Veo 3.1 Preview: $0.40 per second (Quality Mode); Veo 3.1 Fast: $0.15 per second
+  const COST_PER_VIDEO_SECOND_FAST = 0.15;
+  const COST_PER_VIDEO_SECOND_QUALITY = 0.40;
+  const COST_PER_REFERENCE_IMAGE = 0.15;
+  const useQualityMode = videoQualityMode ?? true;
+  const costPerVideoSecond = useQualityMode ? COST_PER_VIDEO_SECOND_QUALITY : COST_PER_VIDEO_SECOND_FAST;
+  const COST_PER_VIDEO = (costPerVideoSecond * VIDEO_AVG_SECONDS) + (useQualityMode ? COST_PER_REFERENCE_IMAGE : 0);
 
   // Market Value Equivalents (Agency Proxy)
   const VALUE_PER_IMAGE = 75.00;  // Professional customized creative
   const VALUE_PER_VIDEO = 350.00; // High-fidelity social video motion
 
-  const totalCost = usageStats ? (usageStats.imagesGenerated * COST_PER_IMAGE) + (usageStats.videosGenerated * COST_PER_VIDEO) : 0;
-  const totalValue = usageStats ? (usageStats.imagesGenerated * VALUE_PER_IMAGE) + (usageStats.videosGenerated * VALUE_PER_VIDEO) : 0;
+  const fallbackQualityMode = videoQualityMode ?? true;
+  const itemList = items || [];
+  const hasItemEconomics = itemList.length > 0;
+
+  const calculateItemEconomics = (entry: CanvasItem) => {
+    if (entry.type === 'image') {
+      return { cost: COST_PER_IMAGE, value: VALUE_PER_IMAGE };
+    }
+    if (entry.type === 'video') {
+      const meta = entry.meta || {};
+      const referenceCount = Number.isFinite(meta.referenceCount) ? (meta.referenceCount as number) : 0;
+      const isQuality = meta.qualityMode === true || referenceCount > 0 || (meta.qualityMode === undefined && fallbackQualityMode);
+      const costPerSecond = isQuality ? COST_PER_VIDEO_SECOND_QUALITY : COST_PER_VIDEO_SECOND_FAST;
+      const baseCost = costPerSecond * VIDEO_AVG_SECONDS;
+      const referenceCost = meta.autoReferenceUsed ? COST_PER_REFERENCE_IMAGE : 0;
+      return { cost: baseCost + referenceCost, value: VALUE_PER_VIDEO };
+    }
+    if (entry.type === 'carousel') {
+      const meta = entry.meta || {};
+      const rawCount = entry.carouselUrls?.length ?? (meta.slideCount as number | undefined) ?? 1;
+      const slideCount = Math.max(1, rawCount || 1);
+      return { cost: slideCount * COST_PER_IMAGE, value: slideCount * VALUE_PER_IMAGE };
+    }
+    return { cost: 0, value: 0 };
+  };
+
+  const itemEconomics = hasItemEconomics
+    ? itemList.reduce((acc, entry) => {
+      const { cost, value } = calculateItemEconomics(entry);
+      acc.cost += cost;
+      acc.value += value;
+      return acc;
+    }, { cost: 0, value: 0 })
+    : null;
+
+  const totalCost = itemEconomics
+    ? itemEconomics.cost
+    : usageStats ? (usageStats.imagesGenerated * COST_PER_IMAGE) + (usageStats.videosGenerated * COST_PER_VIDEO) : 0;
+  const totalValue = itemEconomics
+    ? itemEconomics.value
+    : usageStats ? (usageStats.imagesGenerated * VALUE_PER_IMAGE) + (usageStats.videosGenerated * VALUE_PER_VIDEO) : 0;
   const savings = totalValue - totalCost;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'logo' | 'avatar' | 'general') => {

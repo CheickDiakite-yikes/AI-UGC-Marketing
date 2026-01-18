@@ -1,0 +1,82 @@
+# Predi AI App Context
+
+## Product Summary
+Predi AI is an AI-native marketing OS that generates campaigns, images, videos, and carousels. It uses Gemini models for text/image generation and Veo for video generation, grounded by brand identity, avatar identity, and product catalogs.
+
+## Core Architecture
+- Frontend: React/TypeScript app with a central `Workspace` orchestrating chat and generation jobs.
+- Backend: Next.js server actions + job queue stored in Postgres (Drizzle ORM).
+- Storage: Media is uploaded to object storage; DB stores `storageKey` references.
+- Identity grounding: Brand, avatar, and product constraints are appended to prompts before generation.
+
+## Key Models
+- Image generation: `gemini-3-pro-image-preview` (Nano Banana Pro).
+- Video generation:
+  - `veo-3.1-generate-preview` when Quality Mode or references are used.
+  - `veo-3.1-fast-generate-preview` otherwise.
+- Reference frames for videos: `gemini-3-pro-image-preview`.
+
+## Generation Pipeline (High Level)
+1. User prompt -> `chatWithMarketingAgent` decides tool calls.
+2. Jobs are created via `/api/jobs` and processed by:
+   - `server/jobRunner.ts` (background worker) and/or
+   - `app/api/jobs/process/route.ts` (API processor).
+3. Prompts are compiled with brand/product/avatar identity in:
+   - `services/identityPromptService.ts`
+   - `services/identityPromptUtils.ts`
+4. Media is generated and stored with metadata; usage and credits are consumed.
+
+## Video Generation Details
+- Prompt guardrails are applied in `services/videoPromptUtils.ts`:
+  - Duration and pacing constraints.
+  - Quality constraints (anatomy, physics, text limits).
+- Reference images:
+  - If ingredient assets are available, they are used (`services/videoIngredientService.ts`).
+  - If none and Quality Mode is ON, a reference frame is generated from the prompt
+    using Nano Banana Pro (`services/videoReferenceService.ts`) and passed to Veo.
+  - Vertical references are attempted in Quality Mode with a safe fallback.
+- Quality Mode:
+  - Default ON in UI.
+  - Uses Veo preview model and auto reference frames by default.
+
+## Image and Carousel Generation
+- All images use Nano Banana Pro via `generateMarketingImage` in `services/geminiService.ts`.
+- Carousels generate slides with the same image pipeline and store slide count metadata.
+
+## Pricing, Credits, and ROI
+- Credits:
+  - Images: 1 credit.
+  - Videos: 9 credits (8s + 1 reference frame).
+  - Logic in `services/usageLimits.ts` and `services/usageConsumption.ts`.
+- Plans:
+  - Free: images only.
+  - Basic: 50 images, 3 videos.
+  - Pro: 150 images, 10 videos.
+  - Defined in `services/subscriptionPlans.ts`.
+- Credit packs:
+  - 50/$20, 100/$38, 200/$75.
+- ROI/cost math:
+  - Computed per item using metadata in `components/Sidebar.tsx`.
+  - Video cost uses quality mode, reference usage, and 8s baseline.
+  - Carousel cost/value scales by slide count.
+
+## Important Files
+- Chat and tools: `services/geminiService.ts`
+- Video API: `app/actions.ts`
+- Video job processing: `server/jobRunner.ts`, `app/api/jobs/process/route.ts`
+- Reference images: `services/videoReferenceService.ts`
+- Video guardrails: `services/videoPromptUtils.ts`
+- Identity grounding: `services/identityPromptService.ts`, `services/identityPromptUtils.ts`
+- Plans and usage: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
+- Sidebar ROI: `components/Sidebar.tsx`
+
+## Defaults and Toggles
+- Quality Mode is ON by default in the chat header.
+- On-screen text in videos is discouraged unless explicitly requested; keep 1-3 words max.
+- Aspect ratio defaults:
+  - Video: 16:9 unless specified.
+  - Image: 1:1 unless specified.
+
+## Open Considerations
+- Persist Quality Mode per user/board if needed.
+- Revisit plan limits or credit pack pricing based on observed costs.

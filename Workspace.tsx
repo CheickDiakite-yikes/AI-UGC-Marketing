@@ -68,6 +68,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const { showError, showSuccess, showToast } = useToast();
   const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, creditBalance: 0, lastResetDate: 0 });
   const [planTier, setPlanTier] = useState<PlanTier>('free');
+  const [videoQualityMode, setVideoQualityMode] = useState(true);
   const [paywallState, setPaywallState] = useState<{ isOpen: boolean; reason: 'image_limit' | 'video_limit' | 'video_locked' | null }>({
     isOpen: false,
     reason: null,
@@ -253,7 +254,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [activeJobs, setActiveJobs] = useState<string[]>([]);
   const [pendingItems, setPendingItems] = useState<CanvasItem[]>([]);
 
-  const loadBoardDetails = useCallback(async (boardId: string) => {
+  const loadBoardDetails = useCallback(async (boardId: string, options?: { skipOnboarding?: boolean }) => {
     const b = await getBoardDetails(boardId);
     if (b) {
       const mappedBoard: Board = {
@@ -282,7 +283,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       };
       setActiveBoard(mappedBoard);
     }
-    await refreshOnboardingState();
+    if (!options?.skipOnboarding) {
+      await refreshOnboardingState();
+    }
   }, [refreshOnboardingState]);
 
   // Trigger the job processor API to process pending jobs (works with Autoscale)
@@ -377,7 +380,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             await triggerJobProcessing();
             pendingJobs.forEach((job: any) => {
               pollJobStatus(job.id, async () => {
-                await loadBoardDetails(activeBoardId);
+                await loadBoardDetails(activeBoardId, { skipOnboarding: true });
                 getUserUsageAction().then(setUsage);
               });
             });
@@ -914,6 +917,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           if (fc.name === 'generate_image') {
             setProcessingStatus(`Queuing image generation...`);
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
+            const title = typeof fc.args['title'] === 'string' ? fc.args['title'] : undefined;
+            const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
+            const caption = typeof fc.args['caption'] === 'string' ? fc.args['caption'] : undefined;
+            const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
             const traceId = crypto.randomUUID();
             if (remainingImages <= 0) {
               const message = `Image quota reached (${usage.imagesGenerated}/${imageLimit}).`;
@@ -931,6 +938,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   prompt: fc.args['prompt'],
                   aspectRatio: fc.args['aspectRatio'] || '1:1',
                   productId,
+                  title,
+                  hook,
+                  caption,
+                  archetype,
                   traceId
                 }
               })
@@ -949,21 +960,36 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             if (job.id) {
               setActiveJobs(prev => [...prev, job.id]);
               addPendingItem(job.id, 'image', {
-                title: fc.args['prompt'] ? 'Queued Image' : 'Generating Image',
-                aspectRatio: fc.args['aspectRatio'] || '1:1'
+                title: title || (fc.args['prompt'] ? 'Queued Image' : 'Generating Image'),
+                aspectRatio: fc.args['aspectRatio'] || '1:1',
+                caption,
+                hook,
+                archetype
               });
               remainingImages = Math.max(0, remainingImages - 1);
               pollJobStatus(job.id, async () => {
-                await loadBoardDetails(activeBoardId);
+                await loadBoardDetails(activeBoardId, { skipOnboarding: true });
                 getUserUsageAction().then(setUsage);
               });
-              responseText = `🎨 Image generation in progress. This will complete even if you leave the page.`;
+              const metaLines: string[] = [];
+              if (hook) metaLines.push(`**Hook Strategy:** "${hook}"`);
+              if (caption) metaLines.push(`**Caption:** ${caption}`);
+              if (metaLines.length > 0) {
+                responseText = responseText ? `${responseText}\n\n${metaLines.join('\n')}` : metaLines.join('\n');
+              }
+              const progressMessage = `🎨 Image generation in progress. This will complete even if you leave the page.`;
+              responseText = responseText ? `${responseText}\n\n${progressMessage}` : progressMessage;
             }
           }
           if (fc.name === 'generate_video') {
             setProcessingStatus(`Queuing video generation...`);
             const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
+            const title = typeof fc.args['title'] === 'string' ? fc.args['title'] : undefined;
+            const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
+            const caption = typeof fc.args['caption'] === 'string' ? fc.args['caption'] : undefined;
+            const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
+            const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
             const traceId = crypto.randomUUID();
             if (isVideoLocked) {
               showError('Video generation requires a subscription.');
@@ -988,6 +1014,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   resolution: '720p',
                   productId,
                   ingredientAssetIds,
+                  qualityMode,
+                  title,
+                  hook,
+                  caption,
+                  archetype,
                   traceId
                 }
               })
@@ -1006,16 +1037,26 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             if (job.id) {
               setActiveJobs(prev => [...prev, job.id]);
               addPendingItem(job.id, 'video', {
-                title: fc.args['prompt'] ? 'Queued Video' : 'Generating Video',
+                title: title || (fc.args['prompt'] ? 'Queued Video' : 'Generating Video'),
                 aspectRatio: fc.args['aspectRatio'] || '16:9',
-                resolution: '720p'
+                resolution: '720p',
+                caption,
+                hook,
+                archetype
               });
               remainingVideos = Math.max(0, remainingVideos - 1);
               pollJobStatus(job.id, async () => {
-                await loadBoardDetails(activeBoardId);
+                await loadBoardDetails(activeBoardId, { skipOnboarding: true });
                 getUserUsageAction().then(setUsage);
               });
-              responseText = `🎬 Video generation in progress (takes 1-2 min). This will complete even if you leave the page.`;
+              const metaLines: string[] = [];
+              if (hook) metaLines.push(`**Hook Strategy:** "${hook}"`);
+              if (caption) metaLines.push(`**Caption:** ${caption}`);
+              if (metaLines.length > 0) {
+                responseText = responseText ? `${responseText}\n\n${metaLines.join('\n')}` : metaLines.join('\n');
+              }
+              const progressMessage = `🎬 Video generation in progress (takes 1-2 min). This will complete even if you leave the page.`;
+              responseText = responseText ? `${responseText}\n\n${progressMessage}` : progressMessage;
             }
           }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
@@ -1216,6 +1257,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               }
 
               const jobType = item.type === 'video' ? 'generate_video' : 'generate_image';
+              const itemQualityMode = item.type === 'video' && typeof item.qualityMode === 'boolean'
+                ? item.qualityMode
+                : videoQualityMode;
               const res = await fetch('/api/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1232,6 +1276,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                     archetype: item.archetype,
                     productId: item.productId,
                     ingredientAssetIds: item.ingredientAssetIds,
+                    qualityMode: jobType === 'generate_video' ? itemQualityMode : undefined,
                     traceId
                   }
                 })
@@ -1270,7 +1315,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   remainingImages = Math.max(0, remainingImages - 1);
                 }
                 pollJobStatus(job.id, async () => {
-                  await loadBoardDetails(activeBoardId);
+                  await loadBoardDetails(activeBoardId, { skipOnboarding: true });
                   getUserUsageAction().then(setUsage);
                 });
               }
@@ -1343,6 +1388,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         if (pendingJobs.length > 0) {
           setActiveJobs(pendingJobs.map((j: any) => j.id));
           const pendingIds = new Set(pendingJobs.map((j: any) => j.id));
+          const completedIds = activeJobs.filter(id => !pendingIds.has(id));
           setPendingItems(prev => prev
             .filter(item => pendingIds.has(item.id))
             .map(item => {
@@ -1352,8 +1398,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               return { ...item, meta: { ...item.meta, status: nextStatus } };
             })
           );
-          await loadBoardDetails(activeBoardId);
-          getUserUsageAction().then(setUsage);
+          if (completedIds.length > 0) {
+            await loadBoardDetails(activeBoardId, { skipOnboarding: true });
+            getUserUsageAction().then(setUsage);
+          }
         } else if (activeJobs.length > 0) {
           setActiveJobs([]);
           setPendingItems([]);
@@ -1367,7 +1415,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [activeBoardId, activeJobs.length, loadBoardDetails]);
+  }, [activeBoardId, activeJobs, loadBoardDetails]);
 
   const handleRetryJob = async (failedJob: FailedJob) => {
     if (!activeBoardId) return;
@@ -1392,7 +1440,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       setActiveJobs(prev => [...prev, job.id]);
       addPendingItem(job.id, failedJob.type === 'generate_video' ? 'video' : 'image', failedJob.payload);
       pollJobStatus(job.id, async () => {
-        await loadBoardDetails(activeBoardId);
+        await loadBoardDetails(activeBoardId, { skipOnboarding: true });
         getUserUsageAction().then(setUsage);
       });
     } catch (error: any) {
@@ -1504,6 +1552,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           onExitApp={onExitApp} usageStats={usage}
           planTier={planTier}
           boardId={activeBoardId}
+          videoQualityMode={videoQualityMode}
+          items={activeBoard.items}
         />
       </div>
 
@@ -1551,7 +1601,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         </div>
       </div>
 
-      <ChatInterface messages={activeBoard.messages} onSendMessage={handleSendMessage} onDismissResearch={handleDismissResearch} isProcessing={isProcessing} processingStatus={processingStatus} hasAssets={activeBoard.assets.length > 0} />
+      <ChatInterface
+        messages={activeBoard.messages}
+        onSendMessage={handleSendMessage}
+        onDismissResearch={handleDismissResearch}
+        isProcessing={isProcessing}
+        processingStatus={processingStatus}
+        hasAssets={activeBoard.assets.length > 0}
+        videoQualityMode={videoQualityMode}
+        onToggleVideoQuality={() => setVideoQualityMode(prev => !prev)}
+      />
       
       {activeJobs.length > 0 && (
         <div className="fixed bottom-4 right-4 md:bottom-28 md:right-8 z-30">

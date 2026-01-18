@@ -28,7 +28,11 @@ const generateImageTool: FunctionDeclaration = {
       prompt: { type: Type.STRING, description: "Detailed visual description." },
       aspectRatio: { type: Type.STRING, description: "Aspect ratio (e.g., '1:1', '16:9', '9:16'). Default '1:1'." },
       imageSize: { type: Type.STRING, description: "Resolution (e.g., '1K', '2K'). Default '1K'." },
-      productId: { type: Type.STRING, description: "Optional product ID to bind identity constraints for visuals." }
+      productId: { type: Type.STRING, description: "Optional product ID to bind identity constraints for visuals." },
+      title: { type: Type.STRING, description: "Short title for the asset card." },
+      hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
+      caption: { type: Type.STRING, description: "Social caption for the asset." },
+      archetype: { type: Type.STRING, description: "Creative archetype or style (optional)." }
     },
     required: ["prompt"]
   }
@@ -43,7 +47,12 @@ const generateVideoTool: FunctionDeclaration = {
       prompt: { type: Type.STRING, description: "Describe the video content, movement, and camera angle. Must fit within 8 seconds." },
       aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
       productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
-      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." }
+      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." },
+      qualityMode: { type: Type.BOOLEAN, description: "Prefer higher-fidelity video generation (slower, more expensive) with extra reference anchoring when possible." },
+      title: { type: Type.STRING, description: "Short title for the asset card." },
+      hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
+      caption: { type: Type.STRING, description: "Social caption for the asset." },
+      archetype: { type: Type.STRING, description: "Creative archetype or style (optional)." }
     },
     required: ["prompt"]
   }
@@ -70,7 +79,8 @@ const generateCampaignPackTool: FunctionDeclaration = {
             caption: { type: Type.STRING },
             aspectRatio: { type: Type.STRING },
             productId: { type: Type.STRING },
-            ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING } }
+            ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING } },
+            qualityMode: { type: Type.BOOLEAN }
           },
           required: ["type", "visual_prompt", "caption", "archetype", "title", "aspectRatio"]
         }
@@ -409,17 +419,23 @@ export const chatWithMarketingAgent = async (
     - Match the tone, language, and positioning from the source documents
     - Don't use Search and Function Calling in the same turn
     - Keep product and avatar identity consistent across ALL assets and copy
+    - For single generate_image or generate_video requests, include title, hook, and caption in the tool call arguments
+    - After calling generate_image or generate_video, provide the hook strategy and caption in your text response
 
     VIDEO GENERATION GUIDELINES:
     - Use generate_video for cinematic UGC-style videos, viral shorts, or Reels content
     - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
     - Video prompts should describe: scene, action, movement, camera angle, mood
+    - Avoid on-screen text unless the user explicitly asks for it
     - Max duration is 8 seconds; design the primary action to finish by 7s and end on a complete beat
     - Keep pacing tight: hook in the first 1s, payoff by 6s, single scene or two quick cuts max
-    - On-screen text must be short (3-6 words) to avoid rushed or cut-off overlays
+    - On-screen text must be short (1-3 words) to avoid misspellings or cut-off overlays
+    - Avoid morphing, extra limbs, or identity shifts; describe stable anatomy and clear hand-object contact
+    - For taps, button presses, or phone use: specify realistic contact, finger alignment, and device response
     - Videos take longer to generate (1-2 minutes each) so keep pack sizes reasonable
     - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
-    - Ingredient-based video generation only supports 16:9 and 8s duration (use only when compatible)
+    - Ingredient-based video generation is most reliable in 16:9 and 8s duration; for vertical, enable qualityMode and expect possible fallback
+    - Set qualityMode: true for UGC/influencer videos, close-up hands, product interactions, or when the user asks for the best realism
   `;
 
   const model = "gemini-3-pro-preview";
@@ -458,6 +474,24 @@ export const generateMarketingImage = async (
   throw new Error("No image data");
 };
 
+export const generateReferenceImage = async (
+  prompt: string,
+  aspectRatio: AspectRatio = AspectRatio.LANDSCAPE
+): Promise<{ base64: string; mimeType: string }> => {
+  const model = "gemini-3-pro-image-preview";
+  const response: any = await generateImagesServer(model, prompt, { imageConfig: { aspectRatio } });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData?.data) {
+      return {
+        base64: part.inlineData.data,
+        mimeType: part.inlineData.mimeType || "image/png"
+      };
+    }
+  }
+  throw new Error("No reference image data");
+};
+
 export const generateVeoVideo = async (
   prompt: string,
   config: VeoConfig,
@@ -467,6 +501,7 @@ export const generateVeoVideo = async (
     aspectRatio: config.aspectRatio,
     resolution: config.resolution,
     durationSeconds: config.durationSeconds,
+    qualityMode: config.qualityMode,
     referenceImages: options?.referenceImages,
     traceId: options?.traceId
   });

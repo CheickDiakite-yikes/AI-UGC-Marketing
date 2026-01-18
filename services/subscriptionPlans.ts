@@ -34,13 +34,14 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     name: 'Basic',
     priceMonthly: 29,
     images: 50,
-    videos: 4,
+    videos: 3,
     trialDays: 3,
     badge: 'Most Popular',
     description: 'Launch campaigns with video access.',
     features: [
       '50 image generations',
-      `4 videos (avg ${VIDEO_AVG_SECONDS}s)`,
+      `3 videos (avg ${VIDEO_AVG_SECONDS}s)`,
+      'Quality Mode video generation (reference frames)',
       'Campaign packs + carousels',
       'Priority queue',
     ],
@@ -50,12 +51,13 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     name: 'Pro',
     priceMonthly: 79,
     images: 150,
-    videos: 12,
+    videos: 10,
     badge: 'Scale Mode',
     description: 'For teams shipping weekly campaigns.',
     features: [
       '150 image generations',
-      `12 videos (avg ${VIDEO_AVG_SECONDS}s)`,
+      `10 videos (avg ${VIDEO_AVG_SECONDS}s)`,
+      'Quality Mode video generation (reference frames)',
       'Advanced brand consistency checks',
       'Faster turnaround',
     ],
@@ -85,9 +87,9 @@ export type CreditPack = {
 };
 
 export const CREDIT_PACKS: CreditPack[] = [
-  { id: 'credits-50', credits: 50, price: 15, label: '50 credits' },
-  { id: 'credits-100', credits: 100, price: 29, label: '100 credits' },
-  { id: 'credits-200', credits: 200, price: 59, label: '200 credits' },
+  { id: 'credits-50', credits: 50, price: 20, label: '50 credits' },
+  { id: 'credits-100', credits: 100, price: 38, label: '100 credits' },
+  { id: 'credits-200', credits: 200, price: 75, label: '200 credits' },
 ];
 
 export const getPlanLimits = (tier: PlanTier) => {

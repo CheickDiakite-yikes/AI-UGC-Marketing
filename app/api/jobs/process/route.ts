@@ -4,6 +4,7 @@ import { generateMarketingImage, generateVeoVideo } from '../../../../services/g
 import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../../../../services/videoPromptUtils';
+import { generateAutoReferenceImages } from '../../../../services/videoReferenceService';
 import { uploadGeneratedItem } from '../../../../services/objectStorageService';
 import { db } from '../../../../db';
 import { generatedItems, users } from '../../../../db/schema';
@@ -144,24 +145,28 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     archetype?: string;
     productId?: string;
     ingredientAssetIds?: string[];
+    qualityMode?: boolean;
     traceId?: string;
   };
   const { prompt, aspectRatio, resolution, title, caption, hook, archetype, productId, ingredientAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
+  const qualityMode = payload.qualityMode === true;
 
   await assertVideoQuota(job.userId, 1);
   
   const config: VeoConfig = {
     aspectRatio: (aspectRatio === '9:16' ? '9:16' : '16:9'),
     resolution: (resolution === '1080p' ? '1080p' : '720p'),
-    durationSeconds: 8
+    durationSeconds: 8,
+    qualityMode
   };
   
-  console.log(`[API JOB PROCESSOR ${traceId}] Generating video...`);
+  console.log(`[API JOB PROCESSOR ${traceId}] Generating video (quality=${qualityMode})...`);
 
   let referenceImages = [];
   let selectedIngredientIds: string[] = [];
   let productIdUsed: string | undefined;
+  let autoReferenceUsed = false;
 
   try {
     const ingredientResult = await resolveVideoIngredients({
@@ -181,9 +186,29 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     console.error(`[API JOB PROCESSOR ${traceId}] Ingredient resolution failed:`, error);
   }
 
-  const useIngredients = referenceImages.length > 0 && config.aspectRatio === '16:9';
-  if (referenceImages.length > 0 && config.aspectRatio !== '16:9') {
-    console.warn(`[API JOB PROCESSOR ${traceId}] Skipping ingredients: aspect ratio ${config.aspectRatio} is not supported for reference images`);
+  if (qualityMode && referenceImages.length === 0) {
+    const autoRefs = await generateAutoReferenceImages({
+      boardId: job.boardId,
+      prompt,
+      aspectRatio: config.aspectRatio,
+      productId: productIdUsed || productId || null,
+      traceId
+    });
+    if (autoRefs.referenceImages.length > 0) {
+      referenceImages = autoRefs.referenceImages;
+      autoReferenceUsed = true;
+    }
+    if (autoRefs.warnings.length > 0) {
+      console.warn(`[API JOB PROCESSOR ${traceId}] Auto-reference warnings:`, autoRefs.warnings);
+    }
+  }
+
+  const allowVerticalReferences = qualityMode;
+  const useIngredients = referenceImages.length > 0 && (config.aspectRatio === '16:9' || allowVerticalReferences);
+  if (referenceImages.length > 0 && !useIngredients) {
+    console.warn(`[API JOB PROCESSOR ${traceId}] Skipping references: aspect ratio ${config.aspectRatio} is not supported for reference images`);
+  } else if (referenceImages.length > 0 && config.aspectRatio !== '16:9') {
+    console.warn(`[API JOB PROCESSOR ${traceId}] Using references with vertical aspect ratio ${config.aspectRatio}`);
   }
   
   const promptWithGuardrails = applyVideoDurationGuardrails(prompt);
@@ -239,6 +264,9 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       prompt: compiled.prompt.substring(0, 200),
       productId: productIdUsed || productId || null,
       ingredientAssetIds: selectedIngredientIds,
+      qualityMode,
+      autoReferenceUsed,
+      referenceCount: useIngredients ? referenceImages.length : 0,
       caption: caption || null,
       hook: hook || null,
       archetype: archetype || null,

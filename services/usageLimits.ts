@@ -3,7 +3,8 @@ export const VIDEO_LIMIT = Number(process.env.NEXT_PUBLIC_VIDEO_LIMIT || 5);
 
 export const VIDEO_AVG_SECONDS = 8;
 export const IMAGE_CREDIT_COST = 1;
-export const VIDEO_CREDIT_COST = VIDEO_AVG_SECONDS;
+export const VIDEO_REFERENCE_IMAGE_CREDIT_COST = 1;
+export const VIDEO_CREDIT_COST = VIDEO_AVG_SECONDS + VIDEO_REFERENCE_IMAGE_CREDIT_COST;
 
 export const getRemainingImages = (used: number, limit: number = IMAGE_LIMIT, credits: number = 0) => {
   if (!Number.isFinite(limit)) return Number.POSITIVE_INFINITY;
