@@ -163,6 +163,21 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         )}
 
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Link
+            href="/profile"
+            className="bg-black text-white border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest"
+          >
+            Profile
+          </Link>
+          <Link
+            href="/profile/dashboard"
+            className="bg-white text-black border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-yellow transition-all"
+          >
+            Dashboard
+          </Link>
+        </div>
+
         <section className="bg-white border-4 border-black shadow-neo p-6 md:p-8 mb-8">
           <div className="flex flex-col md:flex-row gap-6 md:items-center">
             <div className="w-20 h-20 rounded-full border-4 border-black bg-neo-lime flex items-center justify-center font-display font-black text-2xl overflow-hidden">

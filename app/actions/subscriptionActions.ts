@@ -40,18 +40,19 @@ const getOrCreateStripeCustomerId = async (userId: string) => {
 export async function getSubscriptionStateAction() {
   const session = await getSession();
   if (!session || !session.userId) {
-    return { planTier: 'free' as PlanTier, creditBalance: 0 };
+    return { planTier: 'free' as PlanTier, creditBalance: 0, ahaPackUsed: false };
   }
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.userId as string),
-    columns: { planTier: true, creditBalance: true, stripeSubscriptionStatus: true },
+    columns: { planTier: true, creditBalance: true, stripeSubscriptionStatus: true, ahaPackUsed: true },
   });
 
   return {
     planTier: (user?.planTier as PlanTier) || 'free',
     creditBalance: user?.creditBalance || 0,
     subscriptionStatus: user?.stripeSubscriptionStatus || null,
+    ahaPackUsed: user?.ahaPackUsed ?? false,
   };
 }
 

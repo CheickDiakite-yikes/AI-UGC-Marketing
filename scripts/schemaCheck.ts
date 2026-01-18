@@ -7,6 +7,7 @@ const requiredTables = [
   'favorites',
   'jobs',
   'credit_transactions',
+  'calendar_items',
 ];
 
 const requiredUserColumns = [
@@ -28,6 +29,8 @@ const requiredUserColumns = [
   'subscription_current_period_end',
   'trial_ends_at',
   'credit_balance',
+  'aha_pack_used',
+  'aha_pack_used_at',
 ];
 
 export async function getSchemaIssues(client: PoolClient) {

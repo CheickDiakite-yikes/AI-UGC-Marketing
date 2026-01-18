@@ -47,6 +47,8 @@ export const users = pgTable('users', {
   subscriptionCurrentPeriodEnd: timestamp('subscription_current_period_end'),
   trialEndsAt: timestamp('trial_ends_at'),
   creditBalance: integer('credit_balance').default(0).notNull(),
+  ahaPackUsed: boolean('aha_pack_used').default(false).notNull(),
+  ahaPackUsedAt: timestamp('aha_pack_used_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -87,6 +89,16 @@ export const generatedItems = pgTable('generated_items', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   x: integer('x').default(0),
   y: integer('y').default(0),
+});
+
+export const calendarItems = pgTable('calendar_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }).notNull(),
+  itemId: uuid('item_id').references(() => generatedItems.id, { onDelete: 'cascade' }).notNull(),
+  scheduledFor: timestamp('scheduled_for').notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 export const messages = pgTable('messages', {
@@ -227,6 +239,7 @@ export const boardsRelations = relations(boards, ({ many, one }) => ({
   messages: many(messages),
   jobs: many(jobs),
   products: many(products),
+  calendarItems: many(calendarItems),
   brandIdentity: one(brandIdentities, {
     fields: [boards.brandIdentityId],
     references: [brandIdentities.id],
@@ -276,6 +289,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   profileProducts: many(profileProducts),
   favorites: many(favorites),
   creditTransactions: many(creditTransactions),
+  calendarItems: many(calendarItems),
 }));
 
 export const profileAssetsRelations = relations(profileAssets, ({ one, many }) => ({
@@ -320,6 +334,21 @@ export const generatedItemsRelations = relations(generatedItems, ({ one }) => ({
   board: one(boards, {
     fields: [generatedItems.boardId],
     references: [boards.id],
+  }),
+}));
+
+export const calendarItemsRelations = relations(calendarItems, ({ one }) => ({
+  user: one(users, {
+    fields: [calendarItems.userId],
+    references: [users.id],
+  }),
+  board: one(boards, {
+    fields: [calendarItems.boardId],
+    references: [boards.id],
+  }),
+  item: one(generatedItems, {
+    fields: [calendarItems.itemId],
+    references: [generatedItems.id],
   }),
 }));
 

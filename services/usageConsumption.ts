@@ -1,5 +1,3 @@
-import 'server-only';
-
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { users } from '@/db/schema';

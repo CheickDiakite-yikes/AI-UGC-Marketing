@@ -71,11 +71,14 @@ const assertVideoQuota = async (userId: string, count: number = 1) => {
 };
 
 async function processImageJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string };
+  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string; freebie?: boolean };
   const { prompt, aspectRatio, title, caption, hook, archetype, productId } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
+  const isFreebie = payload.freebie === true;
 
-  await assertImageQuota(job.userId, 1);
+  if (!isFreebie) {
+    await assertImageQuota(job.userId, 1);
+  }
   
   const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.SQUARE;
   
@@ -119,10 +122,12 @@ async function processImageJob(job: Job): Promise<JobResult> {
     },
   }).returning();
   
-  try {
-    await consumeUsage(job.userId, 'image', 1);
-  } catch (error) {
-    console.warn('[API JOB PROCESSOR] Failed to apply image usage charge', error);
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'image', 1);
+    } catch (error) {
+      console.warn('[API JOB PROCESSOR] Failed to apply image usage charge', error);
+    }
   }
   
   console.log(`[API JOB PROCESSOR] Saved image ${itemId}`);
@@ -147,12 +152,16 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     ingredientAssetIds?: string[];
     qualityMode?: boolean;
     traceId?: string;
+    freebie?: boolean;
   };
   const { prompt, aspectRatio, resolution, title, caption, hook, archetype, productId, ingredientAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
   const qualityMode = payload.qualityMode === true;
+  const isFreebie = payload.freebie === true;
 
-  await assertVideoQuota(job.userId, 1);
+  if (!isFreebie) {
+    await assertVideoQuota(job.userId, 1);
+  }
   
   const config: VeoConfig = {
     aspectRatio: (aspectRatio === '9:16' ? '9:16' : '16:9'),
@@ -276,10 +285,12 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     },
   }).returning();
   
-  try {
-    await consumeUsage(job.userId, 'video', 1);
-  } catch (error) {
-    console.warn('[API JOB PROCESSOR] Failed to apply video usage charge', error);
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'video', 1);
+    } catch (error) {
+      console.warn('[API JOB PROCESSOR] Failed to apply video usage charge', error);
+    }
   }
   
   console.log(`[API JOB PROCESSOR ${traceId}] Saved video ${itemId}`);
@@ -298,10 +309,14 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
     title?: string;
     description?: string;
     metadata?: Record<string, unknown>;
+    freebie?: boolean;
   };
   const { slides, aspectRatio, title, description, metadata } = payload;
+  const isFreebie = payload.freebie === true;
 
-  await assertImageQuota(job.userId, slides.length);
+  if (!isFreebie) {
+    await assertImageQuota(job.userId, slides.length);
+  }
   
   console.log(`[API JOB PROCESSOR] Generating carousel with ${slides.length} slides...`);
   
@@ -344,10 +359,12 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
     metadata: { ...metadata, aspectRatio, jobId: job.id, slideCount: slides.length },
   }).returning();
   
-  try {
-    await consumeUsage(job.userId, 'image', slides.length);
-  } catch (error) {
-    console.warn('[API JOB PROCESSOR] Failed to apply carousel usage charge', error);
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'image', slides.length);
+    } catch (error) {
+      console.warn('[API JOB PROCESSOR] Failed to apply carousel usage charge', error);
+    }
   }
   
   console.log(`[API JOB PROCESSOR] Saved carousel ${itemId} with ${slideUrls.length} slides`);

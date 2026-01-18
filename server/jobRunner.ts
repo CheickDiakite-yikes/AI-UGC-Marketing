@@ -72,11 +72,14 @@ const assertVideoQuota = async (userId: string, count: number = 1) => {
 };
 
 async function processImageJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string };
+  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string; freebie?: boolean };
   const { prompt, aspectRatio, title, caption, hook, archetype, productId } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
-  
-  await assertImageQuota(job.userId, 1);
+  const isFreebie = payload.freebie === true;
+
+  if (!isFreebie) {
+    await assertImageQuota(job.userId, 1);
+  }
   
   const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.SQUARE;
   
@@ -120,10 +123,12 @@ async function processImageJob(job: Job): Promise<JobResult> {
     },
   }).returning();
   
-  try {
-    await consumeUsage(job.userId, 'image', 1);
-  } catch (error) {
-    console.warn('[JOB RUNNER] Failed to apply image usage charge', error);
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'image', 1);
+    } catch (error) {
+      console.warn('[JOB RUNNER] Failed to apply image usage charge', error);
+    }
   }
   
   console.log(`[JOB RUNNER] Saved image ${itemId} to database`);
@@ -148,12 +153,16 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     ingredientAssetIds?: string[];
     qualityMode?: boolean;
     traceId?: string;
+    freebie?: boolean;
   };
   const { prompt, aspectRatio, resolution, title, caption, hook, archetype, productId, ingredientAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
   const qualityMode = payload.qualityMode === true;
+  const isFreebie = payload.freebie === true;
 
-  await assertVideoQuota(job.userId, 1);
+  if (!isFreebie) {
+    await assertVideoQuota(job.userId, 1);
+  }
   
   const config: VeoConfig = {
     aspectRatio: (aspectRatio === '9:16' ? '9:16' : '16:9'),
@@ -277,10 +286,12 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     },
   }).returning();
   
-  try {
-    await consumeUsage(job.userId, 'video', 1);
-  } catch (error) {
-    console.warn('[JOB RUNNER] Failed to apply video usage charge', error);
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'video', 1);
+    } catch (error) {
+      console.warn('[JOB RUNNER] Failed to apply video usage charge', error);
+    }
   }
   
   console.log(`[JOB RUNNER ${traceId}] Saved video ${itemId} to database`);

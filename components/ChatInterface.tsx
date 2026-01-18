@@ -12,6 +12,7 @@ interface ChatInterfaceProps {
   hasAssets: boolean;
   videoQualityMode: boolean;
   onToggleVideoQuality: () => void;
+  ahaPackAvailable: boolean;
 }
 
 // Helper to format long URLs into readable short versions
@@ -42,7 +43,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   processingStatus,
   hasAssets,
   videoQualityMode,
-  onToggleVideoQuality
+  onToggleVideoQuality,
+  ahaPackAvailable
 }) => {
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -87,39 +89,57 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     onSendMessage(prompt);
   };
 
-  const SMART_CHIPS = [
-    { 
-      label: "🔥 Trend Hijack", 
+  const baseChips = [
+    {
+      label: "🔥 Trend Hijack",
       prompt: "Perform a 'Trend Discovery' search for my niche. For each trend found, map it to 3 specific target personas and propose platform-specific angles (TikTok vs IG vs FB). Include Viral Potential scores.",
       color: "bg-neo-lime"
     },
-    { 
-      label: "🎥 UGC Viral Pack", 
+    {
+      label: "🎥 UGC Viral Pack",
       prompt: "Generate a 'UGC Creator Pack' (scripts + visual hooks) for 5 high-energy TikToks/Reels. Ensure the tone is raw, mobile-native, and uses current social hooks.",
       color: "bg-neo-pink"
     },
-    { 
-      label: "🚀 Product Launch", 
+    {
+      label: "⚡ Conversion Engine",
+      prompt: "Generate a 'Conversion Engine Pack' with 2 direct-response videos, 2 static ads, and 1 offer carousel. Focus on urgency, proof, and a clear CTA.",
+      color: "bg-neo-cyan"
+    },
+    {
+      label: "🧠 Proof & Trust",
+      prompt: "Generate a 'Proof & Trust Pack' with 1 testimonial-style video, 1 before/after image, and 1 carousel that highlights proof points. Keep it credible and grounded.",
+      color: "bg-white"
+    },
+    {
+      label: "🧪 Offer Test",
+      prompt: "Generate an 'Offer Test Pack' with 3 variations of the same offer. Include 2 videos and 1 image, each with a distinct hook angle.",
+      color: "bg-neo-yellow"
+    },
+    {
+      label: "🚀 Product Launch",
       prompt: "Propose a '3-Phase Launch Pack': 1. Teaser (Image), 2. Big Reveal (Video), 3. Features Highlight (Carousel). Ground this in the USPs found in my uploaded assets.",
       color: "bg-neo-yellow",
       tour: "product-launch-chip"
     },
-    { 
-      label: "🎯 Persona Map", 
-      prompt: "Identify the top 3 high-value target personas from my source documents. For each, draft a specific messaging hook and a 'Persona-Deep Pack' concept.",
-      color: "bg-neo-cyan"
-    },
-    { 
-      label: "📅 Seasonal Blitz", 
+    {
+      label: "📅 Seasonal Blitz",
       prompt: "Identify the next major holiday or industry event. Generate a 'Seasonal Pack' with 5 assets that creatively bridge my product benefits to that specific occasion.",
       color: "bg-white"
     },
-    { 
-      label: "♻️ Asset Remix", 
+    {
+      label: "♻️ Asset Remix",
       prompt: "Analyze my uploaded assets and propose a 'Multi-Channel Remix Pack'. 1 aesthetic IG post, 1 direct-response FB ad, and 1 lo-fi TikTok concept based on one core USP.",
       color: "bg-neo-yellow"
     }
   ];
+
+  const ahaChip = {
+    label: "✨ Aha Pack (Free)",
+    prompt: "Generate an 'Aha Pack' as a generate_campaign_pack with exactly 3 items: 1 image post, 1 carousel with 2 slides, and 1 HQ video. Use qualityMode: true for the video and keep the pack outcome-driven.",
+    color: "bg-neo-pink"
+  };
+
+  const SMART_CHIPS = ahaPackAvailable ? [ahaChip, ...baseChips] : baseChips;
 
   if (!isOpen) {
     return (

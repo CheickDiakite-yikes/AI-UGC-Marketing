@@ -69,6 +69,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, creditBalance: 0, lastResetDate: 0 });
   const [planTier, setPlanTier] = useState<PlanTier>('free');
   const [videoQualityMode, setVideoQualityMode] = useState(true);
+  const [ahaPackAvailable, setAhaPackAvailable] = useState(false);
   const [paywallState, setPaywallState] = useState<{ isOpen: boolean; reason: 'image_limit' | 'video_limit' | 'video_locked' | null }>({
     isOpen: false,
     reason: null,
@@ -142,8 +143,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   React.useEffect(() => {
     getUserUsageAction().then(setUsage);
     getSubscriptionStateAction()
-      .then((state) => setPlanTier(state.planTier))
-      .catch(() => setPlanTier('free'));
+      .then((state) => {
+        setPlanTier(state.planTier);
+        setAhaPackAvailable(state.planTier === 'free' && !state.ahaPackUsed);
+      })
+      .catch(() => {
+        setPlanTier('free');
+        setAhaPackAvailable(false);
+      });
     getBoards().then(async (bs) => {
       if (bs.length > 0) {
         const boardsWithDefaults = bs.map((b: any) => ({
@@ -1165,8 +1172,128 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           return fallbackItems;
         };
 
+        const ensureAhaPackItems = (items: any[], requestText: string, productId?: string) => {
+          if (!/aha pack/i.test(requestText)) {
+            return items;
+          }
+
+          const product = selectProductForPack(productId);
+          const productName = product?.name || 'the product';
+          const fallbackItems: any[] = [];
+
+          const imageItem = items.find(i => i.type === 'image') || {
+            type: 'image',
+            title: 'Aha Moment Post',
+            archetype: 'Problem/Solution',
+            hook: `${productName}, but simpler.`,
+            caption: `Meet ${productName}—the fast way to get results.`,
+            aspectRatio: '1:1',
+            productId,
+            visual_prompt: `A crisp, scroll-stopping image that highlights ${productName}. Clean composition, bold lighting, brand colors, premium feel.`
+          };
+
+          const carouselItem = items.find(i => i.type === 'carousel') || {
+            type: 'carousel',
+            title: '2-Step Breakthrough',
+            archetype: 'How It Works',
+            hook: `Two steps to feel the shift.`,
+            caption: `A quick 2-step overview of ${productName}.`,
+            aspectRatio: '1:1',
+            productId,
+            carousel_prompts: [
+              `Slide 1: The pain point. Show the before state and the tension ${productName} solves.`,
+              `Slide 2: The relief. Show the after state with ${productName} in focus.`
+            ]
+          };
+
+          const videoItem = items.find(i => i.type === 'video') || {
+            type: 'video',
+            title: 'HQ Aha Video',
+            archetype: 'UGC',
+            hook: `This changed my routine.`,
+            caption: `A real, human moment with ${productName}.`,
+            aspectRatio: '16:9',
+            productId,
+            qualityMode: true,
+            visual_prompt: `Cinematic, authentic UGC moment with ${productName}. Natural lighting, steady handheld camera, clean framing. Show a simple interaction and a visible result.`
+          };
+
+          const slides = Array.isArray(carouselItem.carousel_prompts) ? carouselItem.carousel_prompts : [];
+          const trimmedCarousel = {
+            ...carouselItem,
+            carousel_prompts: slides.length > 0 ? slides.slice(0, 2) : [
+              `Slide 1: The pain point ${productName} solves, bold headline, clear tension.`,
+              `Slide 2: The solution with ${productName} and a payoff statement.`
+            ]
+          };
+
+          fallbackItems.push(
+            { ...imageItem, type: 'image', aspectRatio: imageItem.aspectRatio || '1:1' },
+            { ...trimmedCarousel, type: 'carousel', aspectRatio: trimmedCarousel.aspectRatio || '1:1' },
+            { ...videoItem, type: 'video', aspectRatio: videoItem.aspectRatio || '16:9', qualityMode: true }
+          );
+
+          return fallbackItems;
+        };
+
         for (const pack of packQueue) {
-          const normalizedItems = ensureLaunchPackItems(pack.items || [], text, pack.productId);
+          const isAhaPack = /aha pack/i.test(pack.packName || '') || /aha pack/i.test(text);
+          let normalizedItems = ensureLaunchPackItems(pack.items || [], text, pack.productId);
+          if (isAhaPack) {
+            normalizedItems = ensureAhaPackItems(normalizedItems, text, pack.productId);
+          }
+
+          if (isAhaPack && !ahaPackAvailable) {
+            showToast('Aha Pack already redeemed. Upgrade for more packs.', 'info');
+          }
+
+          if (isAhaPack && ahaPackAvailable) {
+            try {
+              setProcessingStatus(`Redeeming Aha Pack...`);
+              const res = await fetch('/api/aha-pack', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  boardId: activeBoardId,
+                  packName: pack.packName || 'Aha Pack',
+                  items: normalizedItems
+                })
+              });
+              const data = await res.json().catch(() => null);
+              if (!res.ok || !data?.jobs) {
+                const message = data?.error || 'Aha Pack redemption failed.';
+                showError(message);
+                continue;
+              }
+
+              const jobs = data.jobs as Array<{ id: string; type: string; payload: any }>;
+              setAhaPackAvailable(false);
+              const pendingCount = jobs.length;
+              jobs.forEach((job) => {
+                setActiveJobs(prev => [...prev, job.id]);
+                const jobPayload = job.payload || {};
+                addPendingItem(job.id, job.type === 'generate_video' ? 'video' : job.type === 'generate_carousel' ? 'carousel' : 'image', {
+                  title: jobPayload.title,
+                  aspectRatio: jobPayload.aspectRatio,
+                  resolution: jobPayload.resolution,
+                  caption: jobPayload.caption,
+                  hook: jobPayload.hook,
+                  archetype: jobPayload.archetype
+                });
+                pollJobStatus(job.id, async () => {
+                  await loadBoardDetails(activeBoardId, { skipOnboarding: true });
+                  getUserUsageAction().then(setUsage);
+                });
+              });
+
+              responseText = `✨ Aha Pack redeemed! ${pendingCount} items are generating now.`;
+              continue;
+            } catch (error) {
+              console.error('[WORKSPACE] Aha pack redemption failed:', error);
+              showError('Aha Pack redemption failed. Please try again.');
+              continue;
+            }
+          }
 
           for (const item of normalizedItems) {
             const traceId = crypto.randomUUID();
@@ -1610,6 +1737,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         hasAssets={activeBoard.assets.length > 0}
         videoQualityMode={videoQualityMode}
         onToggleVideoQuality={() => setVideoQualityMode(prev => !prev)}
+        ahaPackAvailable={ahaPackAvailable}
       />
       
       {activeJobs.length > 0 && (
