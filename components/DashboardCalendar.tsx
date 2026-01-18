@@ -234,7 +234,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
             {weeklyTotal} Scheduled Assets
           </div>
         </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="border-2 border-black bg-gray-50 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Images</p>
             <p className="text-2xl font-black">{weeklyImages}</p>
