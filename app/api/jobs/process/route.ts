@@ -3,6 +3,7 @@ import { getPendingJobs, claimJob, updateJobStatus } from '../../../../services/
 import { generateMarketingImage, generateVeoVideo } from '../../../../services/geminiService';
 import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
+import { applyVideoDurationGuardrails } from '../../../../services/videoPromptUtils';
 import { uploadGeneratedItem } from '../../../../services/objectStorageService';
 import { db } from '../../../../db';
 import { generatedItems, users } from '../../../../db/schema';
@@ -185,9 +186,10 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     console.warn(`[API JOB PROCESSOR ${traceId}] Skipping ingredients: aspect ratio ${config.aspectRatio} is not supported for reference images`);
   }
   
+  const promptWithGuardrails = applyVideoDurationGuardrails(prompt);
   const compiled = await compileVisualPromptWithIdentity({
     boardId: job.boardId,
-    basePrompt: prompt,
+    basePrompt: promptWithGuardrails,
     productId: productIdUsed || productId || null,
     traceId
   });

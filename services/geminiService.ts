@@ -36,11 +36,11 @@ const generateImageTool: FunctionDeclaration = {
 
 const generateVideoTool: FunctionDeclaration = {
   name: "generate_video",
-  description: "Generate a single cinematic marketing video using Veo 3.1.",
+  description: "Generate a single marketing video using Veo 3.1 (8-second max).",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      prompt: { type: Type.STRING, description: "Description of the video content, movement, and camera angle." },
+      prompt: { type: Type.STRING, description: "Describe the video content, movement, and camera angle. Must fit within 8 seconds." },
       aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
       productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
       ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." }
@@ -414,6 +414,9 @@ export const chatWithMarketingAgent = async (
     - Use generate_video for cinematic UGC-style videos, viral shorts, or Reels content
     - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
     - Video prompts should describe: scene, action, movement, camera angle, mood
+    - Max duration is 8 seconds; design the primary action to finish by 7s and end on a complete beat
+    - Keep pacing tight: hook in the first 1s, payoff by 6s, single scene or two quick cuts max
+    - On-screen text must be short (3-6 words) to avoid rushed or cut-off overlays
     - Videos take longer to generate (1-2 minutes each) so keep pack sizes reasonable
     - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
     - Ingredient-based video generation only supports 16:9 and 8s duration (use only when compatible)
