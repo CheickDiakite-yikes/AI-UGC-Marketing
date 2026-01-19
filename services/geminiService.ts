@@ -609,9 +609,15 @@ export const researchWithGoogleSearch = async (
   query: string,
   context?: string
 ): Promise<{ text: string; sources?: string[] }> => {
+  const ideaInstruction = `
+After the research, add a section titled "IDEA OPTIONS" with 3-5 campaign ideas.
+Format each idea as:
+1) <Title> - <one-sentence plan>
+Keep each idea under 140 characters.
+`;
   const prompt = context 
-    ? `${context}\n\nResearch query: ${query}\n\nProvide comprehensive, up-to-date research with specific facts, statistics, and actionable insights.`
-    : `Research query: ${query}\n\nProvide comprehensive, up-to-date research with specific facts, statistics, trends, and actionable marketing insights.`;
+    ? `${context}\n\nResearch query: ${query}\n\nProvide comprehensive, up-to-date research with specific facts, statistics, and actionable insights.\n${ideaInstruction}`
+    : `Research query: ${query}\n\nProvide comprehensive, up-to-date research with specific facts, statistics, trends, and actionable marketing insights.\n${ideaInstruction}`;
   
   const response: any = await generateContentWithSearch(prompt, true);
   
@@ -632,6 +638,12 @@ export const discoverTrends = async (
   industry: string,
   targetAudience?: string
 ): Promise<{ text: string; sources?: string[] }> => {
+  const ideaInstruction = `
+After the research, add a section titled "IDEA OPTIONS" with 3-5 campaign ideas.
+Format each idea as:
+1) <Title> - <one-sentence plan>
+Keep each idea under 140 characters.
+`;
   const prompt = `You are a trend research specialist. Find the LATEST viral trends, hashtags, and content formats for:
 
 Industry/Niche: ${industry}
@@ -656,7 +668,8 @@ Research and provide:
    - Upcoming events, holidays, or moments to leverage
    - Current memes or cultural references that are relevant
 
-Be specific with dates, numbers, and examples. This needs to be actionable for creating marketing content TODAY.`;
+Be specific with dates, numbers, and examples. This needs to be actionable for creating marketing content TODAY.
+${ideaInstruction}`;
 
   const response: any = await generateContentWithSearch(prompt, true);
   

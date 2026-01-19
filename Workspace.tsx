@@ -488,6 +488,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const title = typeof payload?.title === 'string'
         ? payload.title
         : type === 'video' ? 'Generating Video' : 'Generating Image';
+      const queuedAt = typeof payload?.queuedAt === 'number' ? payload.queuedAt : Date.now();
       const sceneCount = typeof payload?.sceneCount === 'number' ? payload.sceneCount : undefined;
       const isLongVideo = typeof payload?.isLongVideo === 'boolean'
         ? payload.isLongVideo
@@ -501,7 +502,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         status: 'queued' as const,
         sceneCount,
         totalDurationSeconds: typeof payload?.totalDurationSeconds === 'number' ? payload.totalDurationSeconds : undefined,
-        isLongVideo
+        isLongVideo,
+        queuedAt
       };
       return [...prev, { id: jobId, type, content: '', title, meta }];
     });
@@ -620,7 +622,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       archetype: payload.archetype,
       sceneCount,
       totalDurationSeconds,
-      isLongVideo: true
+      isLongVideo: true,
+      queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
     });
     pollJobStatus(job.id, async () => {
       await loadBoardDetails(activeBoardId, { skipOnboarding: true });
@@ -699,7 +702,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   const appendModelMessage = async (message: ChatMessage) => {
     if (!activeBoardId) return;
-    await saveMessageAction(activeBoardId, 'model', message.text, message.id);
+    await saveMessageAction(activeBoardId, 'model', message.text, message.id, message.groundingLinks);
     updateActiveBoard(b => ({
       ...b,
       messages: [...b.messages, message]
@@ -787,7 +790,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 title: itemType === 'video' ? 'Generating Video' : 'Generating Image',
                 sceneCount,
                 totalDurationSeconds,
-                isLongVideo: job.type === 'generate_long_video'
+                isLongVideo: job.type === 'generate_long_video',
+                queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
               });
             });
             // Immediately trigger job processing for any pending jobs
@@ -1492,6 +1496,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const modelParts = response.candidates[0].content.parts || [];
       let responseText = response.text || "";
       let newItems: CanvasItem[] = [];
+      let groundingLinks: ChatMessage['groundingLinks'] | undefined;
+      let isResearchResult = false;
       const packQueue: any[] = [];
       const storyboardMessages: ChatMessage[] = [];
       const storyboardQueue: StoryboardRecord[] = [];
@@ -1551,7 +1557,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 aspectRatio: fc.args['aspectRatio'] || '1:1',
                 caption,
                 hook,
-                archetype
+                archetype,
+                queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
               });
               remainingImages = Math.max(0, remainingImages - 1);
               pollJobStatus(job.id, async () => {
@@ -1633,7 +1640,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 resolution: '720p',
                 caption,
                 hook,
-                archetype
+                archetype,
+                queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
               });
               remainingVideos = Math.max(0, remainingVideos - 1);
               pollJobStatus(job.id, async () => {
@@ -1663,6 +1671,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const prompt = typeof fc.args['prompt'] === 'string' ? fc.args['prompt'] : undefined;
             const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
             const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
+            if (isVideoLocked) {
+              showError('Long video generation requires a subscription.');
+              openPaywall('video_locked');
+              continue;
+            }
             if (!hasAvatarIdentity) {
               needsAvatarPrompt = true;
               console.log('[LONG-VIDEO] No avatar detected; prompting for avatar consistency.');
@@ -1701,8 +1714,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               fc.args['targetAudience'] as string | undefined
             );
             responseText = trendResult.text;
+            isResearchResult = true;
             if (trendResult.sources && trendResult.sources.length > 0) {
-              responseText += `\n\n📚 **Sources:**\n${trendResult.sources.slice(0, 5).map(s => `- ${s}`).join('\n')}`;
+              groundingLinks = trendResult.sources.slice(0, 5).map((url) => ({ title: '', url }));
             }
           }
           
@@ -1713,8 +1727,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               fc.args['context'] as string | undefined
             );
             responseText = researchResult.text;
+            isResearchResult = true;
             if (researchResult.sources && researchResult.sources.length > 0) {
-              responseText += `\n\n📚 **Sources:**\n${researchResult.sources.slice(0, 5).map(s => `- ${s}`).join('\n')}`;
+              groundingLinks = researchResult.sources.slice(0, 5).map((url) => ({ title: '', url }));
             }
           }
         }
@@ -1913,7 +1928,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                       return sum + duration;
                     }, 0)
                     : undefined,
-                  isLongVideo: job.type === 'generate_long_video'
+                  isLongVideo: job.type === 'generate_long_video',
+                  queuedAt: Date.now()
                 });
                 pollJobStatus(job.id, async () => {
                   await loadBoardDetails(activeBoardId, { skipOnboarding: true });
@@ -2095,6 +2111,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   caption: item.caption,
                   hook: item.hook,
                   archetype: item.archetype,
+                  queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
                 });
                 if (item.type === 'video') {
                   remainingVideos = Math.max(0, remainingVideos - 1);
@@ -2142,7 +2159,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         modelMessages.push({
           id: crypto.randomUUID(),
           role: 'model',
-          text: responseText
+          text: responseText,
+          ...(groundingLinks ? { groundingLinks } : {}),
+          ...(isResearchResult ? { isResearchResult: true } : {})
         });
       }
       if (storyboardMessages.length > 0) {
@@ -2171,7 +2190,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
       const storyboardLookup = new Map(storyboardQueue.map(storyboard => [storyboard.id, storyboard]));
       for (const message of modelMessages) {
-        await saveMessageAction(activeBoardId, 'model', message.text, message.id);
+        await saveMessageAction(activeBoardId, 'model', message.text, message.id, message.groundingLinks);
         if (message.storyboardId) {
           const storyboard = storyboardLookup.get(message.storyboardId);
           if (storyboard) {
@@ -2275,7 +2294,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       setActiveJobs(prev => [...prev, job.id]);
       addPendingItem(job.id, failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video' ? 'video' : 'image', {
         ...failedJob.payload,
-        isLongVideo: failedJob.type === 'generate_long_video'
+        isLongVideo: failedJob.type === 'generate_long_video',
+        queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
       });
       pollJobStatus(job.id, async () => {
         await loadBoardDetails(activeBoardId, { skipOnboarding: true });
@@ -2377,7 +2397,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {/* Sidebar - Slide-out on mobile, fixed on desktop */}
       <div className={`
         fixed md:relative inset-y-0 left-0 z-50
-        w-[85%] max-w-[320px] md:w-1/5 md:max-w-none
+        w-[85%] max-w-[320px] md:w-[220px] md:max-w-none
         transform transition-transform duration-300 ease-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         ${!sidebarOpen && 'md:pointer-events-auto pointer-events-none'}
@@ -2454,6 +2474,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         hasAssets={activeBoard.assets.length > 0}
         assets={activeBoard.assets}
         storyboards={activeBoard.storyboards || pendingStoryboards}
+        pendingItems={pendingItems}
         hasAvatar={hasAvatar}
         avatarBusy={avatarBusy}
         videoQualityMode={videoQualityMode}

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage, ProjectAsset, StoryboardRecord, VideoReferenceMode, VideoReferenceSelection } from '../types';
+import { CanvasItem, ChatMessage, ProjectAsset, StoryboardRecord, VideoReferenceMode, VideoReferenceSelection } from '../types';
 import ReactMarkdown from 'react-markdown';
 import StoryboardReferenceKit from './StoryboardReferenceKit';
 
@@ -19,6 +19,7 @@ interface ChatInterfaceProps {
   hasAssets: boolean;
   assets: ProjectAsset[];
   storyboards?: StoryboardRecord[];
+  pendingItems?: CanvasItem[];
   hasAvatar: boolean;
   avatarBusy?: boolean;
   videoQualityMode: boolean;
@@ -46,6 +47,54 @@ const formatUrl = (url: string): string => {
   }
 };
 
+type IdeaOption = {
+  title: string;
+  summary: string;
+  raw: string;
+  prompt: string;
+};
+
+const extractIdeaOptions = (text: string): { cleanedText: string; ideas: IdeaOption[] } => {
+  const marker = /(?:^|\n)\s*IDEA OPTIONS\s*:?\s*\n/i;
+  const match = text.match(marker);
+  if (!match || match.index === undefined) {
+    return { cleanedText: text, ideas: [] };
+  }
+
+  const cleanedText = text.slice(0, match.index).trimEnd();
+  const ideaBlock = text.slice(match.index + match[0].length);
+  const lines = ideaBlock.split('\n');
+  const ideas: IdeaOption[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (ideas.length > 0) break;
+      continue;
+    }
+    const lineMatch = trimmed.match(/^(\d+)[\).]\s*(.+)$/);
+    if (!lineMatch) {
+      if (ideas.length > 0) break;
+      continue;
+    }
+
+    const content = lineMatch[2].trim();
+    if (!content) continue;
+    const parts = content.split(/\s+-\s+|\s+:\s+/);
+    const title = parts[0]?.trim() || content;
+    const summary = parts.slice(1).join(' - ').trim();
+    ideas.push({
+      title,
+      summary,
+      raw: content,
+      prompt: `Run with this idea: ${content}. Build the campaign and generate assets.`
+    });
+    if (ideas.length >= 5) break;
+  }
+
+  return { cleanedText: cleanedText || text, ideas };
+};
+
 interface Chip {
   label: string;
   prompt: string;
@@ -68,6 +117,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   hasAssets,
   assets,
   storyboards,
+  pendingItems,
   hasAvatar,
   avatarBusy,
   videoQualityMode,
@@ -78,10 +128,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [showAvatarComposer, setShowAvatarComposer] = useState(false);
   const [avatarPrompt, setAvatarPrompt] = useState('');
+  const [now, setNow] = useState(() => Date.now());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const storyboardById = new Map((storyboards || []).map(storyboard => [storyboard.id, storyboard]));
+  const pendingGenerations = (pendingItems || []).filter(item => item.type === 'image' || item.type === 'video' || item.type === 'carousel');
+  const hasPendingGenerations = pendingGenerations.length > 0;
+
+  useEffect(() => {
+    if (!hasPendingGenerations) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [hasPendingGenerations]);
 
   useEffect(() => {
     if (window.innerWidth >= 768) {
@@ -136,6 +195,51 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
     return null;
   })();
+
+  const formatDuration = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
+  };
+
+  const getEstimatedSeconds = (item: CanvasItem) => {
+    if (item.type === 'image') return 35;
+    if (item.type === 'carousel') {
+      const count = typeof item.meta?.slideCount === 'number'
+        ? item.meta.slideCount
+        : (item.carouselUrls?.length || 2);
+      return Math.max(1, count) * 18;
+    }
+    if (item.type === 'video') {
+      if (item.meta?.isLongVideo) {
+        const scenes = typeof item.meta?.sceneCount === 'number' ? item.meta.sceneCount : 3;
+        return Math.max(1, scenes) * 90;
+      }
+      return 90;
+    }
+    return 60;
+  };
+
+  const getProgressPercent = (item: CanvasItem) => {
+    const status = item.meta?.status || 'queued';
+    const estimate = getEstimatedSeconds(item);
+    const queuedAt = item.meta?.queuedAt;
+    const elapsed = queuedAt ? Math.max(0, (now - queuedAt) / 1000) : 0;
+    const base = estimate > 0 ? Math.min(elapsed / estimate, 0.95) : 0.15;
+    const floor = status === 'processing' ? 0.35 : 0.15;
+    const cap = status === 'processing' ? 0.95 : 0.3;
+    const progress = Math.min(cap, Math.max(floor, base));
+    return Math.round(progress * 100);
+  };
+
+  const getGenerationLabel = (item: CanvasItem) => {
+    if (item.type === 'image') return 'Image';
+    if (item.type === 'carousel') return 'Carousel';
+    if (item.type === 'video' && item.meta?.isLongVideo) return 'Long Video';
+    return 'Video';
+  };
 
   const handleAvatarUploadClick = () => {
     if (!onUploadAvatar || avatarBusy || isProcessing) return;
@@ -283,8 +387,55 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-black/20 bg-white/20">
+        {hasPendingGenerations && (
+          <div className="border-2 border-black bg-white/90 p-3 rounded-xl shadow-neo-sm animate-fade-in-up">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Generation Queue</span>
+              <span className="text-[10px] font-bold text-gray-600">{pendingGenerations.length} active</span>
+            </div>
+            <div className="mt-2 space-y-3">
+              {pendingGenerations.map((item) => {
+                const status = item.meta?.status === 'processing' ? 'Rendering' : 'Queued';
+                const progress = getProgressPercent(item);
+                const estimate = getEstimatedSeconds(item);
+                const queuedAt = item.meta?.queuedAt;
+                const elapsedSeconds = queuedAt ? Math.max(0, Math.round((now - queuedAt) / 1000)) : null;
+                const remainingSeconds = elapsedSeconds !== null ? Math.max(0, Math.round(estimate - elapsedSeconds)) : null;
+                const etaLabel = remainingSeconds !== null
+                  ? `ETA ~${formatDuration(remainingSeconds)}`
+                  : `ETA ~${formatDuration(estimate)}`;
+                const elapsedLabel = elapsedSeconds !== null ? `Elapsed ${formatDuration(elapsedSeconds)}` : '';
+                const sceneLabel = item.meta?.sceneCount ? `${item.meta.sceneCount} scenes` : '';
+                return (
+                  <div key={`pending-${item.id}`} className="border border-black/20 rounded-lg p-2 bg-white/80">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                      <span>{getGenerationLabel(item)}</span>
+                      <span>{status}</span>
+                    </div>
+                    <div className="mt-1 text-xs font-bold text-gray-800 truncate">
+                      {item.title || 'Generation in progress'}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-gray-500">
+                      <span>{etaLabel}</span>
+                      <span>{sceneLabel || elapsedLabel}</span>
+                    </div>
+                    <div className="mt-1 h-2 w-full border border-black/40 bg-white/60 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${status === 'Rendering' ? 'bg-neo-cyan' : 'bg-gray-400'} transition-all duration-500`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {messages.map((msg) => {
           const storyboard = msg.storyboardId ? storyboardById.get(msg.storyboardId) : null;
+          const ideaPayload = msg.role === 'model' ? extractIdeaOptions(msg.text) : { cleanedText: msg.text, ideas: [] };
+          const displayText = msg.role === 'model' ? ideaPayload.cleanedText : msg.text;
+          const ideaOptions = ideaPayload.ideas;
           return (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
             <div 
@@ -295,7 +446,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               }`}
             >
               {msg.role === 'user' ? (
-                msg.text
+                displayText
               ) : (
                 <div className="markdown-content overflow-hidden break-words">
                   <ReactMarkdown
@@ -315,7 +466,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       td: ({node, ...props}) => <td className="p-2 text-xs border-r border-black" {...props} />
                     }}
                   >
-                    {msg.text}
+                    {displayText}
                   </ReactMarkdown>
                 </div>
               )}
@@ -344,9 +495,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </div>
                </div>
             )}
+
+            {ideaOptions.length > 0 && !msg.researchDismissed && (
+              <div className="mt-3 ml-1 max-w-[90%] flex flex-col gap-2 animate-fade-in-up">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Idea Options</span>
+                <div className="grid gap-2">
+                  {ideaOptions.map((idea, idx) => (
+                    <button
+                      key={`${msg.id}-idea-${idx}`}
+                      onClick={() => {
+                        console.log('[RESEARCH] Idea selected', { messageId: msg.id, idea: idea.raw });
+                        onSendMessage(idea.prompt);
+                      }}
+                      disabled={isProcessing}
+                      className="text-left text-xs bg-white border-2 border-black px-3 py-2 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold disabled:opacity-50"
+                    >
+                      <div className="text-[11px] font-black text-gray-900">
+                        {idea.title || `Idea ${idx + 1}`}
+                      </div>
+                      {idea.summary && (
+                        <div className="text-[10px] font-medium text-gray-600 mt-1">
+                          {idea.summary}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             
             {/* Response buttons for research results */}
-            {msg.role === 'model' && msg.groundingLinks && msg.groundingLinks.length > 0 && !msg.researchDismissed && (
+            {msg.role === 'model' && (msg.isResearchResult || (msg.groundingLinks && msg.groundingLinks.length > 0)) && !msg.researchDismissed && (
               <div className="mt-3 ml-1 max-w-[90%] flex flex-col gap-2 animate-fade-in-up">
                 <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Quick Actions</span>
                 <div className="flex flex-wrap gap-2">

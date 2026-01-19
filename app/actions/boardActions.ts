@@ -616,12 +616,21 @@ export async function setProductAssetsAction(productId: string, assignments: Pro
     return { success: true };
 }
 
-export async function saveMessageAction(boardId: string, role: 'user' | 'model' | 'system', text: string, messageId?: string) {
+export async function saveMessageAction(
+    boardId: string,
+    role: 'user' | 'model' | 'system',
+    text: string,
+    messageId?: string,
+    groundingLinks?: { title: string; url: string }[]
+) {
     await assertBoardOwnership(boardId);
 
     const values: any = { boardId, role, text };
     if (messageId) {
         values.id = messageId;
+    }
+    if (groundingLinks && groundingLinks.length > 0) {
+        values.groundingLinks = groundingLinks;
     }
 
     const [msg] = await db.insert(messages).values(values).returning();

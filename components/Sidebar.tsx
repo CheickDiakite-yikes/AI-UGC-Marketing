@@ -3,7 +3,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product, PlanTier, CanvasItem } from '../types';
-import { getPlanLimits, formatLimit, VIDEO_AVG_SECONDS } from '../services/subscriptionPlans';
+import { getPlanLimits, formatLimit } from '../services/subscriptionPlans';
+import { COST_PER_IMAGE, COST_PER_VIDEO_SECOND_FAST, COST_PER_VIDEO_SECOND_QUALITY, COST_PER_REFERENCE_IMAGE, VIDEO_AVG_SECONDS } from '../services/usageLimits';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
 import { getUserProfile } from '../app/actions/userActions';
@@ -155,12 +156,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const ALLOWED_DOC_TYPES = ".pdf,text/plain";
 
   // --- PRECISE UNIT ECONOMICS (Ref: Oct 2025 Pricing) ---
-  // Nano Banana Pro: $0.15 per image (reference frame included in Quality Mode)
-  const COST_PER_IMAGE = 0.15;
-  // Veo 3.1 Preview: $0.40 per second (Quality Mode); Veo 3.1 Fast: $0.15 per second
-  const COST_PER_VIDEO_SECOND_FAST = 0.15;
-  const COST_PER_VIDEO_SECOND_QUALITY = 0.40;
-  const COST_PER_REFERENCE_IMAGE = 0.15;
   const useQualityMode = videoQualityMode ?? true;
   const costPerVideoSecond = useQualityMode ? COST_PER_VIDEO_SECOND_QUALITY : COST_PER_VIDEO_SECOND_FAST;
   const COST_PER_VIDEO = (costPerVideoSecond * VIDEO_AVG_SECONDS) + (useQualityMode ? COST_PER_REFERENCE_IMAGE : 0);
@@ -222,6 +217,15 @@ const Sidebar: React.FC<SidebarProps> = ({
     ? itemEconomics.value
     : usageStats ? (usageStats.imagesGenerated * VALUE_PER_IMAGE) + (usageStats.videosGenerated * VALUE_PER_VIDEO) : 0;
   const savings = totalValue - totalCost;
+  const allBoardsCost = usageStats
+    ? (usageStats.imagesGenerated * COST_PER_IMAGE) + (usageStats.videosGenerated * COST_PER_VIDEO)
+    : null;
+  const allBoardsValue = usageStats
+    ? (usageStats.imagesGenerated * VALUE_PER_IMAGE) + (usageStats.videosGenerated * VALUE_PER_VIDEO)
+    : null;
+  const allBoardsSavings = allBoardsValue !== null && allBoardsCost !== null
+    ? allBoardsValue - allBoardsCost
+    : null;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: 'logo' | 'avatar' | 'general') => {
     const file = e.target.files?.[0];
@@ -620,6 +624,22 @@ const Sidebar: React.FC<SidebarProps> = ({
               +${savings.toLocaleString('en-US')}
             </div>
           </div>
+          {allBoardsValue !== null && allBoardsCost !== null && allBoardsSavings !== null && (
+            <div className="flex justify-between items-center text-[9px] border-t border-white/10 pt-2 mt-2 text-gray-300">
+              <div className="uppercase tracking-widest text-[9px]">All Boards</div>
+              <div>
+                <span className="text-gray-400">Value: </span>
+                <span className="text-neo-lime font-bold">${allBoardsValue.toLocaleString('en-US')}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Cost: </span>
+                <span className="font-bold">${allBoardsCost.toFixed(2)}</span>
+              </div>
+              <div className="bg-white text-black px-2 py-0.5 font-black text-[9px] uppercase">
+                +${allBoardsSavings.toLocaleString('en-US')}
+              </div>
+            </div>
+          )}
           <div className="mt-1 text-[9px] text-gray-400 uppercase tracking-widest">
             Credits: <span className="text-white font-bold">{usageStats?.creditBalance ?? 0}</span>
           </div>

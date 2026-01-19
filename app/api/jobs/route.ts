@@ -108,6 +108,18 @@ export async function POST(request: NextRequest) {
     }
 
     const job = await createJob(boardId, session.userId as string, type, payload);
+    const traceId = typeof payload?.traceId === 'string' ? payload.traceId : undefined;
+    const sceneCount = type === 'generate_long_video' && Array.isArray(payload?.scenes)
+      ? payload.scenes.length
+      : undefined;
+    console.log('[API JOB CREATE]', {
+      jobId: job.id,
+      type,
+      boardId,
+      userId: session.userId,
+      traceId,
+      sceneCount,
+    });
 
     return NextResponse.json({
       id: job.id,

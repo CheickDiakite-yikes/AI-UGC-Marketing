@@ -1,4 +1,5 @@
 import { IMAGE_LIMIT, VIDEO_AVG_SECONDS } from './usageLimits';
+import { CREDIT_PACKS, type CreditPack } from './pricing';
 import type { PlanTier } from '@/types';
 export { VIDEO_AVG_SECONDS };
 
@@ -25,6 +26,7 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     features: [
       `${IMAGE_LIMIT} image generations`,
       'No video generation',
+      'Long-form video locked',
       'Core brand context builder',
       'Community support',
     ],
@@ -41,6 +43,7 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     features: [
       '50 image generations',
       `3 videos (avg ${VIDEO_AVG_SECONDS}s)`,
+      'Long-form video generation (15-30s)',
       'Quality Mode video generation (reference frames)',
       'Campaign packs + carousels',
       'Priority queue',
@@ -57,6 +60,7 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     features: [
       '150 image generations',
       `10 videos (avg ${VIDEO_AVG_SECONDS}s)`,
+      'Long-form video generation (15-30s)',
       'Quality Mode video generation (reference frames)',
       'Advanced brand consistency checks',
       'Faster turnaround',
@@ -79,18 +83,8 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
   },
 };
 
-export type CreditPack = {
-  id: string;
-  credits: number;
-  price: number;
-  label: string;
-};
-
-export const CREDIT_PACKS: CreditPack[] = [
-  { id: 'credits-50', credits: 50, price: 20, label: '50 credits' },
-  { id: 'credits-100', credits: 100, price: 38, label: '100 credits' },
-  { id: 'credits-200', credits: 200, price: 75, label: '200 credits' },
-];
+export type { CreditPack };
+export { CREDIT_PACKS };
 
 export const getPlanLimits = (tier: PlanTier) => {
   const plan = PLAN_CATALOG[tier] ?? PLAN_CATALOG.free;

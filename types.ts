@@ -39,6 +39,7 @@ export interface CanvasItem {
     longVideoGroupId?: string;
     isScene?: boolean;
     isLongVideo?: boolean;
+    queuedAt?: number;
   };
   x?: number; // For future drag/drop
   y?: number;
