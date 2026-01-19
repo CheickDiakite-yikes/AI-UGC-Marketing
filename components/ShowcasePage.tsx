@@ -54,8 +54,33 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
 
   const closeModal = () => setSelectedItem(null);
 
+  const formatAspectRatio = (ratio?: string | null) => {
+    if (!ratio) return null;
+    const normalized = ratio.trim();
+    if (normalized.includes(':')) {
+      const [w, h] = normalized.split(':');
+      const width = Number(w);
+      const height = Number(h);
+      if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+        return `${width} / ${height}`;
+      }
+    }
+    return null;
+  };
+
+  const getPreviewStyle = (item: ShowcaseItem) => {
+    const parsed = formatAspectRatio(item.aspectRatio);
+    if (parsed) {
+      return { aspectRatio: parsed };
+    }
+    if (item.type === 'video') return { aspectRatio: '16 / 9' };
+    if (item.type === 'image') return { aspectRatio: '1 / 1' };
+    if (item.type === 'carousel') return { aspectRatio: '1 / 1' };
+    return { aspectRatio: '4 / 3' };
+  };
+
   return (
-    <div className="w-full h-screen overflow-y-auto bg-white font-sans text-neo-black relative overflow-x-hidden selection:bg-neo-yellow selection:text-black custom-scrollbar">
+    <div className="w-full h-screen overflow-y-auto bg-white font-sans text-neo-black relative overflow-x-hidden selection:bg-neo-yellow selection:text-black custom-scrollbar scroll-smooth">
       <div className="absolute -top-24 left-12 w-72 h-72 bg-neo-cyan/30 blur-3xl animate-float"></div>
       <div className="absolute top-1/2 right-0 w-80 h-80 bg-neo-pink/30 blur-3xl animate-pulse"></div>
 
@@ -79,11 +104,11 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
 
       <div className="max-w-7xl mx-auto px-6 py-16 md:py-24 relative z-10">
         <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center">
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Community Showcase</p>
-            <h1 className="font-display font-black text-5xl md:text-7xl leading-none mt-3">
+            <h1 className="font-display font-black text-4xl sm:text-5xl md:text-7xl leading-none mt-3 break-words">
               Campaigns that feel
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-neo-pink to-neo-cyan">
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-neo-pink to-neo-cyan break-words">
                 impossible.
               </span>
             </h1>
@@ -105,9 +130,9 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="absolute -top-6 -left-6 w-24 h-24 bg-neo-lime border-4 border-black shadow-neo animate-wiggle"></div>
-            <div className="bg-black border-4 border-black shadow-neo-lg p-4 relative">
+            <div className="bg-black border-4 border-black shadow-neo-lg p-4 relative max-w-full">
               <div className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-widest text-gray-400">
                 Featured Drop
               </div>
@@ -115,22 +140,23 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
                 <button
                   type="button"
                   onClick={() => setSelectedItem(featured)}
-                  className="mt-6 w-full aspect-[4/3] bg-white border-2 border-black overflow-hidden"
+                  className="mt-6 w-full bg-white border-2 border-black overflow-hidden"
+                  style={getPreviewStyle(featured)}
                 >
                   {featured.type === 'video' ? (
                     <video
                       src={featured.previewUrl}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain bg-black"
                       muted
                       playsInline
                       preload="metadata"
                     />
                   ) : (
-                    <img src={featured.previewUrl} alt={featured.title} className="w-full h-full object-cover" />
+                    <img src={featured.previewUrl} alt={featured.title} className="w-full h-full object-contain bg-white" />
                   )}
                 </button>
               ) : (
-                <div className="mt-6 w-full aspect-[4/3] bg-gray-100 border-2 border-black flex items-center justify-center text-sm font-bold text-gray-500">
+                <div className="mt-6 w-full bg-gray-100 border-2 border-black flex items-center justify-center text-sm font-bold text-gray-500" style={{ aspectRatio: '4 / 3' }}>
                   No showcase items yet.
                 </div>
               )}
@@ -186,21 +212,21 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
                 }`}
                 style={{ animationDelay: `${idx * 60}ms` }}
               >
-                <div className="relative border-2 border-black overflow-hidden bg-gray-100">
+                <div className="relative border-2 border-black overflow-hidden bg-gray-100" style={getPreviewStyle(item)}>
                   {item.previewUrl ? (
                     item.type === 'video' ? (
                       <video
                         src={item.previewUrl}
-                        className="w-full h-full object-cover aspect-[4/3]"
+                        className="w-full h-full object-contain bg-black"
                         muted
                         playsInline
                         preload="metadata"
                       />
                     ) : (
-                      <img src={item.previewUrl} alt={item.title} className="w-full h-full object-cover aspect-[4/3]" />
+                      <img src={item.previewUrl} alt={item.title} className="w-full h-full object-contain bg-white" />
                     )
                   ) : (
-                    <div className="aspect-[4/3] bg-gray-200"></div>
+                    <div className="w-full h-full bg-gray-200"></div>
                   )}
                   <div className="absolute top-2 left-2 bg-neo-yellow text-black text-[9px] font-black uppercase tracking-widest px-2 py-1 border-2 border-black">
                     {item.type}
@@ -269,7 +295,7 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
                 />
               )}
               {selectedItem.type === 'carousel' && (
-                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory p-6 bg-black">
+                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory p-6 bg-black scroll-smooth">
                   {selectedItem.mediaUrls.map((url, idx) => (
                     <div key={`${selectedItem.id}-slide-${idx}`} className="snap-center min-w-[70%]">
                       <img src={url} alt={`Slide ${idx + 1}`} className="w-full h-auto border-2 border-white/30" />

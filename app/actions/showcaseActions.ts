@@ -47,6 +47,7 @@ export async function getShowcaseItemsAction(): Promise<ShowcaseItem[]> {
     itemContent: generatedItems.content,
     itemStorageKey: generatedItems.storageKey,
     itemCarouselUrls: generatedItems.carouselUrls,
+    itemMetadata: generatedItems.metadata,
   })
     .from(favorites)
     .innerJoin(generatedItems, eq(favorites.generatedItemId, generatedItems.id))
@@ -59,6 +60,8 @@ export async function getShowcaseItemsAction(): Promise<ShowcaseItem[]> {
     if (!['image', 'video', 'carousel'].includes(type)) return null;
 
     const carouselUrls = Array.isArray(row.itemCarouselUrls) ? row.itemCarouselUrls : [];
+    const metadata = (row.itemMetadata ?? {}) as Record<string, unknown>;
+    const aspectRatio = typeof metadata.aspectRatio === 'string' ? metadata.aspectRatio : null;
     let previewUrl: string | null = null;
     let mediaUrls: string[] = [];
 
@@ -83,6 +86,7 @@ export async function getShowcaseItemsAction(): Promise<ShowcaseItem[]> {
       previewUrl,
       mediaUrls,
       boardName: row.boardName || null,
+      aspectRatio,
     } as ShowcaseItem;
   });
 

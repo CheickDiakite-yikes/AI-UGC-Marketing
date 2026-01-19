@@ -53,6 +53,7 @@ export type ShowcaseItem = {
   previewUrl: string | null;
   mediaUrls: string[];
   boardName?: string | null;
+  aspectRatio?: string | null;
 };
 
 export type StoryboardStatus = 'pending' | 'processing' | 'approved' | 'cancelled';

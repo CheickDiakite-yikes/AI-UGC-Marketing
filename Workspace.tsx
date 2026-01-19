@@ -205,10 +205,41 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setActiveJobs([]);
     getBoardDetails(activeBoardId).then(b => {
       if (b) {
+        const storyboards = Array.isArray((b as any).storyboards)
+          ? (b as any).storyboards.map((storyboard: any) => ({
+            ...storyboard,
+            status: storyboard.status as StoryboardStatus,
+            payload: storyboard.payload as LongVideoStoryboardPayload,
+          }))
+          : [];
+        const storyboardMessageMap = new Map<string, StoryboardRecord>(
+          storyboards
+            .filter((storyboard: StoryboardRecord) => storyboard.messageId)
+            .map((storyboard: StoryboardRecord) => [storyboard.messageId as string, storyboard])
+        );
+        const mappedMessages = (b.messages as ChatMessage[]).map((msg) => {
+          const storyboard: StoryboardRecord | undefined = storyboardMessageMap.get(msg.id);
+          if (!storyboard) return msg;
+          return {
+            ...msg,
+            storyboardId: storyboard.id,
+            storyboardStatus: storyboard.status
+          };
+        });
+        const fallbackStoryboardMessages = storyboards
+          .filter((storyboard: StoryboardRecord) => !storyboard.messageId || !storyboardMessageMap.has(storyboard.messageId))
+          .map((storyboard: StoryboardRecord) => ({
+            id: storyboard.messageId || storyboard.id,
+            role: 'model' as const,
+            text: buildStoryboardMessage(storyboard.payload, storyboard.totalDurationSeconds),
+            storyboardId: storyboard.id,
+            storyboardStatus: storyboard.status
+          }));
         // Map DB structure to Frontend structure
         const mappedBoard: Board = {
-          ...b,
-          items: b.generatedItems.map((gi: any) => ({
+          id: b.id,
+          name: b.name,
+          items: (b.generatedItems || []).map((gi: any) => ({
             id: gi.id,
             type: gi.type,
             content: gi.content,
@@ -220,10 +251,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             y: gi.y,
             isFavorite: gi.isFavorite
           })),
-          assets: b.assets as ProjectAsset[],
-          messages: b.messages as ChatMessage[],
-          brandIdentity: b.brandIdentity as BrandIdentity | null,
-          avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
+          assets: (b.assets || []) as ProjectAsset[],
+          messages: [...mappedMessages, ...fallbackStoryboardMessages],
+          storyboards,
+          brandIdentity: (b as any).brandIdentity as BrandIdentity | null,
+          avatarIdentity: (b as any).avatarIdentity as AvatarIdentity | null,
           products: (b.products || []).map((p: any) => ({
             ...p,
             assets: p.productAssets as ProductAsset[]
@@ -231,6 +263,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
         };
         setActiveBoard(mappedBoard);
+        setPendingStoryboards(storyboards.filter((storyboard: StoryboardRecord) =>
+          storyboard.status === 'pending' || storyboard.status === 'processing'
+        ));
       }
     }).finally(() => {
       refreshOnboardingState();
@@ -357,13 +392,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           payload: storyboard.payload as LongVideoStoryboardPayload,
         }))
         : [];
-      const storyboardMessageMap = new Map(
+      const storyboardMessageMap = new Map<string, StoryboardRecord>(
         storyboards
           .filter((storyboard: StoryboardRecord) => storyboard.messageId)
           .map((storyboard: StoryboardRecord) => [storyboard.messageId as string, storyboard])
       );
       const mappedMessages = (b.messages as ChatMessage[]).map((msg) => {
-        const storyboard = storyboardMessageMap.get(msg.id);
+        const storyboard: StoryboardRecord | undefined = storyboardMessageMap.get(msg.id);
         if (!storyboard) return msg;
         return {
           ...msg,
@@ -939,6 +974,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         })),
         assets: updated.assets as ProjectAsset[],
         messages: updated.messages as ChatMessage[],
+        storyboards: Array.isArray((updated as any).storyboards)
+          ? (updated as any).storyboards.map((sb: any) => ({
+              ...sb,
+              status: sb.status as StoryboardStatus,
+              payload: sb.payload as LongVideoStoryboardPayload,
+            }))
+          : [],
         brandIdentity: updated.brandIdentity as BrandIdentity | null,
         avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
         products: (updated.products || []).map((p: any) => ({
@@ -995,6 +1037,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         })),
         assets: updated.assets as ProjectAsset[],
         messages: updated.messages as ChatMessage[],
+        storyboards: Array.isArray((updated as any).storyboards)
+          ? (updated as any).storyboards.map((sb: any) => ({
+              ...sb,
+              status: sb.status as StoryboardStatus,
+              payload: sb.payload as LongVideoStoryboardPayload,
+            }))
+          : [],
         brandIdentity: updated.brandIdentity as BrandIdentity | null,
         avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
         products: (updated.products || []).map((p: any) => ({
@@ -1685,8 +1734,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               prompt,
               continuitySpec,
               scenes,
-              aspectRatio: fc.args['aspectRatio'] || '16:9',
-              resolution: fc.args['resolution'] || '720p',
+              aspectRatio: (fc.args['aspectRatio'] as string) || '16:9',
+              resolution: (fc.args['resolution'] as string) || '720p',
               productId,
               ingredientAssetIds,
               referenceSelections,
