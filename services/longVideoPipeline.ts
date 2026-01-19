@@ -189,22 +189,56 @@ export async function generateLongVideoAssets(params: {
 
     let videoResult: string;
     let ingredientFailure: string | null = null;
-    try {
-      videoResult = await generateVeoVideo(
-        compiled.prompt,
+    let retryAttempt = 0;
+    const maxRetries = 2;
+    
+    const attemptGeneration = async (prompt: string, withIngredients: boolean): Promise<string> => {
+      return generateVeoVideo(
+        prompt,
         config,
-        useIngredients ? { referenceImages, traceId: sceneTraceId } : { traceId: sceneTraceId },
+        withIngredients ? { referenceImages, traceId: sceneTraceId } : { traceId: sceneTraceId },
       );
-    } catch (error: any) {
-      if (!useIngredients) {
+    };
+    
+    const simplifyPrompt = (prompt: string): string => {
+      // Remove potentially problematic content for retry
+      return prompt
+        .replace(/\[LONG VIDEO BRIEF\][^[]*/, '')
+        .replace(/\[CONTINUITY SPEC\][^[]*/, '')
+        .trim();
+    };
+    
+    while (retryAttempt <= maxRetries) {
+      try {
+        const promptToUse = retryAttempt > 0 ? simplifyPrompt(compiled.prompt) : compiled.prompt;
+        const useIngredientsForAttempt = useIngredients && retryAttempt === 0;
+        
+        if (retryAttempt > 0) {
+          console.log(`[LONG-VIDEO ${sceneTraceId}] Retry attempt ${retryAttempt}/${maxRetries}`);
+        }
+        
+        videoResult = await attemptGeneration(promptToUse, useIngredientsForAttempt);
+        break; // Success, exit retry loop
+      } catch (error: any) {
+        const errorMessage = error?.message || 'Video generation failed';
+        
+        if (retryAttempt === 0 && useIngredients) {
+          // First failure with ingredients - try without
+          ingredientFailure = errorMessage;
+          retryAttempt++;
+          continue;
+        }
+        
+        if (retryAttempt < maxRetries && errorMessage.includes('No videos were generated')) {
+          // Content moderation issue - retry with simplified prompt
+          console.log(`[LONG-VIDEO ${sceneTraceId}] Scene failed (${errorMessage}), retrying with simplified prompt...`);
+          retryAttempt++;
+          continue;
+        }
+        
+        // All retries exhausted
         throw error;
       }
-      ingredientFailure = error?.message || 'Ingredient video generation failed';
-      videoResult = await generateVeoVideo(
-        compiled.prompt,
-        config,
-        { traceId: sceneTraceId },
-      );
     }
 
     const sceneItemId = crypto.randomUUID();
