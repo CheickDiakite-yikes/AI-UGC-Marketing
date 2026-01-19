@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, gte, lt, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { boards, generatedItems, calendarItems } from '@/db/schema';
 import { getSession } from './authActions';
@@ -89,6 +89,111 @@ const parseScheduledDate = (value: string) => {
     throw new Error('Invalid scheduled date');
   }
   return parsed;
+};
+
+const parseDateKey = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    throw new Error('Invalid date key');
+  }
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+};
+
+const getDateRangeFromKey = (value: string) => {
+  const { year, month, day } = parseDateKey(value);
+  const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const end = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0));
+  return { start, end };
+};
+
+const hydrateCalendarEntry = async (calendarId: string) => {
+  const rows = await db
+    .select({
+      calendarId: calendarItems.id,
+      boardId: calendarItems.boardId,
+      boardName: boards.name,
+      itemId: generatedItems.id,
+      itemTitle: generatedItems.title,
+      itemType: generatedItems.type,
+      itemContent: generatedItems.content,
+      itemStorageKey: generatedItems.storageKey,
+      itemCarouselUrls: generatedItems.carouselUrls,
+      scheduledFor: calendarItems.scheduledFor,
+      note: calendarItems.note,
+    })
+    .from(calendarItems)
+    .innerJoin(boards, eq(calendarItems.boardId, boards.id))
+    .innerJoin(generatedItems, eq(calendarItems.itemId, generatedItems.id))
+    .where(eq(calendarItems.id, calendarId))
+    .limit(1);
+
+  if (!rows.length) {
+    return null;
+  }
+
+  const row = rows[0];
+  return {
+    id: row.calendarId,
+    boardId: row.boardId,
+    boardName: row.boardName,
+    itemId: row.itemId,
+    itemTitle: row.itemTitle,
+    itemType: row.itemType,
+    previewUrl: resolvePreviewUrl({
+      type: row.itemType,
+      content: row.itemContent,
+      storageKey: row.itemStorageKey,
+      carouselUrls: row.itemCarouselUrls,
+    }),
+    scheduledFor: row.scheduledFor.toISOString(),
+    note: row.note ?? null,
+  } satisfies CalendarEntry;
+};
+
+const hydrateCalendarEntriesByIds = async (ids: string[]) => {
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      calendarId: calendarItems.id,
+      boardId: calendarItems.boardId,
+      boardName: boards.name,
+      itemId: generatedItems.id,
+      itemTitle: generatedItems.title,
+      itemType: generatedItems.type,
+      itemContent: generatedItems.content,
+      itemStorageKey: generatedItems.storageKey,
+      itemCarouselUrls: generatedItems.carouselUrls,
+      scheduledFor: calendarItems.scheduledFor,
+      note: calendarItems.note,
+    })
+    .from(calendarItems)
+    .innerJoin(boards, eq(calendarItems.boardId, boards.id))
+    .innerJoin(generatedItems, eq(calendarItems.itemId, generatedItems.id))
+    .where(inArray(calendarItems.id, ids));
+
+  return rows.map(row => ({
+    id: row.calendarId,
+    boardId: row.boardId,
+    boardName: row.boardName,
+    itemId: row.itemId,
+    itemTitle: row.itemTitle,
+    itemType: row.itemType,
+    previewUrl: resolvePreviewUrl({
+      type: row.itemType,
+      content: row.itemContent,
+      storageKey: row.itemStorageKey,
+      carouselUrls: row.itemCarouselUrls,
+    }),
+    scheduledFor: row.scheduledFor.toISOString(),
+    note: row.note ?? null,
+  }) satisfies CalendarEntry);
 };
 
 export async function getCalendarDashboardData(): Promise<CalendarDashboardData> {
@@ -223,6 +328,252 @@ export async function createCalendarItemAction(payload: {
 
   revalidatePath('/profile/dashboard');
   return { success: true, item: calendarEntry };
+}
+
+export async function updateCalendarItemAction(payload: {
+  calendarItemId: string;
+  scheduledFor?: string;
+  note?: string | null;
+}) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const { calendarItemId, scheduledFor, note } = payload;
+  const updates: Record<string, any> = {};
+
+  if (scheduledFor) {
+    updates.scheduledFor = parseScheduledDate(scheduledFor);
+  }
+
+  if (note !== undefined) {
+    updates.note = note?.trim() || null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { success: false, error: 'No updates provided' };
+  }
+
+  const [updated] = await db
+    .update(calendarItems)
+    .set(updates)
+    .where(and(eq(calendarItems.id, calendarItemId), eq(calendarItems.userId, session.userId as string)))
+    .returning();
+
+  if (!updated) {
+    return { success: false, error: 'Calendar entry not found' };
+  }
+
+  const hydrated = await hydrateCalendarEntry(updated.id);
+  if (!hydrated) {
+    return { success: false, error: 'Calendar entry missing' };
+  }
+
+  revalidatePath('/profile/dashboard');
+  return { success: true, item: hydrated };
+}
+
+export async function createCalendarItemsBatchAction(payload: {
+  entries: Array<{
+    boardId: string;
+    itemId: string;
+    scheduledFor: string;
+    note?: string | null;
+  }>;
+}) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const entries = payload.entries || [];
+  if (entries.length === 0) {
+    return { success: false, error: 'No entries provided' };
+  }
+
+  const boardIds = Array.from(new Set(entries.map(entry => entry.boardId)));
+  const itemIds = Array.from(new Set(entries.map(entry => entry.itemId)));
+
+  const boardRows = await db
+    .select({ id: boards.id, name: boards.name })
+    .from(boards)
+    .where(and(eq(boards.userId, session.userId as string), inArray(boards.id, boardIds)));
+
+  if (boardRows.length !== boardIds.length) {
+    return { success: false, error: 'Board ownership mismatch' };
+  }
+
+  const itemRows = await db
+    .select({ id: generatedItems.id, boardId: generatedItems.boardId })
+    .from(generatedItems)
+    .where(inArray(generatedItems.id, itemIds));
+
+  const itemBoardMap = new Map(itemRows.map(row => [row.id, row.boardId]));
+  for (const entry of entries) {
+    if (itemBoardMap.get(entry.itemId) !== entry.boardId) {
+      return { success: false, error: 'Item ownership mismatch' };
+    }
+  }
+
+  const newItems = entries.map(entry => ({
+    id: crypto.randomUUID(),
+    userId: session.userId as string,
+    boardId: entry.boardId,
+    itemId: entry.itemId,
+    scheduledFor: parseScheduledDate(entry.scheduledFor),
+    note: entry.note || null,
+  }));
+
+  const inserted = await db.insert(calendarItems).values(newItems).returning({ id: calendarItems.id });
+  const insertedIds = inserted.map(row => row.id);
+  const hydrated = await hydrateCalendarEntriesByIds(insertedIds);
+
+  revalidatePath('/profile/dashboard');
+  return { success: true, items: hydrated };
+}
+
+export async function deleteCalendarItemsBatchAction(payload: { ids: string[] }) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const ids = payload.ids || [];
+  if (ids.length === 0) {
+    return { success: false, error: 'No entries provided' };
+  }
+
+  const rows = await db
+    .select({ id: calendarItems.id })
+    .from(calendarItems)
+    .where(and(eq(calendarItems.userId, session.userId as string), inArray(calendarItems.id, ids)));
+
+  if (rows.length === 0) {
+    return { success: false, error: 'No entries found' };
+  }
+
+  await db
+    .delete(calendarItems)
+    .where(and(eq(calendarItems.userId, session.userId as string), inArray(calendarItems.id, ids)));
+
+  revalidatePath('/profile/dashboard');
+  return { success: true, deletedIds: rows.map(row => row.id) };
+}
+
+export async function deleteCalendarItemsForDayAction(payload: { day: string }) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const { day } = payload;
+  const { start, end } = getDateRangeFromKey(day);
+
+  const rows = await db
+    .select({ id: calendarItems.id })
+    .from(calendarItems)
+    .where(
+      and(
+        eq(calendarItems.userId, session.userId as string),
+        gte(calendarItems.scheduledFor, start),
+        lt(calendarItems.scheduledFor, end),
+      ),
+    );
+
+  if (rows.length === 0) {
+    return { success: false, error: 'No entries found for that day' };
+  }
+
+  await db
+    .delete(calendarItems)
+    .where(
+      and(
+        eq(calendarItems.userId, session.userId as string),
+        gte(calendarItems.scheduledFor, start),
+        lt(calendarItems.scheduledFor, end),
+      ),
+    );
+
+  revalidatePath('/profile/dashboard');
+  return { success: true, deletedIds: rows.map(row => row.id) };
+}
+
+export async function duplicateCalendarItemsToNextWeekAction(payload: { day: string }) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const { day } = payload;
+  const { start, end } = getDateRangeFromKey(day);
+
+  const rows = await db
+    .select({
+      calendarId: calendarItems.id,
+      boardId: calendarItems.boardId,
+      itemId: calendarItems.itemId,
+      note: calendarItems.note,
+      scheduledFor: calendarItems.scheduledFor,
+      boardName: boards.name,
+      itemTitle: generatedItems.title,
+      itemType: generatedItems.type,
+      itemContent: generatedItems.content,
+      itemStorageKey: generatedItems.storageKey,
+      itemCarouselUrls: generatedItems.carouselUrls,
+    })
+    .from(calendarItems)
+    .innerJoin(boards, eq(calendarItems.boardId, boards.id))
+    .innerJoin(generatedItems, eq(calendarItems.itemId, generatedItems.id))
+    .where(
+      and(
+        eq(calendarItems.userId, session.userId as string),
+        gte(calendarItems.scheduledFor, start),
+        lt(calendarItems.scheduledFor, end),
+      ),
+    );
+
+  if (rows.length === 0) {
+    return { success: false, error: 'No entries found for that day' };
+  }
+
+  const newEntries = rows.map(row => {
+    const nextWeek = new Date(row.scheduledFor);
+    nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+    return {
+      id: crypto.randomUUID(),
+      userId: session.userId as string,
+      boardId: row.boardId,
+      itemId: row.itemId,
+      scheduledFor: nextWeek,
+      note: row.note ?? null,
+    };
+  });
+
+  await db.insert(calendarItems).values(newEntries);
+
+  const items: CalendarEntry[] = newEntries.map((entry, index) => {
+    const row = rows[index];
+    return {
+      id: entry.id,
+      boardId: row.boardId,
+      boardName: row.boardName,
+      itemId: row.itemId,
+      itemTitle: row.itemTitle,
+      itemType: row.itemType,
+      previewUrl: resolvePreviewUrl({
+        type: row.itemType,
+        content: row.itemContent,
+        storageKey: row.itemStorageKey,
+        carouselUrls: row.itemCarouselUrls,
+      }),
+      scheduledFor: entry.scheduledFor.toISOString(),
+      note: entry.note ?? null,
+    };
+  });
+
+  revalidatePath('/profile/dashboard');
+  return { success: true, items };
 }
 
 export async function deleteCalendarItemAction(calendarItemId: string) {

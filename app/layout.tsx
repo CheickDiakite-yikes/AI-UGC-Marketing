@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, Syne } from 'next/font/google'
 import './globals.css'
+import ToastProvider from '@/components/Toast'
 
 export const viewport: Viewport = {
     width: 'device-width',
@@ -224,7 +225,9 @@ export default function RootLayout({
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
                 />
             </head>
-            <body className={`${spaceGrotesk.variable} ${syne.variable} font-sans`}>{children}</body>
+            <body className={`${spaceGrotesk.variable} ${syne.variable} font-sans`}>
+                <ToastProvider>{children}</ToastProvider>
+            </body>
         </html>
     )
 }

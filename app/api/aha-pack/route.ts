@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       freebie: true,
       traceId: crypto.randomUUID(),
     });
-    jobs.push({ id: imageJob.id, type: imageJob.type, payload: imageJob.payload });
+    jobs.push({ id: imageJob.id, type: imageJob.type, payload: imageJob.payload as Record<string, unknown> });
 
     const carouselJob = await createJob(boardId, session.userId as string, 'generate_carousel', {
       slides: carouselPrompts.map((prompt) => ({ prompt })),
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       freebie: true,
       traceId: crypto.randomUUID(),
     });
-    jobs.push({ id: carouselJob.id, type: carouselJob.type, payload: carouselJob.payload });
+    jobs.push({ id: carouselJob.id, type: carouselJob.type, payload: carouselJob.payload as Record<string, unknown> });
 
     const videoJob = await createJob(boardId, session.userId as string, 'generate_video', {
       prompt: videoItem.visual_prompt,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       freebie: true,
       traceId: crypto.randomUUID(),
     });
-    jobs.push({ id: videoJob.id, type: videoJob.type, payload: videoJob.payload });
+    jobs.push({ id: videoJob.id, type: videoJob.type, payload: videoJob.payload as Record<string, unknown> });
 
     await db.update(users)
       .set({ ahaPackUsed: true, ahaPackUsedAt: new Date() })

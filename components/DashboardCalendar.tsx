@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useTransition } from 'react';
-import { createCalendarItemAction, deleteCalendarItemAction } from '@/app/actions/calendarActions';
+import {
+  createCalendarItemAction,
+  createCalendarItemsBatchAction,
+  deleteCalendarItemsBatchAction,
+  deleteCalendarItemAction,
+  deleteCalendarItemsForDayAction,
+  duplicateCalendarItemsToNextWeekAction,
+  updateCalendarItemAction,
+} from '@/app/actions/calendarActions';
+import { useToast } from '@/components/Toast';
 
 type CalendarBoardItem = {
   id: string;
@@ -127,6 +136,13 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
   const [entries, setEntries] = useState<CalendarEntry[]>(calendarItems);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editNote, setEditNote] = useState('');
+  const [editDate, setEditDate] = useState<string>(formatDateKey(new Date()));
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [draggedEntryId, setDraggedEntryId] = useState<string | null>(null);
+  const [dragEnabled, setDragEnabled] = useState(true);
+  const { showToast, showError, showSuccess } = useToast();
 
   const boardMap = useMemo(() => new Map(boards.map(board => [board.id, board])), [boards]);
   const selectedBoard = boardMap.get(selectedBoardId);
@@ -147,6 +163,23 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
       setSelectedItemId(selectedBoard.items[0]?.id ?? '');
     }
   }, [selectedBoard, selectedItemId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const media = window.matchMedia('(pointer: fine)');
+    const update = (event: MediaQueryListEvent | MediaQueryList) => {
+      setDragEnabled(event.matches);
+    };
+    update(media);
+    if (media.addEventListener) {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
 
   const monthGrid = useMemo(() => getMonthGrid(currentMonth), [currentMonth]);
   const itemsByDate = useMemo(() => {
@@ -185,6 +218,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
   const handleSchedule = () => {
     if (!selectedBoardId || !selectedItemId) {
       setError('Select a board and asset first.');
+      showError('Select a board and asset first.');
       return;
     }
     setError(null);
@@ -198,28 +232,250 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
       });
       if (!result?.success || !result.item) {
         setError(result?.error || 'Unable to schedule asset.');
+        showError(result?.error || 'Unable to schedule asset.');
         return;
       }
       setEntries(prev => [result.item!, ...prev]);
       setNote('');
+      showSuccess(`Scheduled asset for ${scheduledFor}.`);
+    });
+  };
+
+  const handleMoveEntry = (calendarId: string, dayKey: string, noteOverride?: string | null) => {
+    setError(null);
+    const currentEntry = entries.find(entry => entry.id === calendarId);
+    const previousDay = currentEntry?.scheduledFor.slice(0, 10) || null;
+    const previousNote = currentEntry?.note ?? null;
+    const nextNote = noteOverride !== undefined ? noteOverride : previousNote;
+    startTransition(async () => {
+      const result = await updateCalendarItemAction({
+        calendarItemId: calendarId,
+        scheduledFor: dayKey,
+        note: nextNote,
+      });
+      if (!result?.success || !result.item) {
+        setError(result?.error || 'Unable to move entry.');
+        showError(result?.error || 'Unable to move entry.');
+        return;
+      }
+      setEntries(prev => prev.map(entry => (entry.id === calendarId ? result.item! : entry)));
+      setSelectedDate(new Date(`${dayKey}T12:00:00Z`));
+      setEditingEntryId(null);
+      const shouldOfferUndo = previousDay && (previousDay !== dayKey || previousNote !== nextNote);
+      if (shouldOfferUndo && currentEntry) {
+        showToast({
+          message: `Moved "${currentEntry.itemTitle}" to ${dayKey}.`,
+          type: 'info',
+          duration: 8000,
+          actionLabel: 'Undo',
+          onAction: () => {
+            startTransition(async () => {
+              const undoResult = await updateCalendarItemAction({
+                calendarItemId: calendarId,
+                scheduledFor: previousDay,
+                note: previousNote,
+              });
+              if (!undoResult?.success || !undoResult.item) {
+                showError(undoResult?.error || 'Undo failed.');
+                return;
+              }
+              setEntries(prev => prev.map(entry => (entry.id === calendarId ? undoResult.item! : entry)));
+              setSelectedDate(new Date(`${previousDay}T12:00:00Z`));
+            });
+          },
+        });
+      } else if (currentEntry) {
+        showSuccess(`Updated "${currentEntry.itemTitle}".`);
+      }
     });
   };
 
   const handleRemove = (calendarId: string) => {
     setError(null);
+    const removedEntry = entries.find(entry => entry.id === calendarId);
     startTransition(async () => {
       const result = await deleteCalendarItemAction(calendarId);
       if (!result?.success) {
         setError(result?.error || 'Unable to remove entry.');
+        showError(result?.error || 'Unable to remove entry.');
         return;
       }
       setEntries(prev => prev.filter(entry => entry.id !== calendarId));
+      if (removedEntry) {
+        showToast({
+          message: `Removed "${removedEntry.itemTitle}".`,
+          type: 'warning',
+          duration: 8000,
+          actionLabel: 'Undo',
+          onAction: () => {
+            startTransition(async () => {
+              const restore = await createCalendarItemsBatchAction({
+                entries: [{
+                  boardId: removedEntry.boardId,
+                  itemId: removedEntry.itemId,
+                  scheduledFor: removedEntry.scheduledFor.slice(0, 10),
+                  note: removedEntry.note ?? null,
+                }],
+              });
+              if (!restore?.success || !restore.items) {
+                showError(restore?.error || 'Undo failed.');
+                return;
+              }
+              setEntries(prev => [...restore.items!, ...prev]);
+            });
+          },
+        });
+      }
     });
   };
 
   const selectedDateKey = formatDateKey(selectedDate);
   const selectedDayItems = itemsByDate.get(selectedDateKey) || [];
   const todayKey = formatDateKey(new Date());
+  const nextWeekKey = formatDateKey(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + 7));
+
+  const handleClearDay = () => {
+    if (selectedDayItems.length === 0) {
+      setError('No entries to clear.');
+      showError('No entries to clear.');
+      return;
+    }
+    const confirmed = window.confirm(`Clear ${selectedDayItems.length} scheduled asset(s) on ${formatLongDate(selectedDate)}?`);
+    if (!confirmed) {
+      return;
+    }
+    setError(null);
+    const clearedEntries = [...selectedDayItems];
+    startTransition(async () => {
+      const result = await deleteCalendarItemsForDayAction({ day: selectedDateKey });
+      if (!result?.success) {
+        setError(result?.error || 'Unable to clear day.');
+        showError(result?.error || 'Unable to clear day.');
+        return;
+      }
+      setEntries(prev => prev.filter(entry => entry.scheduledFor.slice(0, 10) !== selectedDateKey));
+      setEditingEntryId(null);
+      showToast({
+        message: `Cleared ${clearedEntries.length} asset(s) on ${selectedDateKey}.`,
+        type: 'warning',
+        duration: 9000,
+        actionLabel: 'Undo',
+        onAction: () => {
+          startTransition(async () => {
+            const restore = await createCalendarItemsBatchAction({
+              entries: clearedEntries.map(entry => ({
+                boardId: entry.boardId,
+                itemId: entry.itemId,
+                scheduledFor: entry.scheduledFor.slice(0, 10),
+                note: entry.note ?? null,
+              })),
+            });
+            if (!restore?.success || !restore.items) {
+              showError(restore?.error || 'Undo failed.');
+              return;
+            }
+            setEntries(prev => [...restore.items!, ...prev]);
+          });
+        },
+      });
+    });
+  };
+
+  const handleDuplicateDay = () => {
+    if (selectedDayItems.length === 0) {
+      setError('No entries to duplicate.');
+      showError('No entries to duplicate.');
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await duplicateCalendarItemsToNextWeekAction({ day: selectedDateKey });
+      if (!result?.success || !result.items) {
+        setError(result?.error || 'Unable to duplicate day.');
+        showError(result?.error || 'Unable to duplicate day.');
+        return;
+      }
+      setEntries(prev => [...result.items!, ...prev]);
+      const duplicatedIds = result.items.map(item => item.id);
+      showToast({
+        message: `Duplicated ${result.items.length} asset(s) to ${nextWeekKey}.`,
+        type: 'info',
+        duration: 9000,
+        actionLabel: 'Undo',
+        onAction: () => {
+          startTransition(async () => {
+            const undo = await deleteCalendarItemsBatchAction({ ids: duplicatedIds });
+            if (!undo?.success) {
+              showError(undo?.error || 'Undo failed.');
+              return;
+            }
+            setEntries(prev => prev.filter(entry => !duplicatedIds.includes(entry.id)));
+          });
+        },
+      });
+    });
+  };
+
+  const handleStartEdit = (entry: CalendarEntry) => {
+    setEditingEntryId(entry.id);
+    setEditDate(entry.scheduledFor.slice(0, 10));
+    setEditNote(entry.note || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEntryId(null);
+    setEditNote('');
+  };
+
+  const handleSaveEdit = (entryId: string) => {
+    if (!editDate) {
+      setError('Pick a date to reschedule.');
+      return;
+    }
+    handleMoveEntry(entryId, editDate, editNote.trim() || null);
+  };
+
+  const handleDragStart = (entryId: string) => (event: React.DragEvent<HTMLDivElement>) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/calendar-entry', entryId);
+    event.dataTransfer.setData('text/plain', entryId);
+    setDraggedEntryId(entryId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedEntryId(null);
+    setDragOverKey(null);
+  };
+
+  const handleDropOnDay = (dayKey: string) => (event: React.DragEvent<HTMLElement>) => {
+    if (!dragEnabled) {
+      return;
+    }
+    event.preventDefault();
+    const entryId = event.dataTransfer.getData('text/calendar-entry') || event.dataTransfer.getData('text/plain');
+    if (!entryId) {
+      return;
+    }
+    setDragOverKey(null);
+    handleMoveEntry(entryId, dayKey);
+  };
+
+  const handleDragOver = (dayKey: string) => (event: React.DragEvent<HTMLElement>) => {
+    if (!dragEnabled) {
+      return;
+    }
+    event.preventDefault();
+    if (dragOverKey !== dayKey) {
+      setDragOverKey(dayKey);
+    }
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragLeave = (dayKey: string) => () => {
+    if (dragOverKey === dayKey) {
+      setDragOverKey(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -297,14 +553,20 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
               const dayItems = itemsByDate.get(key) || [];
               const isToday = key === todayKey;
               const isSelected = key === selectedDateKey;
+              const isDragOver = key === dragOverKey;
               return (
                 <button
                   type="button"
                   key={key}
                   onClick={() => setSelectedDate(new Date(date))}
+                  onDragOver={handleDragOver(key)}
+                  onDragLeave={handleDragLeave(key)}
+                  onDrop={handleDropOnDay(key)}
                   className={`border-2 border-black p-2 text-left min-h-[110px] transition-all ${
                     inMonth ? 'bg-white' : 'bg-gray-100 text-gray-400'
-                  } ${isSelected ? 'shadow-neo-sm bg-neo-yellow/30' : ''}`}
+                  } ${isSelected ? 'shadow-neo-sm bg-neo-yellow/30' : ''} ${
+                    isDragOver ? 'bg-neo-cyan/30 shadow-neo-sm' : ''
+                  }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className={`text-xs font-black ${isToday ? 'text-neo-pink' : ''}`}>
@@ -341,6 +603,9 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Schedule Panel</p>
             <h3 className="font-display font-black text-xl">{formatLongDate(selectedDate)}</h3>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-1">
+              {dragEnabled ? 'Drag cards to a new day on desktop.' : 'Drag is off on touch devices.'} Tap edit to move.
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -427,6 +692,24 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                 {selectedDayItems.length} assets
               </span>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleDuplicateDay}
+                disabled={selectedDayItems.length === 0 || isPending}
+                className="border-2 border-black bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-neo-cyan transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Duplicate to {nextWeekKey}
+              </button>
+              <button
+                type="button"
+                onClick={handleClearDay}
+                disabled={selectedDayItems.length === 0 || isPending}
+                className="border-2 border-black bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-neo-pink transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Clear Day
+              </button>
+            </div>
             {selectedDayItems.length === 0 ? (
               <div className="border-2 border-dashed border-black/30 p-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
                 Nothing scheduled yet.
@@ -434,8 +717,17 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
             ) : (
               <div className="space-y-2">
                 {selectedDayItems.map(item => (
-                  <div key={item.id} className="border-2 border-black bg-gray-50 p-2">
-                    <div className="flex items-center justify-between">
+                  <div
+                    key={item.id}
+                    draggable={dragEnabled}
+                    onDragStart={handleDragStart(item.id)}
+                    onDragEnd={handleDragEnd}
+                    aria-grabbed={draggedEntryId === item.id}
+                    className={`border-2 border-black bg-gray-50 p-2 transition-opacity ${
+                      draggedEntryId === item.id ? 'opacity-60' : ''
+                    } ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`w-3 h-3 border border-black ${typeBadge(item.itemType)}`} />
                         <div>
@@ -443,18 +735,67 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                           <p className="text-[9px] uppercase tracking-widest text-gray-500">{item.boardName}</p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(item.id)}
-                        className="text-[9px] font-bold uppercase tracking-widest text-red-600 hover:text-black"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(item)}
+                          className="text-[9px] font-bold uppercase tracking-widest text-black hover:text-neo-pink"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(item.id)}
+                          className="text-[9px] font-bold uppercase tracking-widest text-red-600 hover:text-black"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                    {item.note && (
-                      <p className="mt-2 text-[10px] text-gray-600 font-bold uppercase tracking-widest">
-                        {item.note}
-                      </p>
+                    {editingEntryId === item.id ? (
+                      <div className="mt-2 border-t-2 border-black pt-2 space-y-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Move to day</label>
+                          <input
+                            type="date"
+                            value={editDate}
+                            onChange={event => setEditDate(event.target.value)}
+                            className="w-full border-2 border-black p-2 text-[10px] font-bold bg-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Note</label>
+                          <textarea
+                            value={editNote}
+                            onChange={event => setEditNote(event.target.value)}
+                            rows={2}
+                            className="w-full border-2 border-black p-2 text-[10px] font-bold bg-white"
+                            placeholder="Add a reminder..."
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEdit(item.id)}
+                            className="border-2 border-black bg-black text-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEdit}
+                            className="border-2 border-black bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-neo-yellow transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      item.note && (
+                        <p className="mt-2 text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+                          {item.note}
+                        </p>
+                      )
                     )}
                   </div>
                 ))}

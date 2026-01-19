@@ -41,6 +41,24 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - ROI/Cost in `components/Sidebar.tsx` uses per-item metadata:
   - `qualityMode`, `referenceCount`, `autoReferenceUsed`, `slideCount`.
 
+## Aha Pack (Freebie)
+- One-time free pack for free users: 1 image, 1 two-slide carousel, 1 HQ video.
+- Redeemed via `app/api/aha-pack/route.ts` with `freebie: true` on jobs.
+- Quota/usage is bypassed when `payload.freebie === true` in:
+  - `server/jobRunner.ts`
+  - `app/api/jobs/process/route.ts`
+- User flags: `users.ahaPackUsed`, `users.ahaPackUsedAt`.
+
+## Dashboard Calendar
+- New dashboard tab at `/profile/dashboard`.
+- Calendar supports multi-asset scheduling per day, edit/reschedule, and removal.
+- Drag-and-drop rescheduling on pointer-fine devices; edit flow for mobile.
+- Bulk actions: clear a day, duplicate a day to next week.
+- Undo toasts for bulk and move actions.
+- Data/actions: `app/actions/calendarActions.ts`.
+- UI: `components/DashboardCalendar.tsx`.
+- Table: `calendar_items`.
+
 ## Key Files
 - Chat + tools: `services/geminiService.ts`
 - Video API: `app/actions.ts`
@@ -49,3 +67,5 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Auto references: `services/videoReferenceService.ts`
 - Pricing/limits: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
 - ROI display: `components/Sidebar.tsx`
+- Calendar actions: `app/actions/calendarActions.ts`
+- Calendar UI: `components/DashboardCalendar.tsx`

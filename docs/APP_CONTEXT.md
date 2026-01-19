@@ -43,6 +43,21 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - All images use Nano Banana Pro via `generateMarketingImage` in `services/geminiService.ts`.
 - Carousels generate slides with the same image pipeline and store slide count metadata.
 
+## Aha Pack (Freebie)
+- One-time free pack for free users: 1 image, 1 two-slide carousel, 1 HQ video.
+- Redeemed via `app/api/aha-pack/route.ts` and flagged on `users.ahaPackUsed`.
+- Jobs include `freebie: true` to bypass quota checks and usage consumption.
+
+## Dashboard Calendar
+- New dashboard route: `/profile/dashboard`.
+- Users can schedule multiple assets per day, edit/reschedule, and remove scheduled items.
+- Drag-and-drop rescheduling on pointer-fine devices; edit UI for mobile.
+- Bulk actions: clear a day, duplicate a day to next week.
+- Undo toasts for bulk and move actions.
+- Data/actions live in `app/actions/calendarActions.ts`.
+- UI lives in `components/DashboardCalendar.tsx`.
+- Table: `calendar_items` (user, board, item, scheduled date, note).
+
 ## Pricing, Credits, and ROI
 - Credits:
   - Images: 1 credit.
@@ -69,6 +84,8 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Identity grounding: `services/identityPromptService.ts`, `services/identityPromptUtils.ts`
 - Plans and usage: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
 - Sidebar ROI: `components/Sidebar.tsx`
+- Calendar actions: `app/actions/calendarActions.ts`
+- Calendar UI: `components/DashboardCalendar.tsx`
 
 ## Defaults and Toggles
 - Quality Mode is ON by default in the chat header.
