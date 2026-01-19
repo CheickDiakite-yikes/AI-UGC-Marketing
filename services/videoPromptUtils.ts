@@ -16,6 +16,14 @@ const VIDEO_QUALITY_BLOCK = [
   "- Minimize motion blur and avoid rapid camera shakes that distort the subject."
 ].join("\n");
 
+const LONG_VIDEO_CONTINUITY_BLOCK = [
+  "[LONG VIDEO CONTINUITY]",
+  "- Same main character across all scenes; no swaps or morphs.",
+  "- Lock hair, face, skin tone, outfit, accessories, phone model, body type, height, and weight.",
+  "- Keep lighting style consistent unless explicitly changed in a scene.",
+  "- Keep rendering style consistent; do not jump between photorealistic and cartoon styles."
+].join("\n");
+
 export function applyVideoDurationGuardrails(prompt: string): string {
   if (!prompt) {
     return `${VIDEO_CONSTRAINTS_BLOCK}\n\n${VIDEO_QUALITY_BLOCK}`;
@@ -29,4 +37,14 @@ export function applyVideoDurationGuardrails(prompt: string): string {
   if (!hasConstraints) blocks.push(VIDEO_CONSTRAINTS_BLOCK);
   if (!hasQuality) blocks.push(VIDEO_QUALITY_BLOCK);
   return `${prompt}\n\n${blocks.join("\n\n")}`;
+}
+
+export function applyLongVideoContinuityGuardrails(prompt: string): string {
+  if (!prompt) {
+    return LONG_VIDEO_CONTINUITY_BLOCK;
+  }
+  if (prompt.includes("[LONG VIDEO CONTINUITY]")) {
+    return prompt;
+  }
+  return `${prompt}\n\n${LONG_VIDEO_CONTINUITY_BLOCK}`;
 }

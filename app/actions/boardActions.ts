@@ -5,13 +5,16 @@ import { db } from '@/db';
 import { boards, assets, messages, storyboards, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs, favorites, profileAssets, profileProducts, profileProductAssets } from '@/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection, LongVideoStoryboardPayload, StoryboardStatus } from '@/types';
+import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection, LongVideoStoryboardPayload, StoryboardStatus, AspectRatio, ImageSize, PlanTier } from '@/types';
 import { getSession } from './authActions';
 import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset, downloadAsset } from '@/services/objectStorageService';
 import { consumeUsage } from '@/services/usageConsumption';
 import { processImageForGemini } from '@/services/imageProcessingService';
 import { generateContentServer } from '@/app/actions';
 import { Type } from '@google/genai';
+import { generateMarketingImage, analyzeAvatarImage } from '@/services/geminiService';
+import { getPlanLimits } from '@/services/subscriptionPlans';
+import { getRemainingImages } from '@/services/usageLimits';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -72,6 +75,25 @@ function logTrace(traceId: string, message: string, data?: unknown) {
         console.log(`[TRACE ${traceId}] ${message}`, data);
     } else {
         console.log(`[TRACE ${traceId}] ${message}`);
+    }
+}
+
+async function assertImageQuotaForUser(userId: string, count: number, traceId: string) {
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+        columns: { imagesGenerated: true, planTier: true, creditBalance: true }
+    });
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const { imageLimit } = getPlanLimits((user.planTier as PlanTier) || 'free');
+    const remaining = getRemainingImages(user.imagesGenerated, imageLimit, user.creditBalance || 0);
+
+    if (remaining < count) {
+        logTrace(traceId, 'Image quota exceeded', { remaining, requested: count });
+        throw new Error('QUOTA_EXCEEDED');
     }
 }
 
@@ -446,6 +468,64 @@ export async function saveAvatarIdentityAction(boardId: string, identity: Avatar
     return savedIdentity;
 }
 
+export async function generateAvatarAssetAction(boardId: string, description: string) {
+    const traceId = crypto.randomUUID();
+    logTrace(traceId, 'Avatar generation requested', { boardId });
+
+    try {
+        const session = await getSession();
+        if (!session || !session.userId) {
+            return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED', traceId };
+        }
+
+        await assertBoardOwnership(boardId);
+        await assertImageQuotaForUser(session.userId as string, 1, traceId);
+
+        const trimmed = description.trim();
+        if (!trimmed) {
+            return { success: false, error: 'Missing avatar description', code: 'INVALID_INPUT', traceId };
+        }
+
+        const avatarPrompt = [
+            'Photorealistic portrait of a single person, waist-up framing.',
+            'Neutral background, even natural lighting, sharp facial details.',
+            'No text, no logos, no props, no extra people.',
+            `Description: ${trimmed}`
+        ].join('\n');
+
+        const dataUrl = await generateMarketingImage(avatarPrompt, AspectRatio.SQUARE, ImageSize.ONE_K);
+        const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+        if (!base64) {
+            throw new Error('Missing avatar image data');
+        }
+
+        const savedAsset = await saveAsset(boardId, {
+            id: crypto.randomUUID(),
+            type: 'avatar',
+            name: 'AI Avatar',
+            content: base64,
+            mimeType: 'image/png',
+        });
+        logTrace(traceId, 'Avatar asset saved', { assetId: savedAsset.id });
+
+        const identity = await analyzeAvatarImage([base64]);
+        logTrace(traceId, 'Avatar identity generated', { traitCount: identity.traits?.length || 0 });
+
+        try {
+            await consumeUsage(session.userId as string, 'image', 1);
+        } catch (error) {
+            console.warn(`[AVATAR ${traceId}] Failed to apply usage charge`, error);
+        }
+
+        return { success: true, asset: savedAsset, identity, traceId };
+    } catch (error: any) {
+        const message = error?.message || 'Avatar generation failed';
+        const code = message === 'QUOTA_EXCEEDED' ? 'QUOTA_EXCEEDED' : undefined;
+        logTrace(traceId, 'Avatar generation failed', { error: message });
+        return { success: false, error: message, code, traceId };
+    }
+}
+
 type ProductInput = Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>;
 type ProductAssetInput = Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>;
 
@@ -591,6 +671,27 @@ export async function updateStoryboardStatusAction(storyboardId: string, status:
         .returning();
     revalidatePath('/');
     return updated;
+}
+
+export async function updateStoryboardPayloadAction(storyboardId: string, payload: LongVideoStoryboardPayload) {
+    const traceId = crypto.randomUUID();
+    logTrace(traceId, 'Updating storyboard payload', {
+        storyboardId,
+        referenceMode: payload.referenceMode || null,
+        referenceCount: Array.isArray(payload.referenceSelections) ? payload.referenceSelections.length : 0
+    });
+    try {
+        await assertStoryboardOwnership(storyboardId);
+        const [updated] = await db.update(storyboards)
+            .set({ payload, updatedAt: new Date() })
+            .where(eq(storyboards.id, storyboardId))
+            .returning();
+        revalidatePath('/');
+        return updated;
+    } catch (error: any) {
+        logTrace(traceId, 'Failed to update storyboard payload', { error: error?.message || error });
+        throw error;
+    }
 }
 
 export async function saveGeneratedItemAction(boardId: string, item: any) {

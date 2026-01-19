@@ -15,11 +15,11 @@ const listToLines = (items?: string[] | null, max: number = 8): string => {
   return limited.length > 0 ? limited.map(item => `- ${item}`).join('\n') : '- None';
 };
 
-const shouldUseAvatar = (prompt: string): boolean => {
+export const shouldUseAvatar = (prompt: string): boolean => {
   const text = prompt.toLowerCase();
   const blockAvatar = /no (people|person|faces|human|avatar|model)/.test(text) || /product\s*only/.test(text);
   if (blockAvatar) return false;
-  return /(person|woman|man|people|face|spokesperson|model|creator|founder|influencer|ugc)/.test(text);
+  return /(person|woman|man|people|face|spokesperson|model|creator|founder|influencer|ugc|character|girl|boy|dad|mom|mother|father|kid|child|teen|adult)/.test(text);
 };
 
 const buildBrandBlock = (brand?: BrandIdentity | null): string | null => {

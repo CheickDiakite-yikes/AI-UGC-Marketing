@@ -10,7 +10,7 @@ import { generateLongVideoAssets } from '../../../../services/longVideoPipeline'
 import { db } from '../../../../db';
 import { generatedItems, users } from '../../../../db/schema';
 import { eq } from 'drizzle-orm';
-import { AspectRatio, VeoConfig, PlanTier } from '../../../../types';
+import { AspectRatio, VeoConfig, PlanTier, VideoReferenceMode, VideoReferenceSelection } from '../../../../types';
 import { getPlanLimits } from '../../../../services/subscriptionPlans';
 import { getRemainingImages, getRemainingVideos } from '../../../../services/usageLimits';
 import { consumeUsage } from '../../../../services/usageConsumption';
@@ -151,6 +151,8 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     archetype?: string;
     productId?: string;
     ingredientAssetIds?: string[];
+    referenceSelections?: VideoReferenceSelection[];
+    referenceMode?: VideoReferenceMode;
     qualityMode?: boolean;
     traceId?: string;
     freebie?: boolean;
@@ -177,18 +179,25 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let selectedIngredientIds: string[] = [];
   let productIdUsed: string | undefined;
   let autoReferenceUsed = false;
+  let avatarReferenceImages = [];
 
   try {
     const ingredientResult = await resolveVideoIngredients({
       boardId: job.boardId,
       productId,
       ingredientAssetIds,
+      referenceSelections: payload.referenceSelections,
+      referenceMode: payload.referenceMode,
       prompt,
-      traceId
+      traceId,
+      preferAvatar: true
     });
     referenceImages = ingredientResult.referenceImages;
     selectedIngredientIds = ingredientResult.selectedAssetIds;
     productIdUsed = ingredientResult.productIdUsed;
+    avatarReferenceImages = (ingredientResult.referenceAssets || [])
+      .filter(asset => asset.type === 'avatar')
+      .map(asset => asset.referenceImage);
     if (ingredientResult.warnings.length > 0) {
       console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient warnings:`, ingredientResult.warnings);
     }
@@ -231,23 +240,50 @@ async function processVideoJob(job: Job): Promise<JobResult> {
 
   let videoResult: string;
   let ingredientFailure: string | null = null;
+  let referenceImagesUsed: typeof referenceImages = [];
   try {
+    const referencesForAttempt = useIngredients ? referenceImages : [];
     videoResult = await generateVeoVideo(
       compiled.prompt,
       config,
-      useIngredients ? { referenceImages, traceId } : { traceId }
+      referencesForAttempt.length > 0 ? { referenceImages: referencesForAttempt, traceId } : { traceId }
     );
+    referenceImagesUsed = referencesForAttempt;
   } catch (error: any) {
     if (!useIngredients) {
       throw error;
     }
     ingredientFailure = error?.message || 'Ingredient video generation failed';
-    console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient generation failed, retrying without references: ${ingredientFailure}`);
-    videoResult = await generateVeoVideo(
-      compiled.prompt,
-      config,
-      { traceId }
-    );
+    const fallbackReferences = avatarReferenceImages.length > 0 && avatarReferenceImages.length < referenceImages.length
+      ? avatarReferenceImages
+      : [];
+    if (fallbackReferences.length > 0) {
+      console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient generation failed, retrying with avatar references: ${ingredientFailure}`);
+      try {
+        videoResult = await generateVeoVideo(
+          compiled.prompt,
+          config,
+          { referenceImages: fallbackReferences, traceId }
+        );
+        referenceImagesUsed = fallbackReferences;
+      } catch (fallbackError) {
+        console.warn(`[API JOB PROCESSOR ${traceId}] Avatar reference retry failed, retrying without references`);
+        videoResult = await generateVeoVideo(
+          compiled.prompt,
+          config,
+          { traceId }
+        );
+        referenceImagesUsed = [];
+      }
+    } else {
+      console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient generation failed, retrying without references: ${ingredientFailure}`);
+      videoResult = await generateVeoVideo(
+        compiled.prompt,
+        config,
+        { traceId }
+      );
+      referenceImagesUsed = [];
+    }
   }
   
   const itemId = crypto.randomUUID();
@@ -276,7 +312,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       ingredientAssetIds: selectedIngredientIds,
       qualityMode,
       autoReferenceUsed,
-      referenceCount: useIngredients ? referenceImages.length : 0,
+      referenceCount: referenceImagesUsed.length,
       caption: caption || null,
       hook: hook || null,
       archetype: archetype || null,

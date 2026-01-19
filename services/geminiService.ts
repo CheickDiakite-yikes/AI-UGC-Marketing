@@ -48,6 +48,19 @@ const generateVideoTool: FunctionDeclaration = {
       aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
       productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
       ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." },
+      referenceSelections: {
+        type: Type.ARRAY,
+        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            assetId: { type: Type.STRING },
+            role: { type: Type.STRING }
+          },
+          required: ["assetId"]
+        }
+      },
+      referenceMode: { type: Type.STRING, description: "Reference mode: manual (only selections), hybrid (fill missing), auto (AI chooses)." },
       qualityMode: { type: Type.BOOLEAN, description: "Prefer higher-fidelity video generation (slower, more expensive) with extra reference anchoring when possible." },
       title: { type: Type.STRING, description: "Short title for the asset card." },
       hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
@@ -70,6 +83,19 @@ const generateLongVideoTool: FunctionDeclaration = {
       resolution: { type: Type.STRING, description: "Target resolution: '720p' or '1080p'." },
       productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
       ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." },
+      referenceSelections: {
+        type: Type.ARRAY,
+        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            assetId: { type: Type.STRING },
+            role: { type: Type.STRING }
+          },
+          required: ["assetId"]
+        }
+      },
+      referenceMode: { type: Type.STRING, description: "Reference mode: manual (only selections), hybrid (fill missing), auto (AI chooses)." },
       qualityMode: { type: Type.BOOLEAN, description: "Prefer higher-fidelity video generation with extra reference anchoring." },
       title: { type: Type.STRING, description: "Short title for the asset card." },
       hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
@@ -80,7 +106,7 @@ const generateLongVideoTool: FunctionDeclaration = {
         items: {
           type: Type.OBJECT,
           properties: {
-            prompt: { type: Type.STRING, description: "Scene-specific visual prompt." },
+            prompt: { type: Type.STRING, description: "Scene-specific visual prompt. Prefer a structured JSON scene spec (character, environment, camera, action) for continuity." },
             durationSeconds: { type: Type.NUMBER, description: "Scene length (4, 6, or 8 seconds)." },
             title: { type: Type.STRING, description: "Optional scene title." },
             camera: { type: Type.STRING, description: "Camera movement or angle." },
@@ -432,6 +458,7 @@ export const chatWithMarketingAgent = async (
     - If the user mentions a product or requests visuals, select the correct product.
     - If multiple products exist and the user did not specify, ask a clarifying question before generating.
     - For video generation, include ingredientAssetIds (max 3) or productId when product assets are available.
+    - If reference roles are known, include referenceSelections (roles: avatar, item, setting) and set referenceMode to manual or hybrid.
     - For image generation, include productId when the visual is product-specific.
     - Do not invent product claims beyond the Product Catalog and Source Documents.
     - Enforce Copy Spec: use canonical names, approved claims, and required phrases; avoid disallowed claims.
@@ -496,9 +523,13 @@ export const chatWithMarketingAgent = async (
     - Videos take longer to generate (1-2 minutes each) so keep pack sizes reasonable
     - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
     - Ingredient-based video generation is most reliable in 16:9 and 8s duration; for vertical, enable qualityMode and expect possible fallback
+    - When possible, use referenceSelections with roles (avatar, item, setting) to lock identity and props; set referenceMode: hybrid to fill missing
     - Set qualityMode: true for UGC/influencer videos, close-up hands, product interactions, or when the user asks for the best realism
     - For generate_long_video, provide 2-5 scenes, each 4/6/8 seconds, total 30s or less
     - For generate_long_video, include continuitySpec covering character, wardrobe, props, lighting, and camera style
+    - continuitySpec should read like a character bible with explicit, unchanging traits (hair, skin tone, facial features, body type, outfit, accessories, phone model)
+    - When possible, write scene prompts as structured JSON; copy the same character object across scenes and only change actions or location
+    - If using JSON, include scene_number, duration_seconds, and aspect_ratio for clarity
     - If you include a long video inside a campaign pack, set type: "long_video" and include scenes + continuitySpec
     - Long videos in packs will still require storyboard approval before generation
     - Use 1080p only when every scene is 8 seconds; otherwise stick to 720p

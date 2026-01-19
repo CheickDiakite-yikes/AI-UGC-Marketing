@@ -1,0 +1,153 @@
+import React from 'react';
+import type { ProjectAsset, VideoReferenceMode, VideoReferenceRole, VideoReferenceSelection } from '../types';
+
+const ROLE_SLOTS: Array<{ role: VideoReferenceRole; label: string; hint: string }> = [
+  { role: 'avatar', label: 'Avatar / Person', hint: 'Use a consistent face or creator.' },
+  { role: 'item', label: 'Item / Outfit / Product', hint: 'Phone, outfit, or product anchor.' },
+  { role: 'setting', label: 'Setting / Location', hint: 'Background or environment reference.' }
+];
+
+const getAssetPreview = (asset: ProjectAsset): string | null => {
+  if (!asset.content) return null;
+  if (asset.content.startsWith('data:') || asset.content.startsWith('http') || asset.content.startsWith('/api/')) {
+    return asset.content;
+  }
+  const mimeType = asset.mimeType || 'image/png';
+  return `data:${mimeType};base64,${asset.content}`;
+};
+
+const formatAssetLabel = (asset: ProjectAsset): string => `${asset.name} (${asset.type})`;
+
+interface StoryboardReferenceKitProps {
+  storyboardId: string;
+  assets: ProjectAsset[];
+  referenceSelections?: VideoReferenceSelection[] | null;
+  referenceMode?: VideoReferenceMode | null;
+  disabled?: boolean;
+  onChange: (storyboardId: string, selections: VideoReferenceSelection[], mode: VideoReferenceMode) => void;
+}
+
+const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
+  storyboardId,
+  assets,
+  referenceSelections,
+  referenceMode,
+  disabled,
+  onChange
+}) => {
+  const mode: VideoReferenceMode = referenceMode || 'hybrid';
+  const aiFillEnabled = mode !== 'manual';
+  const selections = Array.isArray(referenceSelections) ? referenceSelections : [];
+  const selectionMap = new Map<VideoReferenceRole, string>();
+  const unassignedSelections: VideoReferenceSelection[] = [];
+
+  selections.forEach(selection => {
+    if (!selection?.assetId) return;
+    if (selection.role) {
+      selectionMap.set(selection.role, selection.assetId);
+    } else {
+      unassignedSelections.push(selection);
+    }
+  });
+
+  if (unassignedSelections.length > 0) {
+    const openSlots = ROLE_SLOTS.map(slot => slot.role).filter(role => !selectionMap.has(role));
+    unassignedSelections.forEach((selection, index) => {
+      const role = openSlots[index];
+      if (role) selectionMap.set(role, selection.assetId);
+    });
+  }
+
+  const imageAssets = assets.filter(asset => (asset.type === 'image' || asset.type === 'avatar') && asset.content);
+
+  const updateSelections = (role: VideoReferenceRole, assetId: string) => {
+    const nextSelections: VideoReferenceSelection[] = ROLE_SLOTS.map(slot => {
+      const nextAssetId = slot.role === role ? assetId : (selectionMap.get(slot.role) || '');
+      if (!nextAssetId) return null;
+      return { assetId: nextAssetId, role: slot.role };
+    }).filter(Boolean) as VideoReferenceSelection[];
+    onChange(storyboardId, nextSelections, mode);
+  };
+
+  const handleModeToggle = (enabled: boolean) => {
+    const nextMode: VideoReferenceMode = enabled ? 'hybrid' : 'manual';
+    onChange(storyboardId, selections, nextMode);
+  };
+
+  const clearRole = (role: VideoReferenceRole) => {
+    updateSelections(role, '');
+  };
+
+  return (
+    <div className="border-2 border-black rounded-xl bg-white/90 p-3 shadow-neo-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Reference Kit</div>
+          <p className="text-xs font-bold text-gray-700">
+            Up to 3 reference images per scene. Order: avatar → item → setting.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          <input
+            type="checkbox"
+            checked={aiFillEnabled}
+            onChange={(e) => handleModeToggle(e.target.checked)}
+            disabled={disabled}
+            className="h-4 w-4 border-2 border-black accent-neo-cyan"
+          />
+          AI fill missing
+        </label>
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        {ROLE_SLOTS.map(slot => {
+          const selectedId = selectionMap.get(slot.role) || '';
+          const selectedAsset = selectedId ? imageAssets.find(asset => asset.id === selectedId) : undefined;
+          const previewSrc = selectedAsset ? getAssetPreview(selectedAsset) : null;
+          return (
+            <div key={slot.role} className="flex items-center gap-3 border-2 border-black bg-white p-2 shadow-neo-sm">
+              <div className="w-14 h-14 border-2 border-black bg-gray-100 flex items-center justify-center overflow-hidden">
+                {previewSrc ? (
+                  <img src={previewSrc} alt={selectedAsset?.name || slot.label} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">{slot.role}</span>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{slot.label}</div>
+                <div className="text-[10px] text-gray-500">{slot.hint}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <select
+                    value={selectedId}
+                    onChange={(e) => updateSelections(slot.role, e.target.value)}
+                    disabled={disabled}
+                    className="flex-1 border-2 border-black bg-white text-xs font-bold px-2 py-1"
+                  >
+                    <option value="">Auto</option>
+                    {imageAssets.map(asset => (
+                      <option key={asset.id} value={asset.id}>
+                        {formatAssetLabel(asset)}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedId ? (
+                    <button
+                      type="button"
+                      onClick={() => clearRole(slot.role)}
+                      disabled={disabled}
+                      className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2 py-1 bg-white hover:bg-black hover:text-white transition-all"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default StoryboardReferenceKit;

@@ -1,17 +1,26 @@
 import { VideoGenerationReferenceImage, VideoGenerationReferenceType } from '@google/genai';
 import { db } from '@/db';
 import { generatedItems } from '@/db/schema';
-import { VeoConfig } from '@/types';
+import { VeoConfig, VideoReferenceMode, VideoReferenceSelection } from '@/types';
 import { uploadGeneratedItem } from '@/services/objectStorageService';
 import { compileVisualPromptWithIdentity } from '@/services/identityPromptService';
-import { applyVideoDurationGuardrails } from '@/services/videoPromptUtils';
+import { applyLongVideoContinuityGuardrails, applyVideoDurationGuardrails } from '@/services/videoPromptUtils';
 import { resolveVideoIngredients } from '@/services/videoIngredientService';
+import type { ReferenceAsset } from '@/services/videoIngredientService';
 import { generateAutoReferenceImages } from '@/services/videoReferenceService';
 import { generateVeoVideo } from '@/services/geminiService';
 import { extractLastFrame, stitchVideoClips } from '@/services/videoStitchService';
 
 const MAX_LONG_VIDEO_SECONDS = 30;
 const SUPPORTED_DURATIONS = new Set([4, 6, 8]);
+const CONTINUITY_ANCHOR_BLOCK = [
+  "[CONTINUITY ANCHOR]",
+  "- Single person on a neutral background in even, natural lighting.",
+  "- Clear, sharp face; waist-up framing; relaxed, neutral pose.",
+  "- No props, no product, no text, no logos, no extra people.",
+  "- Keep hair, facial features, skin tone, body type, and outfit exactly as specified.",
+  "- This reference locks the main character identity for all scenes."
+].join("\n");
 
 export type LongVideoScene = {
   prompt: string;
@@ -31,6 +40,8 @@ export type LongVideoPayload = {
   qualityMode?: boolean;
   productId?: string;
   ingredientAssetIds?: string[];
+  referenceSelections?: VideoReferenceSelection[];
+  referenceMode?: VideoReferenceMode;
   continuitySpec?: string;
   prompt?: string;
   scenes: LongVideoScene[];
@@ -77,6 +88,23 @@ const buildScenePrompt = (scene: LongVideoScene, params: {
   return blocks.join('\n\n');
 };
 
+const buildContinuityAnchorPrompt = (params: {
+  continuitySpec?: string;
+  summaryPrompt?: string;
+  aspectRatio: string;
+}) => {
+  const blocks: string[] = [];
+  if (params.summaryPrompt) {
+    blocks.push(`[LONG VIDEO BRIEF]\n${params.summaryPrompt.trim()}`);
+  }
+  if (params.continuitySpec) {
+    blocks.push(`[CONTINUITY SPEC]\n${params.continuitySpec.trim()}`);
+  }
+  blocks.push(`Aspect ratio: ${params.aspectRatio}`);
+  blocks.push(CONTINUITY_ANCHOR_BLOCK);
+  return blocks.join('\n\n');
+};
+
 const toReferenceImage = (frame: { base64: string; mimeType: string }): VideoGenerationReferenceImage => ({
   image: {
     imageBytes: frame.base64,
@@ -86,6 +114,13 @@ const toReferenceImage = (frame: { base64: string; mimeType: string }): VideoGen
 });
 
 const clampReferenceImages = (images: VideoGenerationReferenceImage[]) => images.slice(0, 3);
+
+const selectBestIngredientAsset = (assets: ReferenceAsset[]): ReferenceAsset | null => {
+  const nonAvatar = assets.filter(asset => asset.type !== 'avatar');
+  if (nonAvatar.length === 0) return null;
+  const nonLogo = nonAvatar.filter(asset => asset.type !== 'logo');
+  return nonLogo[0] || nonAvatar[0] || null;
+};
 
 export async function generateLongVideoAssets(params: {
   boardId: string;
@@ -118,24 +153,67 @@ export async function generateLongVideoAssets(params: {
   const supports1080p = normalizedScenes.every(scene => scene.durationSeconds === 8);
   const resolution = wants1080p && supports1080p ? '1080p' : '720p';
   const qualityMode = payload.qualityMode === true;
+  const ingredientPrompt = [payload.prompt, payload.continuitySpec, normalizedScenes[0]?.prompt]
+    .filter(Boolean)
+    .join('\n');
 
   const ingredientResult = await resolveVideoIngredients({
     boardId,
     productId: payload.productId,
     ingredientAssetIds: payload.ingredientAssetIds,
-    prompt: payload.prompt || normalizedScenes[0]?.prompt,
+    referenceSelections: payload.referenceSelections,
+    referenceMode: payload.referenceMode,
+    prompt: ingredientPrompt,
     traceId,
+    preferAvatar: true,
   });
 
-  let baseReferences = ingredientResult.referenceImages;
-  if (baseReferences.length > 0) {
-    baseReferences = clampReferenceImages(baseReferences);
-  }
+  const referenceAssets = ingredientResult.referenceAssets || [];
+  const avatarReferenceAsset = referenceAssets.find(asset => asset.type === 'avatar') || null;
+  const bestIngredientAsset = selectBestIngredientAsset(referenceAssets);
+  console.log(`[LONG-VIDEO ${traceId}] Ingredient references`, {
+    selectedAssetIds: ingredientResult.selectedAssetIds,
+    avatarAssetId: avatarReferenceAsset?.id || null,
+    avatarReferenceSource: avatarReferenceAsset?.source || 'asset',
+    bestIngredientAssetId: bestIngredientAsset?.id || null,
+    referenceTypes: referenceAssets.map(asset => asset.type),
+    referenceRoles: referenceAssets.map(asset => asset.role || null),
+    referenceMode: payload.referenceMode || null
+  });
 
   const sceneItemIds: string[] = [];
   const sceneVideos: string[] = [];
   let carryoverReference: VideoGenerationReferenceImage | null = null;
   let autoReferenceCount = 0;
+  let continuityReference: VideoGenerationReferenceImage | null = null;
+
+  if (qualityMode && payload.continuitySpec) {
+    const continuityTraceId = `${traceId}-continuity`;
+    const continuityPrompt = buildContinuityAnchorPrompt({
+      continuitySpec: payload.continuitySpec,
+      summaryPrompt: payload.prompt,
+      aspectRatio,
+    });
+    const autoRefs = await generateAutoReferenceImages({
+      boardId,
+      prompt: continuityPrompt,
+      aspectRatio,
+      productId: payload.productId || null,
+      traceId: continuityTraceId,
+    });
+    if (autoRefs.referenceImages.length > 0) {
+      continuityReference = autoRefs.referenceImages[0];
+      autoReferenceCount += 1;
+    }
+    if (autoRefs.warnings.length > 0) {
+      console.warn(`[LONG-VIDEO ${continuityTraceId}] Continuity reference warnings:`, autoRefs.warnings);
+    }
+    if (continuityReference && avatarReferenceAsset) {
+      console.log(`[LONG-VIDEO ${continuityTraceId}] Continuity reference generated alongside avatar asset`, {
+        avatarAssetId: avatarReferenceAsset.id
+      });
+    }
+  }
 
   for (let index = 0; index < normalizedScenes.length; index += 1) {
     const scene = normalizedScenes[index];
@@ -148,7 +226,7 @@ export async function generateLongVideoAssets(params: {
       sceneCount: normalizedScenes.length,
     });
 
-    const promptWithGuardrails = applyVideoDurationGuardrails(scenePrompt);
+    const promptWithGuardrails = applyVideoDurationGuardrails(applyLongVideoContinuityGuardrails(scenePrompt));
     const compiled = await compileVisualPromptWithIdentity({
       boardId,
       basePrompt: promptWithGuardrails,
@@ -156,12 +234,45 @@ export async function generateLongVideoAssets(params: {
       traceId: sceneTraceId,
     });
 
-    let referenceImages = baseReferences.length > 0 ? [...baseReferences] : [];
-    if (qualityMode && carryoverReference) {
-      referenceImages = clampReferenceImages([carryoverReference, ...referenceImages]);
+    const primaryReference = avatarReferenceAsset?.referenceImage || continuityReference || null;
+    const safeReferenceCandidates: VideoGenerationReferenceImage[] = [];
+    let usedContinuityReference = false;
+    let usedAvatarReference = false;
+
+    if (primaryReference) {
+      safeReferenceCandidates.push(primaryReference);
+      usedAvatarReference = !!avatarReferenceAsset;
+      usedContinuityReference = !avatarReferenceAsset && !!continuityReference;
     }
 
-    let autoReferenceUsed = false;
+    if (qualityMode && carryoverReference) {
+      safeReferenceCandidates.push(carryoverReference);
+    }
+
+    const fullReferenceCandidates = [...safeReferenceCandidates];
+    if (bestIngredientAsset?.referenceImage) {
+      fullReferenceCandidates.push(bestIngredientAsset.referenceImage);
+    }
+
+    let referenceImages = clampReferenceImages(fullReferenceCandidates);
+    let safeReferenceImages = clampReferenceImages(safeReferenceCandidates);
+    const usedCarryoverReference = !!(carryoverReference && referenceImages.includes(carryoverReference));
+    const usedBestIngredient = !!(bestIngredientAsset?.referenceImage && referenceImages.includes(bestIngredientAsset.referenceImage));
+    const usedPrimaryReference = !!(primaryReference && referenceImages.includes(primaryReference));
+
+    console.log(`[LONG-VIDEO ${sceneTraceId}] Reference selection`, {
+      primarySource: usedAvatarReference ? 'avatar' : (usedContinuityReference ? 'continuity' : 'none'),
+      usedPrimaryReference,
+      usedCarryoverReference,
+      usedBestIngredient,
+      referenceCount: referenceImages.length,
+      safeReferenceCount: safeReferenceImages.length,
+      avatarAssetId: avatarReferenceAsset?.id || null,
+      avatarReferenceSource: avatarReferenceAsset?.source || 'asset',
+      bestIngredientAssetId: bestIngredientAsset?.id || null
+    });
+
+    let autoReferenceUsed = usedContinuityReference;
     if (qualityMode && referenceImages.length === 0) {
       const autoRefs = await generateAutoReferenceImages({
         boardId,
@@ -172,13 +283,22 @@ export async function generateLongVideoAssets(params: {
       });
       if (autoRefs.referenceImages.length > 0) {
         referenceImages = clampReferenceImages(autoRefs.referenceImages);
+        safeReferenceImages = referenceImages;
         autoReferenceUsed = true;
         autoReferenceCount += 1;
+        console.log(`[LONG-VIDEO ${sceneTraceId}] Auto reference generated for scene`, {
+          referenceCount: referenceImages.length
+        });
       }
     }
 
     const allowVerticalReferences = qualityMode;
     const useIngredients = referenceImages.length > 0 && (aspectRatio === '16:9' || allowVerticalReferences);
+    if (referenceImages.length > 0 && !useIngredients) {
+      console.warn(`[LONG-VIDEO ${sceneTraceId}] Skipping references: aspect ratio ${aspectRatio} is not supported for reference images`);
+    } else if (referenceImages.length > 0 && aspectRatio !== '16:9') {
+      console.warn(`[LONG-VIDEO ${sceneTraceId}] Using references with vertical aspect ratio ${aspectRatio}`);
+    }
 
     const config: VeoConfig = {
       aspectRatio,
@@ -191,52 +311,75 @@ export async function generateLongVideoAssets(params: {
     let ingredientFailure: string | null = null;
     let retryAttempt = 0;
     const maxRetries = 2;
-    
-    const attemptGeneration = async (prompt: string, withIngredients: boolean): Promise<string> => {
+    let usedReferenceImages: VideoGenerationReferenceImage[] = [];
+    let usedPrompt = compiled.prompt;
+
+    const attemptGeneration = async (
+      prompt: string,
+      references: VideoGenerationReferenceImage[]
+    ): Promise<string> => {
       return generateVeoVideo(
         prompt,
         config,
-        withIngredients ? { referenceImages, traceId: sceneTraceId } : { traceId: sceneTraceId },
+        references.length > 0 ? { referenceImages: references, traceId: sceneTraceId } : { traceId: sceneTraceId },
       );
     };
-    
+
     const simplifyPrompt = (prompt: string): string => {
-      // Remove potentially problematic content for retry
       return prompt
         .replace(/\[LONG VIDEO BRIEF\][^[]*/, '')
-        .replace(/\[CONTINUITY SPEC\][^[]*/, '')
         .trim();
     };
-    
+
+    const hasSafeFallback = safeReferenceImages.length > 0 && safeReferenceImages.length < referenceImages.length;
+    let referencesForAttempt = useIngredients ? referenceImages : [];
+    let useSimplifiedPrompt = false;
+    let usedSafeFallback = false;
+    let droppedAllReferences = false;
+
     while (retryAttempt <= maxRetries) {
+      const promptToUse = useSimplifiedPrompt ? simplifyPrompt(compiled.prompt) : compiled.prompt;
+      if (retryAttempt > 0) {
+        console.log(`[LONG-VIDEO ${sceneTraceId}] Retry attempt ${retryAttempt}/${maxRetries}`, {
+          promptSimplified: useSimplifiedPrompt,
+          referenceCount: referencesForAttempt.length
+        });
+      }
+
       try {
-        const promptToUse = retryAttempt > 0 ? simplifyPrompt(compiled.prompt) : compiled.prompt;
-        const useIngredientsForAttempt = useIngredients && retryAttempt === 0;
-        
-        if (retryAttempt > 0) {
-          console.log(`[LONG-VIDEO ${sceneTraceId}] Retry attempt ${retryAttempt}/${maxRetries}`);
-        }
-        
-        videoResult = await attemptGeneration(promptToUse, useIngredientsForAttempt);
-        break; // Success, exit retry loop
+        videoResult = await attemptGeneration(promptToUse, referencesForAttempt);
+        usedReferenceImages = referencesForAttempt;
+        usedPrompt = promptToUse;
+        break;
       } catch (error: any) {
         const errorMessage = error?.message || 'Video generation failed';
-        
-        if (retryAttempt === 0 && useIngredients) {
-          // First failure with ingredients - try without
+        const shouldSimplify = errorMessage.includes('No videos were generated');
+
+        if (!ingredientFailure && referencesForAttempt.length > 0) {
           ingredientFailure = errorMessage;
+        }
+
+        if (!usedSafeFallback && hasSafeFallback) {
+          usedSafeFallback = true;
+          referencesForAttempt = safeReferenceImages;
           retryAttempt++;
           continue;
         }
-        
-        if (retryAttempt < maxRetries && errorMessage.includes('No videos were generated')) {
-          // Content moderation issue - retry with simplified prompt
+
+        if (shouldSimplify && !useSimplifiedPrompt) {
           console.log(`[LONG-VIDEO ${sceneTraceId}] Scene failed (${errorMessage}), retrying with simplified prompt...`);
+          useSimplifiedPrompt = true;
           retryAttempt++;
           continue;
         }
-        
-        // All retries exhausted
+
+        if (!droppedAllReferences && referencesForAttempt.length > 0) {
+          droppedAllReferences = true;
+          referencesForAttempt = [];
+          retryAttempt++;
+          continue;
+        }
+
         throw error;
       }
     }
@@ -261,11 +404,11 @@ export async function generateLongVideoAssets(params: {
       metadata: {
         aspectRatio,
         resolution,
-        prompt: compiled.prompt.substring(0, 200),
+        prompt: usedPrompt.substring(0, 200),
         productId: payload.productId || null,
         ingredientAssetIds: ingredientResult.selectedAssetIds,
         qualityMode,
-        referenceCount: referenceImages.length,
+        referenceCount: usedReferenceImages.length,
         autoReferenceUsed,
         ingredientFallback: !!ingredientFailure,
         ingredientError: ingredientFailure,
@@ -285,7 +428,9 @@ export async function generateLongVideoAssets(params: {
       try {
         const frame = await extractLastFrame(videoResult, { traceId: sceneTraceId });
         carryoverReference = toReferenceImage(frame);
+        console.log(`[LONG-VIDEO ${sceneTraceId}] Carryover reference captured`);
       } catch (error) {
+        console.warn(`[LONG-VIDEO ${sceneTraceId}] Failed to capture carryover reference`, error);
         carryoverReference = null;
       }
     }

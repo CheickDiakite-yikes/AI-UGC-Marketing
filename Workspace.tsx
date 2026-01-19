@@ -17,7 +17,7 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { getRemainingImages, getRemainingVideos } from './services/usageLimits';
@@ -47,7 +47,9 @@ import {
   dismissOnboardingAction,
   completeOnboardingAction,
   createStoryboardAction,
-  updateStoryboardStatusAction
+  updateStoryboardStatusAction,
+  updateStoryboardPayloadAction,
+  generateAvatarAssetAction
 } from './app/actions/boardActions';
 import { getSubscriptionStateAction, createCheckoutSessionAction, createCreditsCheckoutSessionAction } from './app/actions/subscriptionActions';
 import { toggleFavoriteAction } from './app/actions/favoriteActions';
@@ -242,6 +244,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [selectedItem, setSelectedItem] = useState<CanvasItem | null>(null);
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [isAvatarGenerating, setIsAvatarGenerating] = useState(false);
 
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
   const [pendingLogoAsset, setPendingLogoAsset] = useState<ProjectAsset | null>(null);
@@ -272,6 +276,27 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       return sum + duration;
     }, 0);
     return { sceneCount, totalDurationSeconds };
+  };
+
+  const referenceRoleSet = new Set<VideoReferenceRole>(['avatar', 'item', 'setting']);
+  const referenceModeSet = new Set<VideoReferenceMode>(['manual', 'hybrid', 'auto']);
+
+  const parseReferenceSelections = (value: unknown): VideoReferenceSelection[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    const selections = value
+      .map((entry: any) => {
+        const assetId = typeof entry?.assetId === 'string' ? entry.assetId : null;
+        const role = typeof entry?.role === 'string' && referenceRoleSet.has(entry.role) ? entry.role : undefined;
+        if (!assetId) return null;
+        return { assetId, role } as VideoReferenceSelection;
+      })
+      .filter(Boolean) as VideoReferenceSelection[];
+    return selections.length > 0 ? selections : undefined;
+  };
+
+  const parseReferenceMode = (value: unknown): VideoReferenceMode | undefined => {
+    if (typeof value !== 'string') return undefined;
+    return referenceModeSet.has(value as VideoReferenceMode) ? (value as VideoReferenceMode) : undefined;
   };
 
   const buildStoryboardMessage = (payload: LongVideoStoryboardPayload, totalDurationSeconds: number, note?: string) => {
@@ -562,6 +587,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           resolution: payload.resolution || '720p',
           productId: payload.productId,
           ingredientAssetIds: payload.ingredientAssetIds,
+          referenceSelections: payload.referenceSelections,
+          referenceMode: payload.referenceMode,
           qualityMode,
           title: payload.title,
           hook: payload.hook,
@@ -924,6 +951,24 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   const handleSaveAvatar = async (identity: AvatarIdentity) => {
     if (!activeBoardId) return;
+    const traceId = crypto.randomUUID();
+    const hasAvatarAsset = Boolean(activeBoard?.assets.some(asset => asset.type === 'avatar'));
+    if (!hasAvatarAsset && identity.referenceImages && identity.referenceImages.length > 0) {
+      try {
+        console.log(`[AVATAR ${traceId}] Saving avatar reference asset from identity`, {
+          boardId: activeBoardId
+        });
+        await saveAsset(activeBoardId, {
+          id: Date.now().toString(),
+          type: 'avatar',
+          name: identity.name ? `${identity.name} Avatar` : 'Avatar Reference',
+          content: identity.referenceImages[0],
+          mimeType: 'image/png',
+        });
+      } catch (error) {
+        console.warn(`[AVATAR ${traceId}] Failed to save avatar reference asset`, error);
+      }
+    }
     await saveAvatarIdentityAction(activeBoardId, identity);
     setShowAvatarModal(false);
     setPendingAvatarAssets([]);
@@ -1194,6 +1239,86 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     });
   };
 
+  const handleUploadAvatarFiles = async (files: File[]) => {
+    if (!activeBoardId || files.length === 0 || isAvatarUploading) return;
+    const traceId = crypto.randomUUID();
+    setIsAvatarUploading(true);
+    console.log(`[CHAT-AVATAR ${traceId}] Uploading avatar files`, {
+      boardId: activeBoardId,
+      count: files.length,
+      names: files.map(file => file.name)
+    });
+    try {
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) {
+          console.warn(`[CHAT-AVATAR ${traceId}] Skipping non-image file`, {
+            name: file.name,
+            type: file.type
+          });
+          showError(`Unsupported avatar file type: ${file.name}`);
+          continue;
+        }
+        const base64 = await readFileAsBase64(file);
+        const newAsset: ProjectAsset = {
+          id: Date.now().toString(),
+          type: 'avatar',
+          name: file.name || 'Chat Avatar',
+          content: base64,
+          mimeType: file.type,
+        };
+        await handleAddAsset(newAsset);
+      }
+      console.log(`[CHAT-AVATAR ${traceId}] Avatar upload complete`);
+      showSuccess('Avatar uploaded. Review and save the identity.');
+    } catch (error) {
+      console.error(`[CHAT-AVATAR ${traceId}] Avatar upload failed`, error);
+      showError(`Avatar upload failed. Trace ${traceId}`);
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  };
+
+  const handleCreateAiAvatar = async (description: string) => {
+    if (!activeBoardId || isAvatarGenerating) return;
+    const trimmed = description.trim();
+    if (!trimmed) {
+      showError('Add a short description for the avatar.');
+      return;
+    }
+    const traceId = crypto.randomUUID();
+    setIsAvatarGenerating(true);
+    console.log(`[AI-AVATAR ${traceId}] Generating avatar`, {
+      boardId: activeBoardId,
+      description: trimmed
+    });
+    try {
+      const result = await generateAvatarAssetAction(activeBoardId, trimmed);
+      if (!result.success || !result.asset || !result.identity) {
+        if (result.code === 'QUOTA_EXCEEDED') {
+          openPaywall('image_limit');
+          showError('Image quota reached. Upgrade or add credits to generate an avatar.');
+          return;
+        }
+        const message = result.error || 'AI avatar generation failed.';
+        showError(`${message}${result.traceId ? ` (Trace ${result.traceId})` : ''}`);
+        return;
+      }
+      console.log(`[AI-AVATAR ${result.traceId}] Avatar asset saved`, { assetId: result.asset.id });
+      updateActiveBoard((b) => ({ ...b, assets: [...b.assets, result.asset as ProjectAsset] }));
+      setPendingAvatarAssets(result.identity.referenceImages || []);
+      setPendingScannedAvatar(result.identity);
+      setShowAvatarModal(true);
+      refreshOnboardingState();
+      getUserUsageAction().then(setUsage);
+      showSuccess('AI avatar generated. Review and save the identity.');
+    } catch (error) {
+      console.error(`[AI-AVATAR ${traceId}] Avatar generation failed`, error);
+      showError(`AI avatar generation failed. Trace ${traceId}`);
+    } finally {
+      setIsAvatarGenerating(false);
+    }
+  };
+
   const handleUploadProductImages = async (files: File[]) => {
     if (!activeBoardId) return [];
     const uploadedAssets: ProjectAsset[] = [];
@@ -1275,6 +1400,43 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setChatDraft({ id: crypto.randomUUID(), text: draftText });
   };
 
+  const handleStoryboardReferenceUpdate = async (
+    storyboardId: string,
+    selections: VideoReferenceSelection[],
+    mode: VideoReferenceMode
+  ) => {
+    const storyboard = pendingStoryboards.find(sb => sb.id === storyboardId)
+      || activeBoard?.storyboards?.find(sb => sb.id === storyboardId);
+    if (!storyboard) return;
+
+    const cleanedSelections = selections.filter(selection => selection.assetId);
+    const nextPayload: LongVideoStoryboardPayload = {
+      ...storyboard.payload,
+      referenceSelections: cleanedSelections.length > 0 ? cleanedSelections : undefined,
+      referenceMode: mode
+    };
+
+    const traceId = crypto.randomUUID();
+    console.log(`[STORYBOARD ${traceId}] Reference kit updated`, {
+      storyboardId,
+      referenceMode: mode,
+      referenceCount: cleanedSelections.length
+    });
+    setPendingStoryboards(prev => prev.map(sb => sb.id === storyboardId ? { ...sb, payload: nextPayload } : sb));
+    updateActiveBoard(b => {
+      if (!b.storyboards) return b;
+      const updatedStoryboards = b.storyboards.map(sb => sb.id === storyboardId ? { ...sb, payload: nextPayload } : sb);
+      return { ...b, storyboards: updatedStoryboards };
+    });
+
+    try {
+      await updateStoryboardPayloadAction(storyboardId, nextPayload);
+    } catch (error) {
+      console.warn(`[STORYBOARD ${traceId}] Failed to update references`, error);
+      showError(`Failed to save reference kit settings. Trace ${traceId}`);
+    }
+  };
+
   const handleSendMessage = async (text: string) => {
     if (!activeBoard || !activeBoardId) return;
 
@@ -1333,6 +1495,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const packQueue: any[] = [];
       const storyboardMessages: ChatMessage[] = [];
       const storyboardQueue: StoryboardRecord[] = [];
+      const hasAvatarIdentity = Boolean(activeBoard.avatarIdentity) || activeBoard.assets.some(asset => asset.type === 'avatar');
+      let needsAvatarPrompt = false;
 
       for (const part of modelParts) {
         if (part.functionCall) {
@@ -1407,6 +1571,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           if (fc.name === 'generate_video') {
             setProcessingStatus(`Queuing video generation...`);
             const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
+            const referenceSelections = parseReferenceSelections(fc.args['referenceSelections']);
+            const referenceMode = parseReferenceMode(fc.args['referenceMode']);
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
             const title = typeof fc.args['title'] === 'string' ? fc.args['title'] : undefined;
             const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
@@ -1437,6 +1603,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   resolution: '720p',
                   productId,
                   ingredientAssetIds,
+                  referenceSelections,
+                  referenceMode,
                   qualityMode,
                   title,
                   hook,
@@ -1485,6 +1653,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           if (fc.name === 'generate_long_video') {
             const scenes = Array.isArray(fc.args['scenes']) ? fc.args['scenes'] : [];
             const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
+            const referenceSelections = parseReferenceSelections(fc.args['referenceSelections']);
+            const referenceMode = parseReferenceMode(fc.args['referenceMode']);
             const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
             const title = typeof fc.args['title'] === 'string' ? fc.args['title'] : undefined;
             const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
@@ -1493,6 +1663,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const prompt = typeof fc.args['prompt'] === 'string' ? fc.args['prompt'] : undefined;
             const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
             const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
+            if (!hasAvatarIdentity) {
+              needsAvatarPrompt = true;
+              console.log('[LONG-VIDEO] No avatar detected; prompting for avatar consistency.');
+            }
 
             const storyboard = proposeStoryboard({
               prompt,
@@ -1502,6 +1676,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               resolution: fc.args['resolution'] || '720p',
               productId,
               ingredientAssetIds,
+              referenceSelections,
+              referenceMode,
               qualityMode,
               title,
               hook,
@@ -1956,6 +2132,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         }
       }
 
+      if (needsAvatarPrompt) {
+        const avatarPrompt = 'Want tighter character consistency? Upload an avatar photo or use Create AI Avatar below.';
+        responseText = responseText ? `${responseText}\n\n${avatarPrompt}` : avatarPrompt;
+      }
+
       const modelMessages: ChatMessage[] = [];
       if (responseText) {
         modelMessages.push({
@@ -2155,6 +2336,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   if (!activeBoard) return <WorkspaceSkeleton />;
 
   const editingProduct = activeBoard.products?.find(p => p.id === editingProductId) || null;
+  const hasAvatar = Boolean(activeBoard.avatarIdentity) || activeBoard.assets.some(asset => asset.type === 'avatar');
+  const avatarBusy = isAvatarUploading || isAvatarGenerating;
 
   return (
     <div className="flex flex-col md:flex-row min-h-[100dvh] md:h-screen w-full font-sans text-neo-black relative md:overflow-hidden bg-gray-50">
@@ -2264,13 +2447,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         onDismissResearch={handleDismissResearch}
         onStoryboardAction={handleStoryboardAction}
         onStoryboardEdit={handleStoryboardEdit}
+        onUpdateStoryboardReferences={handleStoryboardReferenceUpdate}
         draftMessage={chatDraft}
         isProcessing={isProcessing}
         processingStatus={processingStatus}
         hasAssets={activeBoard.assets.length > 0}
+        assets={activeBoard.assets}
+        storyboards={activeBoard.storyboards || pendingStoryboards}
+        hasAvatar={hasAvatar}
+        avatarBusy={avatarBusy}
         videoQualityMode={videoQualityMode}
         onToggleVideoQuality={() => setVideoQualityMode(prev => !prev)}
         ahaPackAvailable={ahaPackAvailable}
+        onUploadAvatar={handleUploadAvatarFiles}
+        onCreateAvatar={handleCreateAiAvatar}
       />
       
       {activeJobs.length > 0 && (

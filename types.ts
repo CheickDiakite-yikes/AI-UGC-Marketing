@@ -56,6 +56,14 @@ export interface LongVideoSceneInput {
   transition?: string;
 }
 
+export type VideoReferenceRole = 'avatar' | 'item' | 'setting';
+export type VideoReferenceMode = 'manual' | 'hybrid' | 'auto';
+
+export interface VideoReferenceSelection {
+  assetId: string;
+  role?: VideoReferenceRole;
+}
+
 export interface LongVideoStoryboardPayload {
   prompt?: string;
   continuitySpec?: string;
@@ -64,6 +72,8 @@ export interface LongVideoStoryboardPayload {
   resolution?: string;
   productId?: string;
   ingredientAssetIds?: string[];
+  referenceSelections?: VideoReferenceSelection[];
+  referenceMode?: VideoReferenceMode;
   qualityMode?: boolean;
   title?: string;
   hook?: string;

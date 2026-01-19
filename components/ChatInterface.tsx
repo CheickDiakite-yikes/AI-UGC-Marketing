@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage } from '../types';
+import { ChatMessage, ProjectAsset, StoryboardRecord, VideoReferenceMode, VideoReferenceSelection } from '../types';
 import ReactMarkdown from 'react-markdown';
+import StoryboardReferenceKit from './StoryboardReferenceKit';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -9,10 +10,17 @@ interface ChatInterfaceProps {
   onDismissResearch?: (messageId: string) => void;
   onStoryboardAction?: (storyboardId: string, action: 'approve' | 'cancel') => void;
   onStoryboardEdit?: (storyboardId: string) => void;
+  onUpdateStoryboardReferences?: (storyboardId: string, selections: VideoReferenceSelection[], mode: VideoReferenceMode) => void;
+  onUploadAvatar?: (files: File[]) => void;
+  onCreateAvatar?: (prompt: string) => void;
   draftMessage?: { id: string; text: string } | null;
   isProcessing: boolean;
   processingStatus?: string;
   hasAssets: boolean;
+  assets: ProjectAsset[];
+  storyboards?: StoryboardRecord[];
+  hasAvatar: boolean;
+  avatarBusy?: boolean;
   videoQualityMode: boolean;
   onToggleVideoQuality: () => void;
   ahaPackAvailable: boolean;
@@ -51,18 +59,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onDismissResearch,
   onStoryboardAction,
   onStoryboardEdit,
+  onUpdateStoryboardReferences,
+  onUploadAvatar,
+  onCreateAvatar,
   draftMessage,
   isProcessing,
   processingStatus,
   hasAssets,
+  assets,
+  storyboards,
+  hasAvatar,
+  avatarBusy,
   videoQualityMode,
   onToggleVideoQuality,
   ahaPackAvailable
 }) => {
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [showAvatarComposer, setShowAvatarComposer] = useState(false);
+  const [avatarPrompt, setAvatarPrompt] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const storyboardById = new Map((storyboards || []).map(storyboard => [storyboard.id, storyboard]));
 
   useEffect(() => {
     if (window.innerWidth >= 768) {
@@ -110,6 +129,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (isProcessing) return;
     onSendMessage(prompt);
   };
+
+  const latestStoryboardMessageId = (() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].storyboardId) return messages[i].id;
+    }
+    return null;
+  })();
+
+  const handleAvatarUploadClick = () => {
+    if (!onUploadAvatar || avatarBusy || isProcessing) return;
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0 && onUploadAvatar) {
+      onUploadAvatar?.(files);
+    }
+    e.target.value = '';
+  };
+
+  const handleAvatarCreateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (avatarBusy || isProcessing) return;
+    const trimmed = avatarPrompt.trim();
+    if (!trimmed) return;
+    onCreateAvatar?.(trimmed);
+    setAvatarPrompt('');
+    setShowAvatarComposer(false);
+  };
+
+  useEffect(() => {
+    if (hasAvatar && showAvatarComposer) {
+      setShowAvatarComposer(false);
+    }
+  }, [hasAvatar, showAvatarComposer]);
 
   const baseChips: Chip[] = [
     {
@@ -183,6 +238,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       inset-x-0 top-16 bottom-0
       md:z-50 md:inset-auto md:top-auto md:bottom-6 md:right-6 md:w-96 md:h-[650px] md:rounded-2xl md:border-2 md:border-white/50
     `}>
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleAvatarFiles}
+      />
       
       <div className="bg-white/60 border-b border-white/20 p-4 flex items-center justify-between backdrop-blur-md flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -220,7 +283,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-black/20 bg-white/20">
-        {messages.map((msg) => (
+        {messages.map((msg) => {
+          const storyboard = msg.storyboardId ? storyboardById.get(msg.storyboardId) : null;
+          return (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
             <div 
               className={`max-w-[90%] p-3 md:p-4 rounded-2xl border shadow-sm backdrop-blur-sm text-sm md:text-base font-medium leading-relaxed
@@ -346,6 +411,65 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </button>
                   </div>
                 )}
+                {!hasAvatar && msg.id === latestStoryboardMessageId && (!msg.storyboardStatus || msg.storyboardStatus === 'pending') && (
+                  <div className="border-2 border-black bg-white/80 rounded-xl p-3 shadow-neo-sm">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Character Consistency</div>
+                    <p className="mt-1 text-xs font-bold text-gray-700">
+                      If this long video features a person, add an avatar to lock the character across scenes.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAvatarUploadClick}
+                        disabled={avatarBusy || isProcessing || !onUploadAvatar}
+                        className="text-xs bg-neo-cyan border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold disabled:opacity-50 flex items-center gap-1"
+                      >
+                        <span>📷</span> Upload Avatar
+                      </button>
+                      {onCreateAvatar && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAvatarComposer(prev => !prev)}
+                          disabled={avatarBusy || isProcessing}
+                          className="text-xs bg-neo-pink border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold disabled:opacity-50 flex items-center gap-1"
+                        >
+                          <span>✨</span> Create AI Avatar
+                        </button>
+                      )}
+                    </div>
+                    {showAvatarComposer && onCreateAvatar && (
+                      <form onSubmit={handleAvatarCreateSubmit} className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={avatarPrompt}
+                          onChange={(e) => setAvatarPrompt(e.target.value)}
+                          placeholder="Describe the person (age, vibe, style)..."
+                          className="flex-1 bg-white border-2 border-black px-2 py-1.5 text-xs font-bold"
+                          disabled={avatarBusy || isProcessing}
+                        />
+                        <button
+                          type="submit"
+                          disabled={avatarBusy || isProcessing || !avatarPrompt.trim()}
+                          className="text-xs bg-neo-black text-white border-2 border-black px-3 py-1.5 font-bold disabled:opacity-50"
+                        >
+                          Generate
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                )}
+                {storyboard && onUpdateStoryboardReferences && (!msg.storyboardStatus || msg.storyboardStatus === 'pending') && (
+                  <div className="mt-3">
+                    <StoryboardReferenceKit
+                      storyboardId={storyboard.id}
+                      assets={assets}
+                      referenceSelections={storyboard.payload.referenceSelections}
+                      referenceMode={storyboard.payload.referenceMode}
+                      disabled={isProcessing || msg.storyboardStatus === 'processing'}
+                      onChange={onUpdateStoryboardReferences}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -361,7 +485,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </div>
             )}
           </div>
-        ))}
+        );
+        })}
         
         {isProcessing && (
           <div className="flex justify-start animate-fade-in-up">
@@ -398,6 +523,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       <div className="p-4 bg-white/60 border-t border-white/20 backdrop-blur-md flex-shrink-0">
         <form onSubmit={handleSubmit} className="relative">
+          <button
+            type="button"
+            onClick={handleAvatarUploadClick}
+            disabled={avatarBusy || isProcessing || !onUploadAvatar}
+            title="Upload avatar"
+            className="absolute left-2 top-2 bottom-2 aspect-square bg-white/80 border-2 border-black rounded-lg hover:bg-neo-cyan transition-colors disabled:opacity-50 flex items-center justify-center"
+          >
+            <span className="text-base">👤</span>
+          </button>
           <input
             type="text"
             value={input}
@@ -405,7 +539,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             placeholder="Scan trends or generate campaigns..."
             ref={inputRef}
             data-tour="chat-input"
-            className="w-full bg-white/80 border-2 border-transparent focus:border-neo-pink rounded-xl py-4 pl-4 pr-14 text-base text-gray-800 placeholder-gray-500 outline-none transition-all shadow-inner"
+            className="w-full bg-white/80 border-2 border-transparent focus:border-neo-pink rounded-xl py-4 pl-12 pr-14 text-base text-gray-800 placeholder-gray-500 outline-none transition-all shadow-inner"
           />
           <button 
             type="submit"
