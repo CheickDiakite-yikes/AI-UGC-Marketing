@@ -606,11 +606,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       scenes
     };
     const { totalDurationSeconds } = getStoryboardTotals(scenes);
+    const messageId = crypto.randomUUID();
     const storyboardId = crypto.randomUUID();
+    const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds);
+    const storyboardMessage: ChatMessage = {
+      id: messageId,
+      role: 'model',
+      text: messageText,
+      storyboardId,
+      storyboardStatus: 'pending'
+    };
     const storyboard: StoryboardRecord = {
       id: storyboardId,
       boardId: activeBoardId,
-      messageId: storyboardMessage.id,
+      messageId,
       status: 'pending',
       payload: normalizedPayload,
       totalDurationSeconds,
@@ -618,15 +627,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     };
 
     setPendingStoryboards(prev => [...prev, storyboard]);
-
-    const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds);
-    const storyboardMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'model',
-      text: messageText,
-      storyboardId,
-      storyboardStatus: 'pending'
-    };
     return { storyboard, storyboardMessage };
   };
 

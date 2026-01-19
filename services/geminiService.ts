@@ -480,6 +480,11 @@ export const chatWithMarketingAgent = async (
     - Use generate_long_video for 15-30s requests that require multiple scenes stitched together
     - For long videos, draft a storyboard first and wait for explicit user approval before generation
     - Do not claim the long video is generating until the user approves the storyboard
+    - If the user asks for a long-form video with a short prompt (e.g., "viral GRWM TikTok"), infer reasonable defaults:
+      - Aspect ratio: 9:16 for TikTok/Reels; 16:9 otherwise
+      - Scenes: 3-4 scenes, 6s each (total 18-24s) unless a duration is requested
+      - Continuity: same person, outfit, location, lighting, and props across scenes
+    - Only ask follow-up questions if critical info is missing (no product context, compliance risk, or unclear platform)
     - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
     - Video prompts should describe: scene, action, movement, camera angle, mood
     - Avoid on-screen text unless the user explicitly asks for it
