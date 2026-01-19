@@ -10,7 +10,7 @@ import { generateLongVideoAssets } from '../../../../services/longVideoPipeline'
 import { db } from '../../../../db';
 import { generatedItems, users } from '../../../../db/schema';
 import { eq } from 'drizzle-orm';
-import { AspectRatio, VeoConfig, PlanTier, VideoReferenceMode, VideoReferenceSelection } from '../../../../types';
+import { AspectRatio, VeoConfig, PlanTier, VideoReferenceMode, VideoReferenceSelection, LongVideoSceneInput } from '../../../../types';
 import { getPlanLimits } from '../../../../services/subscriptionPlans';
 import { getRemainingImages, getRemainingVideos } from '../../../../services/usageLimits';
 import { consumeUsage } from '../../../../services/usageConsumption';
@@ -341,7 +341,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
 
 async function processLongVideoJob(job: Job): Promise<JobResult> {
   const payload = job.payload as {
-    scenes: Array<Record<string, unknown>>;
+    scenes: LongVideoSceneInput[];
     title?: string;
     hook?: string;
     caption?: string;
