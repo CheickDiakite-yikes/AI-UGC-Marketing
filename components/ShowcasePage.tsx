@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ShowcaseItem } from '../types';
 import { getShowcaseItemsAction } from '../app/actions/showcaseActions';
 
@@ -14,6 +14,52 @@ const filters: Array<{ id: FilterId; label: string }> = [
   { id: 'image', label: 'Images' },
   { id: 'carousel', label: 'Carousels' },
 ];
+
+const VIDEO_POSTER =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%2380F0F0'/><stop offset='100%' stop-color='%23FF90E8'/></linearGradient></defs><rect width='400' height='300' fill='url(%23g)'/><circle cx='200' cy='150' r='40' fill='%23000000' fill-opacity='0.7'/><polygon points='190,135 190,165 218,150' fill='white'/></svg>";
+
+const VideoPreview = ({ src, className }: { src: string; className?: string }) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [canAutoPlay, setCanAutoPlay] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const saveData = (navigator as any)?.connection?.saveData;
+    setCanAutoPlay(!prefersReducedMotion && !saveData);
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !canAutoPlay) return;
+    let observer: IntersectionObserver | null = null;
+    const handle = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => null);
+        } else {
+          video.pause();
+        }
+      });
+    };
+    observer = new IntersectionObserver(handle, { threshold: 0.35 });
+    observer.observe(video);
+    return () => observer?.disconnect();
+  }, [canAutoPlay]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      className={className}
+      muted
+      playsInline
+      loop
+      preload="metadata"
+      poster={VIDEO_POSTER}
+    />
+  );
+};
 
 const ShowcasePage: React.FC<Props> = ({ onBack }) => {
   const [items, setItems] = useState<ShowcaseItem[]>([]);
@@ -144,12 +190,9 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
                   style={getPreviewStyle(featured)}
                 >
                   {featured.type === 'video' ? (
-                    <video
+                    <VideoPreview
                       src={featured.previewUrl}
                       className="w-full h-full object-contain bg-black"
-                      muted
-                      playsInline
-                      preload="metadata"
                     />
                   ) : (
                     <img src={featured.previewUrl} alt={featured.title} className="w-full h-full object-contain bg-white" />
@@ -215,12 +258,9 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
                 <div className="relative border-2 border-black overflow-hidden bg-gray-100" style={getPreviewStyle(item)}>
                   {item.previewUrl ? (
                     item.type === 'video' ? (
-                      <video
+                      <VideoPreview
                         src={item.previewUrl}
                         className="w-full h-full object-contain bg-black"
-                        muted
-                        playsInline
-                        preload="metadata"
                       />
                     ) : (
                       <img src={item.previewUrl} alt={item.title} className="w-full h-full object-contain bg-white" />
