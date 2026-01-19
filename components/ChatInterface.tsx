@@ -35,6 +35,13 @@ const formatUrl = (url: string): string => {
   }
 };
 
+interface Chip {
+  label: string;
+  prompt: string;
+  color: string;
+  tour?: string;
+}
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   onSendMessage,
@@ -89,7 +96,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     onSendMessage(prompt);
   };
 
-  const baseChips = [
+  const baseChips: Chip[] = [
     {
       label: "🔥 Trend Hijack",
       prompt: "Perform a 'Trend Discovery' search for my niche. For each trend found, map it to 3 specific target personas and propose platform-specific angles (TikTok vs IG vs FB). Include Viral Potential scores.",
@@ -133,13 +140,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   ];
 
-  const ahaChip = {
+  const ahaChip: Chip = {
     label: "✨ Aha Pack (Free)",
     prompt: "Generate an 'Aha Pack' as a generate_campaign_pack with exactly 3 items: 1 image post, 1 carousel with 2 slides, and 1 HQ video. Use qualityMode: true for the video and keep the pack outcome-driven.",
     color: "bg-neo-pink"
   };
 
-  const SMART_CHIPS = ahaPackAvailable ? [ahaChip, ...baseChips] : baseChips;
+  const SMART_CHIPS: Chip[] = ahaPackAvailable ? [ahaChip, ...baseChips] : baseChips;
 
   if (!isOpen) {
     return (
