@@ -348,6 +348,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 )}
               </div>
             )}
+
+            {msg.jobType === 'generate_long_video' && msg.jobStatus && (msg.jobStatus === 'queued' || msg.jobStatus === 'processing') && (
+              <div className="mt-2 ml-1 max-w-[90%] flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 animate-fade-in-up">
+                <span className="w-2 h-2 bg-neo-cyan rounded-full animate-pulse"></span>
+                <span>Long Video Rendering</span>
+                {msg.jobMeta?.sceneCount && (
+                  <span className="bg-white border border-black px-1 py-0.5 text-[9px] font-bold text-gray-600 rounded">
+                    {msg.jobMeta.sceneCount} scenes{msg.jobMeta.totalDurationSeconds ? ` · ${msg.jobMeta.totalDurationSeconds}s` : ''}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
         

@@ -93,6 +93,10 @@ export interface ChatMessage {
   researchDismissed?: boolean; // True when user dismissed the research
   storyboardId?: string;
   storyboardStatus?: 'pending' | 'processing' | 'approved' | 'cancelled';
+  jobId?: string;
+  jobType?: 'generate_image' | 'generate_video' | 'generate_long_video' | 'generate_carousel';
+  jobStatus?: 'queued' | 'processing' | 'completed' | 'failed';
+  jobMeta?: { sceneCount?: number; totalDurationSeconds?: number };
 }
 
 export interface BrandIdentity {

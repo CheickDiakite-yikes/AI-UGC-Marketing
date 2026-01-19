@@ -83,6 +83,11 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
   );
   const pendingStatus = !isContentReady ? (item.meta?.status || 'queued') : null;
   const pendingLabel = pendingStatus === 'processing' ? 'Processing' : pendingStatus === 'failed' ? 'Failed' : 'Queued';
+  const sceneCount = typeof item.meta?.sceneCount === 'number' ? Math.max(1, item.meta.sceneCount) : 1;
+  const totalDurationSeconds = typeof item.meta?.totalDurationSeconds === 'number'
+    ? Math.max(1, item.meta.totalDurationSeconds)
+    : sceneCount > 1 ? sceneCount * 8 : undefined;
+  const isLongVideo = item.type === 'video' && !item.meta?.isScene && (item.meta?.isLongVideo || sceneCount > 1);
 
   return (
     <div className="bg-white border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
@@ -90,6 +95,11 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
       <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden group/header">
         <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
         <div className="flex items-center gap-2 z-10 relative">
+          {isLongVideo && (
+            <div className="text-[9px] uppercase font-bold text-black/70 bg-white/80 border border-black px-1 py-0.5 rounded">
+              Long {sceneCount} scenes
+            </div>
+          )}
           {onToggleFavorite && isContentReady && (
             <button
               onClick={handleToggleFavorite}
@@ -189,10 +199,23 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
             {item.content && (item.content.startsWith('blob:') || item.content.startsWith('/api/storage/') || item.content.startsWith('data:') || item.content.startsWith('http')) ? (
                <video src={item.content} controls className="w-full h-auto max-h-[400px]" onClick={e => e.stopPropagation()} />
             ) : (
-               <div className="flex flex-col items-center justify-center p-8 text-center animate-pulse">
-                   <div className="w-8 h-8 bg-gray-300 rounded-full mb-2"></div>
-                   <span className="text-xs font-bold text-gray-400">Rendering Video...</span>
-                   <span className="text-[10px] text-gray-400 mt-1">(Takes ~1-2 min)</span>
+               <div className="flex flex-col items-center justify-center p-8 text-center animate-pulse w-full gap-2">
+                 <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
+                 <span className="text-xs font-bold text-gray-400">
+                   {isLongVideo ? 'Rendering Long Video...' : 'Rendering Video...'}
+                 </span>
+                 {isLongVideo && (
+                   <div className="flex flex-col items-center gap-2 text-[10px] text-gray-400">
+                     <span>{sceneCount} scenes{totalDurationSeconds ? ` · ${totalDurationSeconds}s` : ''}</span>
+                     <div className="flex items-center gap-1">
+                       {Array.from({ length: Math.min(sceneCount, 5) }).map((_, index) => (
+                         <span key={index} className="w-2 h-2 bg-gray-300 rounded-full"></span>
+                       ))}
+                       {sceneCount > 5 && <span className="text-[9px] text-gray-400">+{sceneCount - 5}</span>}
+                     </div>
+                   </div>
+                 )}
+                 <span className="text-[10px] text-gray-400 mt-1">(Takes ~1-2 min per scene)</span>
                </div>
             )}
           </div>

@@ -501,6 +501,7 @@ export const chatWithMarketingAgent = async (
     - For generate_long_video, include continuitySpec covering character, wardrobe, props, lighting, and camera style
     - If you include a long video inside a campaign pack, set type: "long_video" and include scenes + continuitySpec
     - Long videos in packs will still require storyboard approval before generation
+    - Use 1080p only when every scene is 8 seconds; otherwise stick to 720p
   `;
 
   const model = "gemini-3-pro-preview";

@@ -274,11 +274,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     return { sceneCount, totalDurationSeconds };
   };
 
-  const buildStoryboardMessage = (payload: LongVideoStoryboardPayload, totalDurationSeconds: number) => {
+  const buildStoryboardMessage = (payload: LongVideoStoryboardPayload, totalDurationSeconds: number, note?: string) => {
     const scenes = payload.scenes || [];
     const lines: string[] = [];
     const sceneCount = scenes.length;
     lines.push(`🧭 Storyboard ready for approval (${sceneCount} scene${sceneCount === 1 ? '' : 's'}, ${totalDurationSeconds}s).`);
+    if (note) lines.push(`**Note:** ${note}`);
     if (payload.title) lines.push(`**Title:** ${payload.title}`);
     if (payload.hook) lines.push(`**Hook:** ${payload.hook}`);
     if (payload.caption) lines.push(`**Caption:** ${payload.caption}`);
@@ -403,6 +404,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   }, []);
 
   const pollJobStatus = useCallback((jobId: string, onComplete: (result: any) => void) => {
+    const updateJobMessageStatus = (status: ChatMessage['jobStatus']) => {
+      updateActiveBoard(b => ({
+        ...b,
+        messages: b.messages.map(msg => msg.jobId === jobId ? { ...msg, jobStatus: status } : msg)
+      }));
+    };
     const poll = async () => {
       try {
         // Trigger job processing on each poll (ensures jobs get processed in Autoscale)
@@ -412,11 +419,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         const job = await res.json();
         
         if (job.status === 'completed') {
+          updateJobMessageStatus('completed');
           setPendingItems(prev => prev.filter(item => item.id !== jobId));
           onComplete(job.result);
           setActiveJobs(prev => prev.filter(id => id !== jobId));
           showSuccess(`Content generated successfully!`);
         } else if (job.status === 'failed') {
+          updateJobMessageStatus('failed');
           console.error('[WORKSPACE] Job failed:', job.error);
           setPendingItems(prev => prev.filter(item => item.id !== jobId));
           setActiveJobs(prev => prev.filter(id => id !== jobId));
@@ -430,6 +439,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             payload: job.payload
           }]);
         } else {
+          if (job.status === 'processing') {
+            updateJobMessageStatus('processing');
+          }
           const nextStatus = job.status === 'processing' ? 'processing' : 'queued';
           setPendingItems(prev => prev.map(item => item.id === jobId ? {
             ...item,
@@ -451,6 +463,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       const title = typeof payload?.title === 'string'
         ? payload.title
         : type === 'video' ? 'Generating Video' : 'Generating Image';
+      const sceneCount = typeof payload?.sceneCount === 'number' ? payload.sceneCount : undefined;
+      const isLongVideo = typeof payload?.isLongVideo === 'boolean'
+        ? payload.isLongVideo
+        : typeof sceneCount === 'number' && sceneCount > 1;
       const meta = {
         aspectRatio: typeof payload?.aspectRatio === 'string' ? payload.aspectRatio : undefined,
         resolution: typeof payload?.resolution === 'string' ? payload.resolution : undefined,
@@ -458,8 +474,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         hook: typeof payload?.hook === 'string' ? payload.hook : undefined,
         archetype: typeof payload?.archetype === 'string' ? payload.archetype : undefined,
         status: 'queued' as const,
-        sceneCount: typeof payload?.sceneCount === 'number' ? payload.sceneCount : undefined,
-        totalDurationSeconds: typeof payload?.totalDurationSeconds === 'number' ? payload.totalDurationSeconds : undefined
+        sceneCount,
+        totalDurationSeconds: typeof payload?.totalDurationSeconds === 'number' ? payload.totalDurationSeconds : undefined,
+        isLongVideo
       };
       return [...prev, { id: jobId, type, content: '', title, meta }];
     });
@@ -502,6 +519,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     if (sceneCount > 5) {
       showError('Long videos support up to 5 scenes.');
       return { ok: false, message: 'Long videos support up to 5 scenes.' };
+    }
+    if (totalDurationSeconds > 30) {
+      showError('Total duration exceeds 30 seconds. Reduce scene count or durations.');
+      return { ok: false, message: 'Total duration exceeds 30 seconds.' };
     }
     if (isVideoLocked) {
       showError('Video generation requires a subscription.');
@@ -571,15 +592,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       hook: payload.hook,
       archetype: payload.archetype,
       sceneCount,
-      totalDurationSeconds
+      totalDurationSeconds,
+      isLongVideo: true
     });
     pollJobStatus(job.id, async () => {
       await loadBoardDetails(activeBoardId, { skipOnboarding: true });
       getUserUsageAction().then(setUsage);
     });
 
-    const progressMessage = `🎬 Long video generation in progress (${sceneCount} scenes, ${totalDurationSeconds}s). This will complete even if you leave the page.`;
-    return { ok: true, message: progressMessage };
+    const progressMessage = `🎬 Long video generation in progress (${sceneCount} scenes, ${totalDurationSeconds}s). A Long Video card will appear in your board while it renders.`;
+    return { ok: true, message: progressMessage, jobId: job.id, sceneCount, totalDurationSeconds };
   };
 
   const proposeStoryboard = (payload: LongVideoStoryboardPayload) => {
@@ -598,17 +620,35 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       return null;
     }
 
+    const { totalDurationSeconds } = getStoryboardTotals(scenes);
+    if (totalDurationSeconds > 30) {
+      showError('Total duration exceeds 30 seconds. Reduce scene count or durations.');
+      return null;
+    }
+
+    let resolution = payload.resolution || '720p';
+    let resolutionNote = '';
+    if (resolution === '1080p') {
+      const needsEightSeconds = scenes.some(scene => {
+        const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
+        return duration !== 8;
+      });
+      if (needsEightSeconds) {
+        resolution = '720p';
+        resolutionNote = 'Resolution adjusted to 720p because 1080p requires 8s per scene.';
+      }
+    }
+
     const normalizedPayload: LongVideoStoryboardPayload = {
       ...payload,
       aspectRatio: payload.aspectRatio || '16:9',
-      resolution: payload.resolution || '720p',
+      resolution,
       qualityMode: typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode,
       scenes
     };
-    const { totalDurationSeconds } = getStoryboardTotals(scenes);
     const messageId = crypto.randomUUID();
     const storyboardId = crypto.randomUUID();
-    const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds);
+    const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds, resolutionNote || undefined);
     const storyboardMessage: ChatMessage = {
       id: messageId,
       role: 'model',
@@ -686,7 +726,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     await appendModelMessage({
       id: crypto.randomUUID(),
       role: 'model',
-      text: result.message || 'Long video generation in progress.'
+      text: result.message || 'Long video generation in progress.',
+      jobId: result.jobId,
+      jobType: 'generate_long_video',
+      jobStatus: 'queued',
+      jobMeta: {
+        sceneCount: result.sceneCount,
+        totalDurationSeconds: result.totalDurationSeconds
+      }
     });
   };
 
@@ -703,9 +750,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               const sceneCount = job.type === 'generate_long_video' && Array.isArray(job.payload?.scenes)
                 ? job.payload.scenes.length
                 : undefined;
+              const totalDurationSeconds = job.type === 'generate_long_video' && Array.isArray(job.payload?.scenes)
+                ? job.payload.scenes.reduce((sum: number, scene: any) => {
+                  const duration = typeof scene?.durationSeconds === 'number' ? scene.durationSeconds : 8;
+                  return sum + duration;
+                }, 0)
+                : undefined;
               addPendingItem(job.id, itemType, {
                 title: itemType === 'video' ? 'Generating Video' : 'Generating Image',
-                sceneCount
+                sceneCount,
+                totalDurationSeconds,
+                isLongVideo: job.type === 'generate_long_video'
               });
             });
             // Immediately trigger job processing for any pending jobs
@@ -1675,7 +1730,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   caption: jobPayload.caption,
                   hook: jobPayload.hook,
                   archetype: jobPayload.archetype,
-                  sceneCount: job.type === 'generate_long_video' && Array.isArray(jobPayload.scenes) ? jobPayload.scenes.length : undefined
+                  sceneCount: job.type === 'generate_long_video' && Array.isArray(jobPayload.scenes) ? jobPayload.scenes.length : undefined,
+                  totalDurationSeconds: job.type === 'generate_long_video' && Array.isArray(jobPayload.scenes)
+                    ? jobPayload.scenes.reduce((sum: number, scene: any) => {
+                      const duration = typeof scene?.durationSeconds === 'number' ? scene.durationSeconds : 8;
+                      return sum + duration;
+                    }, 0)
+                    : undefined,
+                  isLongVideo: job.type === 'generate_long_video'
                 });
                 pollJobStatus(job.id, async () => {
                   await loadBoardDetails(activeBoardId, { skipOnboarding: true });
@@ -2030,7 +2092,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       
       const job = await res.json();
       setActiveJobs(prev => [...prev, job.id]);
-      addPendingItem(job.id, failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video' ? 'video' : 'image', failedJob.payload);
+      addPendingItem(job.id, failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video' ? 'video' : 'image', {
+        ...failedJob.payload,
+        isLongVideo: failedJob.type === 'generate_long_video'
+      });
       pollJobStatus(job.id, async () => {
         await loadBoardDetails(activeBoardId, { skipOnboarding: true });
         getUserUsageAction().then(setUsage);

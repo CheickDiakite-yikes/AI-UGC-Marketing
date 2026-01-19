@@ -35,6 +35,8 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Pipeline: `services/longVideoPipeline.ts` generates scenes, extracts continuity frames, and stitches via `services/videoStitchService.ts`.
 - Storyboard approval required: chat proposes storyboard first and only queues generation after user approval.
 - Storyboards are persisted in the `storyboards` table with status and payload; chat shows approve/cancel/edit actions.
+- Chat shows a small in-chat tracker pill for long-video rendering during active jobs.
+- 1080p long-video scenes must be 8s each; otherwise resolution auto-falls back to 720p.
 - Each scene is stored as a `video` item with `meta.isScene` + `sceneIndex`.
 - Final stitched video is a `video` item with `meta.isLongVideo`, `sceneItemIds`, `sceneCount`, `totalDurationSeconds`.
 - Video usage/credits are charged per scene (sceneCount).

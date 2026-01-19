@@ -11,6 +11,7 @@
 - Add a long-video pipeline to deliver 15-30s stitched videos with scene consistency.
 - Require storyboard approval before long-video generation.
 - Add storyboard edit action and persist storyboards across sessions.
+- Add a lightweight in-chat tracker for long-video rendering.
 
 ## Key Decisions
 - Add prompt guardrails for video quality and shorter on-screen text.
@@ -24,6 +25,7 @@
 - Dashboard centers on a monthly calendar and weekly report, with per-day multi-asset scheduling.
 - Long videos require user approval of a storyboard before jobs are queued.
 - Storyboards persist in the database and can be edited via chat.
+- Chat shows a long-video rendering tracker while jobs run.
 
 ## Changes Implemented
 - Video prompt guardrails expanded with anatomy/physics constraints.
@@ -44,6 +46,7 @@
 - Added long-video pipeline with multi-scene generation + ffmpeg stitching.
 - Added storyboard approval flow for long videos in chat (approve/cancel actions).
 - Added storyboard persistence and edit actions that prefill the chat input.
+- Added long-video rendering tracker in chat and 1080p duration guardrails.
 
 ## Current Status
 - Quality Mode is ON by default and active for all video jobs unless toggled off.

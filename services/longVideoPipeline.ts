@@ -114,7 +114,9 @@ export async function generateLongVideoAssets(params: {
 
   const longVideoGroupId = crypto.randomUUID();
   const aspectRatio = payload.aspectRatio === '9:16' ? '9:16' : '16:9';
-  const resolution = payload.resolution === '1080p' ? '1080p' : '720p';
+  const wants1080p = payload.resolution === '1080p';
+  const supports1080p = normalizedScenes.every(scene => scene.durationSeconds === 8);
+  const resolution = wants1080p && supports1080p ? '1080p' : '720p';
   const qualityMode = payload.qualityMode === true;
 
   const ingredientResult = await resolveVideoIngredients({
