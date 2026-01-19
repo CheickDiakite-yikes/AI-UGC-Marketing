@@ -179,12 +179,23 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
     if (entry.type === 'video') {
       const meta = entry.meta || {};
+      if (meta.isScene) {
+        return { cost: 0, value: 0 };
+      }
       const referenceCount = Number.isFinite(meta.referenceCount) ? (meta.referenceCount as number) : 0;
       const isQuality = meta.qualityMode === true || referenceCount > 0 || (meta.qualityMode === undefined && fallbackQualityMode);
       const costPerSecond = isQuality ? COST_PER_VIDEO_SECOND_QUALITY : COST_PER_VIDEO_SECOND_FAST;
-      const baseCost = costPerSecond * VIDEO_AVG_SECONDS;
-      const referenceCost = meta.autoReferenceUsed ? COST_PER_REFERENCE_IMAGE : 0;
-      return { cost: baseCost + referenceCost, value: VALUE_PER_VIDEO };
+      const sceneCount = Number.isFinite(meta.sceneCount) ? Math.max(1, meta.sceneCount as number) : 1;
+      const totalSeconds = Number.isFinite(meta.totalDurationSeconds)
+        ? Math.max(1, meta.totalDurationSeconds as number)
+        : VIDEO_AVG_SECONDS * sceneCount;
+      const baseCost = costPerSecond * totalSeconds;
+      const autoRefCount = Number.isFinite(meta.autoReferenceUsedCount)
+        ? Math.max(0, meta.autoReferenceUsedCount as number)
+        : (meta.autoReferenceUsed ? 1 : 0);
+      const referenceCost = autoRefCount * COST_PER_REFERENCE_IMAGE;
+      const valueMultiplier = totalSeconds / VIDEO_AVG_SECONDS;
+      return { cost: baseCost + referenceCost, value: VALUE_PER_VIDEO * valueMultiplier };
     }
     if (entry.type === 'carousel') {
       const meta = entry.meta || {};

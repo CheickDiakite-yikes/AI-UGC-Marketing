@@ -2,10 +2,10 @@
 'use server';
 
 import { db } from '@/db';
-import { boards, assets, messages, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs, favorites, profileAssets, profileProducts, profileProductAssets } from '@/db/schema';
+import { boards, assets, messages, storyboards, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs, favorites, profileAssets, profileProducts, profileProductAssets } from '@/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection } from '@/types';
+import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection, LongVideoStoryboardPayload, StoryboardStatus } from '@/types';
 import { getSession } from './authActions';
 import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset, downloadAsset } from '@/services/objectStorageService';
 import { consumeUsage } from '@/services/usageConsumption';
@@ -52,6 +52,19 @@ async function assertProductOwnership(productId: string) {
     }
 
     return product;
+}
+
+async function assertStoryboardOwnership(storyboardId: string) {
+    const storyboard = await db.query.storyboards.findFirst({
+        where: eq(storyboards.id, storyboardId)
+    });
+
+    if (!storyboard) {
+        throw new Error('Storyboard not found');
+    }
+
+    await assertBoardOwnership(storyboard.boardId);
+    return storyboard;
 }
 
 function logTrace(traceId: string, message: string, data?: unknown) {
@@ -278,6 +291,7 @@ export async function getBoardDetails(boardId: string) {
             assets: true,
             messages: { orderBy: (messages, { asc }) => [asc(messages.createdAt)] },
             generatedItems: { orderBy: (items, { desc }) => [desc(items.createdAt)] },
+            storyboards: { orderBy: (storyboards, { desc }) => [desc(storyboards.createdAt)] },
             brandIdentity: true,
             avatarIdentity: true,
             products: { with: { productAssets: true } },
@@ -522,16 +536,61 @@ export async function setProductAssetsAction(productId: string, assignments: Pro
     return { success: true };
 }
 
-export async function saveMessageAction(boardId: string, role: 'user' | 'model' | 'system', text: string) {
+export async function saveMessageAction(boardId: string, role: 'user' | 'model' | 'system', text: string, messageId?: string) {
     await assertBoardOwnership(boardId);
-    
-    const [msg] = await db.insert(messages).values({
-        boardId,
-        role,
-        text
-    }).returning();
+
+    const values: any = { boardId, role, text };
+    if (messageId) {
+        values.id = messageId;
+    }
+
+    const [msg] = await db.insert(messages).values(values).returning();
     revalidatePath('/');
     return msg;
+}
+
+export async function createStoryboardAction(
+    boardId: string,
+    input: {
+        id: string;
+        messageId?: string | null;
+        payload: LongVideoStoryboardPayload;
+        totalDurationSeconds: number;
+        status?: StoryboardStatus;
+    }
+) {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        throw new Error('Unauthorized: Must be logged in to create a storyboard');
+    }
+
+    await assertBoardOwnership(boardId);
+
+    const now = new Date();
+    const [saved] = await db.insert(storyboards).values({
+        id: input.id,
+        boardId,
+        userId: session.userId as string,
+        messageId: input.messageId || null,
+        status: input.status || 'pending',
+        payload: input.payload,
+        totalDurationSeconds: input.totalDurationSeconds,
+        createdAt: now,
+        updatedAt: now
+    }).returning();
+
+    revalidatePath('/');
+    return saved;
+}
+
+export async function updateStoryboardStatusAction(storyboardId: string, status: StoryboardStatus) {
+    await assertStoryboardOwnership(storyboardId);
+    const [updated] = await db.update(storyboards)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(storyboards.id, storyboardId))
+        .returning();
+    revalidatePath('/');
+    return updated;
 }
 
 export async function saveGeneratedItemAction(boardId: string, item: any) {

@@ -8,6 +8,7 @@ const requiredTables = [
   'jobs',
   'credit_transactions',
   'calendar_items',
+  'storyboards',
 ];
 
 const requiredUserColumns = [

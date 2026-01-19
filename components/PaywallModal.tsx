@@ -147,7 +147,7 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
             <div className="border-2 border-black bg-white p-3 md:col-span-2">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Video cost guide</p>
               <p className="text-xs text-gray-700">
-                Avg video length: {VIDEO_AVG_SECONDS}s. Quality Mode adds a {VIDEO_REFERENCE_IMAGE_CREDIT_COST}-credit reference frame. Basic includes {PLAN_CATALOG.basic.videos} videos, Pro includes {PLAN_CATALOG.pro.videos}.
+                Avg video length: {VIDEO_AVG_SECONDS}s. Quality Mode adds a {VIDEO_REFERENCE_IMAGE_CREDIT_COST}-credit reference frame. Long videos are stitched from 4/6/8s scenes and consume one video slot per scene. Basic includes {PLAN_CATALOG.basic.videos} videos, Pro includes {PLAN_CATALOG.pro.videos}.
               </p>
             </div>
           </div>

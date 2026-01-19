@@ -21,6 +21,12 @@ export async function POST(request: NextRequest) {
     if (!boardId || !type || !payload) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+    if (type === 'generate_long_video') {
+      const scenes = Array.isArray(payload?.scenes) ? payload.scenes : [];
+      if (scenes.length < 2) {
+        return NextResponse.json({ error: 'Long videos require at least 2 scenes' }, { status: 400 });
+      }
+    }
 
     const board = await db.query.boards.findFirst({
       where: eq(boards.id, boardId),
@@ -34,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (type === 'generate_image' || type === 'generate_video' || type === 'generate_carousel') {
+    if (type === 'generate_image' || type === 'generate_video' || type === 'generate_long_video' || type === 'generate_carousel') {
       const user = await db.query.users.findFirst({
         where: eq(users.id, session.userId as string),
         columns: {
@@ -54,8 +60,11 @@ export async function POST(request: NextRequest) {
       const credits = user.creditBalance || 0;
       const remainingImages = getRemainingImages(user.imagesGenerated, imageLimit, credits);
       const remainingVideos = getRemainingVideos(user.videosGenerated, videoLimit, credits);
+      const requestedScenes = type === 'generate_long_video' && Array.isArray(payload?.scenes)
+        ? payload.scenes.length
+        : 1;
 
-      if (type === 'generate_video' && videoLimit <= 0) {
+      if ((type === 'generate_video' || type === 'generate_long_video') && videoLimit <= 0) {
         return NextResponse.json({
           error: 'Video generation requires a subscription.',
           code: 'PLAN_REQUIRED',
@@ -73,13 +82,14 @@ export async function POST(request: NextRequest) {
         }, { status: 402 });
       }
 
-      if (type === 'generate_video' && remainingVideos <= 0) {
+      if ((type === 'generate_video' || type === 'generate_long_video') && remainingVideos < requestedScenes) {
         return NextResponse.json({
           error: 'Video quota exceeded',
           code: 'QUOTA_EXCEEDED',
           limit: videoLimit,
           used: user.videosGenerated,
-          remaining: remainingVideos
+          remaining: remainingVideos,
+          required: requestedScenes
         }, { status: 402 });
       }
 

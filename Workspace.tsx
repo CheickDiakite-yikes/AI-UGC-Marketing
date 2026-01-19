@@ -17,7 +17,7 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { getRemainingImages, getRemainingVideos } from './services/usageLimits';
@@ -45,7 +45,9 @@ import {
   analyzeProductImagesAction,
   getOnboardingStateAction,
   dismissOnboardingAction,
-  completeOnboardingAction
+  completeOnboardingAction,
+  createStoryboardAction,
+  updateStoryboardStatusAction
 } from './app/actions/boardActions';
 import { getSubscriptionStateAction, createCheckoutSessionAction, createCreditsCheckoutSessionAction } from './app/actions/subscriptionActions';
 import { toggleFavoriteAction } from './app/actions/favoriteActions';
@@ -260,26 +262,115 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   const [activeJobs, setActiveJobs] = useState<string[]>([]);
   const [pendingItems, setPendingItems] = useState<CanvasItem[]>([]);
+  const [pendingStoryboards, setPendingStoryboards] = useState<StoryboardRecord[]>([]);
+  const [chatDraft, setChatDraft] = useState<{ id: string; text: string } | null>(null);
+
+  const getStoryboardTotals = (scenes: LongVideoSceneInput[]) => {
+    const sceneCount = scenes.length;
+    const totalDurationSeconds = scenes.reduce((sum, scene) => {
+      const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
+      return sum + duration;
+    }, 0);
+    return { sceneCount, totalDurationSeconds };
+  };
+
+  const buildStoryboardMessage = (payload: LongVideoStoryboardPayload, totalDurationSeconds: number) => {
+    const scenes = payload.scenes || [];
+    const lines: string[] = [];
+    const sceneCount = scenes.length;
+    lines.push(`🧭 Storyboard ready for approval (${sceneCount} scene${sceneCount === 1 ? '' : 's'}, ${totalDurationSeconds}s).`);
+    if (payload.title) lines.push(`**Title:** ${payload.title}`);
+    if (payload.hook) lines.push(`**Hook:** ${payload.hook}`);
+    if (payload.caption) lines.push(`**Caption:** ${payload.caption}`);
+    if (payload.continuitySpec) lines.push(`**Continuity:** ${payload.continuitySpec}`);
+    lines.push('');
+    scenes.forEach((scene, index) => {
+      const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
+      lines.push(`**Scene ${index + 1} (${duration}s):** ${scene.prompt}`);
+      const detailParts: string[] = [];
+      if (scene.camera) detailParts.push(`Camera: ${scene.camera}`);
+      if (scene.action) detailParts.push(`Action: ${scene.action}`);
+      if (scene.transition) detailParts.push(`Transition: ${scene.transition}`);
+      if (detailParts.length > 0) {
+        lines.push(detailParts.join(' | '));
+      }
+      lines.push('');
+    });
+    lines.push('Approve to start rendering, or reply with edits.');
+    return lines.join('\n');
+  };
+
+  const buildStoryboardEditDraft = (payload: LongVideoStoryboardPayload) => {
+    const lines: string[] = [];
+    lines.push('Please revise this long-video storyboard:');
+    if (payload.prompt) lines.push(`Brief: ${payload.prompt}`);
+    if (payload.continuitySpec) lines.push(`Continuity: ${payload.continuitySpec}`);
+    if (payload.aspectRatio) lines.push(`Aspect ratio: ${payload.aspectRatio}`);
+    if (payload.title) lines.push(`Title: ${payload.title}`);
+    lines.push('');
+    const scenes = payload.scenes || [];
+    scenes.forEach((scene, index) => {
+      const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
+      lines.push(`Scene ${index + 1} (${duration}s): ${scene.prompt}`);
+      if (scene.camera) lines.push(`Camera: ${scene.camera}`);
+      if (scene.action) lines.push(`Action: ${scene.action}`);
+      if (scene.transition) lines.push(`Transition: ${scene.transition}`);
+      lines.push('');
+    });
+    lines.push('Keep total duration <= 30s. Update any lines and send.');
+    return lines.join('\n');
+  };
 
   const loadBoardDetails = useCallback(async (boardId: string, options?: { skipOnboarding?: boolean }) => {
     const b = await getBoardDetails(boardId);
     if (b) {
+      const storyboards = Array.isArray((b as any).storyboards)
+        ? (b as any).storyboards.map((storyboard: any) => ({
+          ...storyboard,
+          status: storyboard.status as StoryboardStatus,
+          payload: storyboard.payload as LongVideoStoryboardPayload,
+        }))
+        : [];
+      const storyboardMessageMap = new Map(
+        storyboards
+          .filter((storyboard: StoryboardRecord) => storyboard.messageId)
+          .map((storyboard: StoryboardRecord) => [storyboard.messageId as string, storyboard])
+      );
+      const mappedMessages = (b.messages as ChatMessage[]).map((msg) => {
+        const storyboard = storyboardMessageMap.get(msg.id);
+        if (!storyboard) return msg;
+        return {
+          ...msg,
+          storyboardId: storyboard.id,
+          storyboardStatus: storyboard.status
+        };
+      });
+      const fallbackStoryboardMessages = storyboards
+        .filter((storyboard: StoryboardRecord) => !storyboard.messageId || !storyboardMessageMap.has(storyboard.messageId))
+        .map((storyboard: StoryboardRecord) => ({
+          id: storyboard.messageId || storyboard.id,
+          role: 'model' as const,
+          text: buildStoryboardMessage(storyboard.payload, storyboard.totalDurationSeconds),
+          storyboardId: storyboard.id,
+          storyboardStatus: storyboard.status
+        }));
       const mappedBoard: Board = {
         ...b,
-          items: b.generatedItems.map((gi: any) => ({
-            id: gi.id,
-            type: gi.type,
-            content: gi.content,
-            carouselUrls: gi.carouselUrls,
-            title: gi.title,
-            description: gi.description,
-            meta: gi.metadata,
-            x: gi.x,
-            y: gi.y,
-            isFavorite: gi.isFavorite
-          })),
+        items: b.generatedItems.map((gi: any) => ({
+          id: gi.id,
+          type: gi.type,
+          content: gi.content,
+          carouselUrls: gi.carouselUrls,
+          title: gi.title,
+          description: gi.description,
+          meta: gi.metadata,
+          x: gi.x,
+          y: gi.y,
+          isFavorite: gi.isFavorite
+        })),
         assets: b.assets as ProjectAsset[],
-        messages: b.messages as ChatMessage[],
+        messages: [...mappedMessages, ...fallbackStoryboardMessages],
+        storyboards,
         brandIdentity: b.brandIdentity as BrandIdentity | null,
         avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
         products: (b.products || []).map((p: any) => ({
@@ -289,6 +380,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
       };
       setActiveBoard(mappedBoard);
+      setPendingStoryboards(storyboards.filter((storyboard: StoryboardRecord) =>
+        storyboard.status === 'pending' || storyboard.status === 'processing'
+      ));
     }
     if (!options?.skipOnboarding) {
       await refreshOnboardingState();
@@ -363,11 +457,238 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         caption: typeof payload?.caption === 'string' ? payload.caption : undefined,
         hook: typeof payload?.hook === 'string' ? payload.hook : undefined,
         archetype: typeof payload?.archetype === 'string' ? payload.archetype : undefined,
-        status: 'queued' as const
+        status: 'queued' as const,
+        sceneCount: typeof payload?.sceneCount === 'number' ? payload.sceneCount : undefined,
+        totalDurationSeconds: typeof payload?.totalDurationSeconds === 'number' ? payload.totalDurationSeconds : undefined
       };
       return [...prev, { id: jobId, type, content: '', title, meta }];
     });
   }, []);
+
+  useEffect(() => {
+    if (!activeBoardId) return;
+    setPendingStoryboards(prev => prev.filter(storyboard => storyboard.boardId === activeBoardId));
+  }, [activeBoardId]);
+
+  
+
+  const updateStoryboardStatus = (storyboardId: string, status: ChatMessage['storyboardStatus']) => {
+    updateActiveBoard(b => ({
+      ...b,
+      messages: b.messages.map(msg => (
+        msg.storyboardId === storyboardId ? { ...msg, storyboardStatus: status } : msg
+      ))
+    }));
+    setPendingStoryboards(prev => {
+      const updated = prev.map(storyboard => (
+        storyboard.id === storyboardId ? { ...storyboard, status: status as StoryboardStatus } : storyboard
+      ));
+      return updated.filter(storyboard => storyboard.status === 'pending' || storyboard.status === 'processing');
+    });
+  };
+
+  const queueLongVideoJob = async (payload: LongVideoStoryboardPayload) => {
+    if (!activeBoardId) {
+      return { ok: false, message: 'No active board.' };
+    }
+
+    const scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
+    const { sceneCount, totalDurationSeconds } = getStoryboardTotals(scenes);
+
+    if (sceneCount < 2) {
+      showError('Long videos require at least 2 scenes.');
+      return { ok: false, message: 'Long videos require at least 2 scenes.' };
+    }
+    if (sceneCount > 5) {
+      showError('Long videos support up to 5 scenes.');
+      return { ok: false, message: 'Long videos support up to 5 scenes.' };
+    }
+    if (isVideoLocked) {
+      showError('Video generation requires a subscription.');
+      openPaywall('video_locked');
+      return { ok: false, message: 'Video generation requires a subscription.' };
+    }
+
+    const pendingVideoCount = pendingItems
+      .filter(item => item.type === 'video')
+      .reduce((sum, item) => sum + (typeof item.meta?.sceneCount === 'number' ? item.meta.sceneCount : 1), 0);
+    const remainingVideos = getRemainingVideos(
+      usage.videosGenerated + pendingVideoCount,
+      planLimits.videoLimit,
+      usage.creditBalance
+    );
+
+    if (remainingVideos < sceneCount) {
+      const message = `Video quota too low for ${sceneCount} scenes (${usage.videosGenerated}/${planLimits.videoLimit}).`;
+      showError(message);
+      openPaywall('video_limit');
+      return { ok: false, message };
+    }
+
+    const qualityMode = typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode;
+    const traceId = crypto.randomUUID();
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        boardId: activeBoardId,
+        type: 'generate_long_video',
+        payload: {
+          prompt: payload.prompt,
+          continuitySpec: payload.continuitySpec,
+          scenes,
+          aspectRatio: payload.aspectRatio || '16:9',
+          resolution: payload.resolution || '720p',
+          productId: payload.productId,
+          ingredientAssetIds: payload.ingredientAssetIds,
+          qualityMode,
+          title: payload.title,
+          hook: payload.hook,
+          caption: payload.caption,
+          archetype: payload.archetype,
+          traceId,
+        }
+      })
+    });
+    const job = await res.json().catch(() => null);
+    if (!res.ok || !job?.id) {
+      const message = job?.error || 'Long video generation request failed.';
+      if (job?.code === 'QUOTA_EXCEEDED') {
+        openPaywall('video_limit');
+      } else if (job?.code === 'PLAN_REQUIRED') {
+        openPaywall('video_locked');
+      }
+      showError(message);
+      return { ok: false, message };
+    }
+
+    setActiveJobs(prev => [...prev, job.id]);
+    addPendingItem(job.id, 'video', {
+      title: payload.title || 'Generating Long Video',
+      aspectRatio: payload.aspectRatio || '16:9',
+      resolution: payload.resolution || '720p',
+      caption: payload.caption,
+      hook: payload.hook,
+      archetype: payload.archetype,
+      sceneCount,
+      totalDurationSeconds
+    });
+    pollJobStatus(job.id, async () => {
+      await loadBoardDetails(activeBoardId, { skipOnboarding: true });
+      getUserUsageAction().then(setUsage);
+    });
+
+    const progressMessage = `🎬 Long video generation in progress (${sceneCount} scenes, ${totalDurationSeconds}s). This will complete even if you leave the page.`;
+    return { ok: true, message: progressMessage };
+  };
+
+  const proposeStoryboard = (payload: LongVideoStoryboardPayload) => {
+    if (!activeBoardId) return null;
+    const scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
+    if (scenes.length < 2) {
+      showError('Long videos require at least 2 scenes.');
+      return null;
+    }
+    if (scenes.length > 5) {
+      showError('Long videos support up to 5 scenes.');
+      return null;
+    }
+    if (!payload.continuitySpec || !payload.continuitySpec.trim()) {
+      showError('Long videos require a continuity spec.');
+      return null;
+    }
+
+    const normalizedPayload: LongVideoStoryboardPayload = {
+      ...payload,
+      aspectRatio: payload.aspectRatio || '16:9',
+      resolution: payload.resolution || '720p',
+      qualityMode: typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode,
+      scenes
+    };
+    const { totalDurationSeconds } = getStoryboardTotals(scenes);
+    const storyboardId = crypto.randomUUID();
+    const storyboard: StoryboardRecord = {
+      id: storyboardId,
+      boardId: activeBoardId,
+      messageId: storyboardMessage.id,
+      status: 'pending',
+      payload: normalizedPayload,
+      totalDurationSeconds,
+      createdAt: Date.now()
+    };
+
+    setPendingStoryboards(prev => [...prev, storyboard]);
+
+    const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds);
+    const storyboardMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'model',
+      text: messageText,
+      storyboardId,
+      storyboardStatus: 'pending'
+    };
+    return { storyboard, storyboardMessage };
+  };
+
+  const appendModelMessage = async (message: ChatMessage) => {
+    if (!activeBoardId) return;
+    await saveMessageAction(activeBoardId, 'model', message.text, message.id);
+    updateActiveBoard(b => ({
+      ...b,
+      messages: [...b.messages, message]
+    }));
+  };
+
+  const executeStoryboardAction = async (storyboardId: string, action: 'approve' | 'cancel') => {
+    const storyboard = pendingStoryboards.find(sb => sb.id === storyboardId);
+    if (!storyboard) return;
+
+    if (action === 'cancel') {
+      updateStoryboardStatus(storyboardId, 'cancelled');
+      try {
+        await updateStoryboardStatusAction(storyboardId, 'cancelled');
+      } catch (error) {
+        console.warn('[STORYBOARD] Failed to update status', error);
+      }
+      setPendingStoryboards(prev => prev.filter(sb => sb.id !== storyboardId));
+      await appendModelMessage({
+        id: crypto.randomUUID(),
+        role: 'model',
+        text: 'Storyboard cancelled.'
+      });
+      return;
+    }
+
+    updateStoryboardStatus(storyboardId, 'processing');
+    try {
+      await updateStoryboardStatusAction(storyboardId, 'processing');
+    } catch (error) {
+      console.warn('[STORYBOARD] Failed to update status', error);
+    }
+    const result = await queueLongVideoJob(storyboard.payload);
+    if (!result.ok) {
+      updateStoryboardStatus(storyboardId, 'pending');
+      try {
+        await updateStoryboardStatusAction(storyboardId, 'pending');
+      } catch (error) {
+        console.warn('[STORYBOARD] Failed to update status', error);
+      }
+      return;
+    }
+
+    updateStoryboardStatus(storyboardId, 'approved');
+    try {
+      await updateStoryboardStatusAction(storyboardId, 'approved');
+    } catch (error) {
+      console.warn('[STORYBOARD] Failed to update status', error);
+    }
+    setPendingStoryboards(prev => prev.filter(sb => sb.id !== storyboardId));
+    await appendModelMessage({
+      id: crypto.randomUUID(),
+      role: 'model',
+      text: result.message || 'Long video generation in progress.'
+    });
+  };
 
   useEffect(() => {
     if (activeBoardId) {
@@ -378,9 +699,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           if (pendingJobs.length > 0) {
             setActiveJobs(pendingJobs.map((j: any) => j.id));
             pendingJobs.forEach((job: any) => {
-              const itemType = job.type === 'generate_video' ? 'video' : 'image';
+              const itemType = job.type === 'generate_video' || job.type === 'generate_long_video' ? 'video' : 'image';
+              const sceneCount = job.type === 'generate_long_video' && Array.isArray(job.payload?.scenes)
+                ? job.payload.scenes.length
+                : undefined;
               addPendingItem(job.id, itemType, {
-                title: itemType === 'video' ? 'Generating Video' : 'Generating Image'
+                title: itemType === 'video' ? 'Generating Video' : 'Generating Image',
+                sceneCount
               });
             });
             // Immediately trigger job processing for any pending jobs
@@ -884,12 +1209,44 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }));
   };
 
+  const handleStoryboardAction = async (storyboardId: string, action: 'approve' | 'cancel') => {
+    await executeStoryboardAction(storyboardId, action);
+  };
+
+  const handleStoryboardEdit = (storyboardId: string) => {
+    const storyboard = pendingStoryboards.find(sb => sb.id === storyboardId);
+    if (!storyboard) return;
+    const draftText = buildStoryboardEditDraft(storyboard.payload);
+    setChatDraft({ id: crypto.randomUUID(), text: draftText });
+  };
+
   const handleSendMessage = async (text: string) => {
     if (!activeBoard || !activeBoardId) return;
 
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text };
+    const trimmedText = text.trim();
+    const normalizedText = trimmedText.toLowerCase();
+    const isShortCommand = trimmedText.length <= 40;
+    const wantsApproval = isShortCommand && /(approve|approved|go ahead|proceed|ship it)/.test(normalizedText);
+    const wantsCancel = isShortCommand && /(cancel|stop|never mind|nevermind)/.test(normalizedText);
+
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', text };
     updateActiveBoard(b => ({ ...b, messages: [...b.messages, userMsg] }));
-    await saveMessageAction(activeBoardId, 'user', text);
+    await saveMessageAction(activeBoardId, 'user', text, userMsg.id);
+    setChatDraft(null);
+
+    const pendingForBoard = pendingStoryboards.filter(storyboard => storyboard.boardId === activeBoardId);
+    if (pendingForBoard.length > 0 && (wantsApproval || wantsCancel)) {
+      if (pendingForBoard.length > 1) {
+        await appendModelMessage({
+          id: crypto.randomUUID(),
+          role: 'model',
+          text: 'Multiple storyboards are pending. Please approve or cancel using the buttons on the storyboard you want.'
+        });
+        return;
+      }
+      await executeStoryboardAction(pendingForBoard[0].id, wantsApproval ? 'approve' : 'cancel');
+      return;
+    }
 
     setIsProcessing(true);
     setProcessingStatus("Reasoning with Context...");
@@ -907,7 +1264,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       ) as any;
 
       const pendingImageCount = pendingItems.filter(item => item.type === 'image').length;
-      const pendingVideoCount = pendingItems.filter(item => item.type === 'video').length;
+      const pendingVideoCount = pendingItems
+        .filter(item => item.type === 'video')
+        .reduce((sum, item) => sum + (typeof item.meta?.sceneCount === 'number' ? item.meta.sceneCount : 1), 0);
       const imageLimit = planLimits.imageLimit;
       const videoLimit = planLimits.videoLimit;
       let remainingImages = getRemainingImages(usage.imagesGenerated + pendingImageCount, imageLimit, usage.creditBalance);
@@ -917,6 +1276,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       let responseText = response.text || "";
       let newItems: CanvasItem[] = [];
       const packQueue: any[] = [];
+      const storyboardMessages: ChatMessage[] = [];
+      const storyboardQueue: StoryboardRecord[] = [];
 
       for (const part of modelParts) {
         if (part.functionCall) {
@@ -1066,6 +1427,40 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               responseText = responseText ? `${responseText}\n\n${progressMessage}` : progressMessage;
             }
           }
+          if (fc.name === 'generate_long_video') {
+            const scenes = Array.isArray(fc.args['scenes']) ? fc.args['scenes'] : [];
+            const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
+            const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
+            const title = typeof fc.args['title'] === 'string' ? fc.args['title'] : undefined;
+            const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
+            const caption = typeof fc.args['caption'] === 'string' ? fc.args['caption'] : undefined;
+            const continuitySpec = typeof fc.args['continuitySpec'] === 'string' ? fc.args['continuitySpec'] : undefined;
+            const prompt = typeof fc.args['prompt'] === 'string' ? fc.args['prompt'] : undefined;
+            const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
+            const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
+
+            const storyboard = proposeStoryboard({
+              prompt,
+              continuitySpec,
+              scenes,
+              aspectRatio: fc.args['aspectRatio'] || '16:9',
+              resolution: fc.args['resolution'] || '720p',
+              productId,
+              ingredientAssetIds,
+              qualityMode,
+              title,
+              hook,
+              caption,
+              archetype
+            });
+
+            if (storyboard?.storyboardMessage) {
+              storyboardMessages.push(storyboard.storyboardMessage);
+              storyboardQueue.push(storyboard.storyboard);
+            } else {
+              responseText = responseText || '⚠️ Unable to prepare a long video storyboard. Please refine the scenes or continuity details.';
+            }
+          }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
           
           if (fc.name === 'discover_trends') {
@@ -1098,6 +1493,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         let backgroundCount = 0;
         let immediateCount = 0;
         let queuedCount = 0;
+        let storyboardCount = 0;
         let skippedCount = 0;
         const skippedReasons: string[] = [];
 
@@ -1272,13 +1668,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               jobs.forEach((job) => {
                 setActiveJobs(prev => [...prev, job.id]);
                 const jobPayload = job.payload || {};
-                addPendingItem(job.id, job.type === 'generate_video' ? 'video' : job.type === 'generate_carousel' ? 'carousel' : 'image', {
+                addPendingItem(job.id, job.type === 'generate_video' || job.type === 'generate_long_video' ? 'video' : job.type === 'generate_carousel' ? 'carousel' : 'image', {
                   title: jobPayload.title,
                   aspectRatio: jobPayload.aspectRatio,
                   resolution: jobPayload.resolution,
                   caption: jobPayload.caption,
                   hook: jobPayload.hook,
-                  archetype: jobPayload.archetype
+                  archetype: jobPayload.archetype,
+                  sceneCount: job.type === 'generate_long_video' && Array.isArray(jobPayload.scenes) ? jobPayload.scenes.length : undefined
                 });
                 pollJobStatus(job.id, async () => {
                   await loadBoardDetails(activeBoardId, { skipOnboarding: true });
@@ -1322,6 +1719,31 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               }
             }
             setProcessingStatus(`Queuing ${item.title}...`);
+            if (item.type === 'long_video') {
+              const storyboard = proposeStoryboard({
+                prompt: item.visual_prompt,
+                continuitySpec: item.continuitySpec,
+                scenes: Array.isArray(item.scenes) ? item.scenes : [],
+                aspectRatio: item.aspectRatio || '16:9',
+                resolution: '720p',
+                title: item.title,
+                caption: item.caption,
+                hook: item.hook,
+                archetype: item.archetype,
+                productId: item.productId,
+                ingredientAssetIds: item.ingredientAssetIds,
+                qualityMode: typeof item.qualityMode === 'boolean' ? item.qualityMode : videoQualityMode
+              });
+              if (storyboard?.storyboardMessage) {
+                storyboardMessages.push(storyboard.storyboardMessage);
+                storyboardCount++;
+                storyboardQueue.push(storyboard.storyboard);
+              } else {
+                skippedCount++;
+                skippedReasons.push('Unable to prepare long video storyboard.');
+              }
+              continue;
+            }
             if (item.type === 'carousel') {
               // TODO: Add carousel support to job runner
               // For now, run synchronously with fallback
@@ -1370,7 +1792,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   skippedReasons.push('Video generation requires a subscription.');
                   continue;
                 }
-                if (remainingVideos <= 0) {
+                if (remainingVideos < 1) {
                   openPaywall('video_limit');
                   skippedCount++;
                   skippedReasons.push('Not enough video quota.');
@@ -1394,7 +1816,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   boardId: activeBoardId,
                   type: jobType,
                   payload: { 
-                    prompt: item.visual_prompt, 
+                    prompt: item.visual_prompt,
                     aspectRatio: item.aspectRatio || (item.type === 'video' ? '16:9' : '1:1'),
                     resolution: '720p',
                     title: item.title,
@@ -1434,7 +1856,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   resolution: item.type === 'video' ? '720p' : undefined,
                   caption: item.caption,
                   hook: item.hook,
-                  archetype: item.archetype
+                  archetype: item.archetype,
                 });
                 if (item.type === 'video') {
                   remainingVideos = Math.max(0, remainingVideos - 1);
@@ -1463,31 +1885,73 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         } else if (skippedCount > 0) {
           responseText = `⚠️ No items generated. ${skippedCount} item${skippedCount > 1 ? 's were' : ' was'} skipped due to quota.`;
         }
+        if (storyboardCount > 0) {
+          const storyboardLine = `${storyboardCount} long video storyboard${storyboardCount > 1 ? 's are' : ' is'} ready for approval.`;
+          responseText = responseText ? `${responseText} ${storyboardLine}` : `🧭 ${storyboardLine}`;
+        }
         if (skippedReasons.length > 0) {
           skippedReasons.slice(0, 2).forEach((reason) => showToast(reason, 'info'));
         }
       }
 
-      let finalMessage = responseText;
-      if (!finalMessage && newItems.length > 0) {
-        const imageCount = newItems.filter(i => i.type === 'image').length;
-        const carouselCount = newItems.filter(i => i.type === 'carousel').length;
-        const videoCount = newItems.filter(i => i.type === 'video').length;
-        const parts: string[] = [];
-        if (imageCount > 0) parts.push(`${imageCount} image${imageCount > 1 ? 's' : ''}`);
-        if (carouselCount > 0) parts.push(`${carouselCount} carousel${carouselCount > 1 ? 's' : ''}`);
-        if (videoCount > 0) parts.push(`${videoCount} video${videoCount > 1 ? 's' : ''}`);
-        finalMessage = `✨ All done! Created ${parts.join(' and ')} for your campaign.`;
-      } else if (!finalMessage) {
-        finalMessage = "Generation confirmed.";
+      const modelMessages: ChatMessage[] = [];
+      if (responseText) {
+        modelMessages.push({
+          id: crypto.randomUUID(),
+          role: 'model',
+          text: responseText
+        });
       }
-      const modelMsgText = finalMessage;
-      await saveMessageAction(activeBoardId, 'model', modelMsgText);
+      if (storyboardMessages.length > 0) {
+        modelMessages.push(...storyboardMessages);
+      }
+      if (modelMessages.length === 0) {
+        let fallbackMessage = '';
+        if (newItems.length > 0) {
+          const imageCount = newItems.filter(i => i.type === 'image').length;
+          const carouselCount = newItems.filter(i => i.type === 'carousel').length;
+          const videoCount = newItems.filter(i => i.type === 'video').length;
+          const parts: string[] = [];
+          if (imageCount > 0) parts.push(`${imageCount} image${imageCount > 1 ? 's' : ''}`);
+          if (carouselCount > 0) parts.push(`${carouselCount} carousel${carouselCount > 1 ? 's' : ''}`);
+          if (videoCount > 0) parts.push(`${videoCount} video${videoCount > 1 ? 's' : ''}`);
+          fallbackMessage = `✨ All done! Created ${parts.join(' and ')} for your campaign.`;
+        } else {
+          fallbackMessage = 'Generation confirmed.';
+        }
+        modelMessages.push({
+          id: crypto.randomUUID(),
+          role: 'model',
+          text: fallbackMessage
+        });
+      }
+
+      const storyboardLookup = new Map(storyboardQueue.map(storyboard => [storyboard.id, storyboard]));
+      for (const message of modelMessages) {
+        await saveMessageAction(activeBoardId, 'model', message.text, message.id);
+        if (message.storyboardId) {
+          const storyboard = storyboardLookup.get(message.storyboardId);
+          if (storyboard) {
+            try {
+              await createStoryboardAction(activeBoardId, {
+                id: storyboard.id,
+                messageId: message.id,
+                payload: storyboard.payload,
+                status: storyboard.status,
+                totalDurationSeconds: storyboard.totalDurationSeconds
+              });
+            } catch (error) {
+              console.warn('[STORYBOARD] Failed to persist storyboard', error);
+              showError('Failed to save storyboard. Please try again.');
+            }
+          }
+        }
+      }
 
       updateActiveBoard(b => ({
         ...b,
         items: [...newItems, ...b.items],
-        messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: modelMsgText }]
+        messages: [...b.messages, ...modelMessages]
       }));
       refreshOnboardingState();
 
@@ -1495,8 +1959,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       console.error("Chat error:", error);
       const errMsg = error?.message || "Something went wrong. Please try again.";
       showError(errMsg.length > 100 ? errMsg.substring(0, 100) + '...' : errMsg);
-      updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: Date.now().toString(), role: 'model', text: `Error: ${errMsg}` }] }));
-      await saveMessageAction(activeBoardId, 'model', `Error: ${errMsg}`);
+      const errorMessageId = crypto.randomUUID();
+      updateActiveBoard(b => ({ ...b, messages: [...b.messages, { id: errorMessageId, role: 'model', text: `Error: ${errMsg}` }] }));
+      await saveMessageAction(activeBoardId, 'model', `Error: ${errMsg}`, errorMessageId);
     } finally { setIsProcessing(false); setProcessingStatus(""); }
   };
 
@@ -1565,7 +2030,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       
       const job = await res.json();
       setActiveJobs(prev => [...prev, job.id]);
-      addPendingItem(job.id, failedJob.type === 'generate_video' ? 'video' : 'image', failedJob.payload);
+      addPendingItem(job.id, failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video' ? 'video' : 'image', failedJob.payload);
       pollJobStatus(job.id, async () => {
         await loadBoardDetails(activeBoardId, { skipOnboarding: true });
         getUserUsageAction().then(setUsage);
@@ -1732,6 +2197,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         messages={activeBoard.messages}
         onSendMessage={handleSendMessage}
         onDismissResearch={handleDismissResearch}
+        onStoryboardAction={handleStoryboardAction}
+        onStoryboardEdit={handleStoryboardEdit}
+        draftMessage={chatDraft}
         isProcessing={isProcessing}
         processingStatus={processingStatus}
         hasAssets={activeBoard.assets.length > 0}

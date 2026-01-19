@@ -112,6 +112,18 @@ export const messages = pgTable('messages', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const storyboards = pgTable('storyboards', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  boardId: uuid('board_id').references(() => boards.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  messageId: uuid('message_id').references(() => messages.id, { onDelete: 'set null' }),
+  status: text('status').default('pending').notNull(),
+  payload: jsonb('payload').notNull(),
+  totalDurationSeconds: integer('total_duration_seconds').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const brandIdentities = pgTable('brand_identities', {
   id: uuid('id').defaultRandom().primaryKey(),
   colors: jsonb('colors').notNull(), // string[]
@@ -237,6 +249,7 @@ export const boardsRelations = relations(boards, ({ many, one }) => ({
   assets: many(assets),
   generatedItems: many(generatedItems),
   messages: many(messages),
+  storyboards: many(storyboards),
   jobs: many(jobs),
   products: many(products),
   calendarItems: many(calendarItems),
@@ -254,6 +267,21 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   board: one(boards, {
     fields: [messages.boardId],
     references: [boards.id],
+  }),
+}));
+
+export const storyboardsRelations = relations(storyboards, ({ one }) => ({
+  board: one(boards, {
+    fields: [storyboards.boardId],
+    references: [boards.id],
+  }),
+  user: one(users, {
+    fields: [storyboards.userId],
+    references: [users.id],
+  }),
+  message: one(messages, {
+    fields: [storyboards.messageId],
+    references: [messages.id],
   }),
 }));
 

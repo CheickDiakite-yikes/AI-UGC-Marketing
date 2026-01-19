@@ -5,10 +5,11 @@ import { resolveVideoIngredients } from '../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../services/videoPromptUtils';
 import { generateAutoReferenceImages } from '../services/videoReferenceService';
 import { uploadGeneratedItem } from '../services/objectStorageService';
+import { generateLongVideoAssets } from '../services/longVideoPipeline';
 import { db } from '../db';
 import { generatedItems, users } from '../db/schema';
 import { eq } from 'drizzle-orm';
-import { AspectRatio, VeoConfig, PlanTier } from '../types';
+import { AspectRatio, VeoConfig, PlanTier, LongVideoStoryboardPayload } from '../types';
 import { getPlanLimits } from '../services/subscriptionPlans';
 import { getRemainingImages, getRemainingVideos } from '../services/usageLimits';
 import { consumeUsage } from '../services/usageConsumption';
@@ -303,6 +304,53 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   };
 }
 
+async function processLongVideoJob(job: Job): Promise<JobResult> {
+  const payload = job.payload as unknown as LongVideoStoryboardPayload & { traceId?: string; freebie?: boolean };
+
+  const traceId = payload.traceId || crypto.randomUUID();
+  const sceneCount = Array.isArray(payload.scenes) ? payload.scenes.length : 0;
+  const isFreebie = payload.freebie === true;
+
+  if (sceneCount < 2) {
+    throw new Error('Long videos require at least 2 scenes');
+  }
+  if (sceneCount > 5) {
+    throw new Error('Long videos support up to 5 scenes');
+  }
+
+  if (!isFreebie) {
+    await assertVideoQuota(job.userId, sceneCount);
+  }
+
+  const result = await generateLongVideoAssets({
+    boardId: job.boardId,
+    payload: {
+      ...payload,
+      scenes: payload.scenes.map(s => ({
+        ...s,
+        prompt: s.prompt || ''
+      })),
+      traceId,
+    } as any,
+  });
+
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'video', sceneCount);
+    } catch (error) {
+      console.warn('[JOB RUNNER] Failed to apply long video usage charge', error);
+    }
+  }
+
+  return {
+    type: 'video',
+    itemId: result.finalItemId,
+    sceneItemIds: result.sceneItemIds,
+    sceneCount: result.sceneCount,
+    totalDurationSeconds: result.totalDurationSeconds,
+  };
+}
+
 async function processCampaignJob(job: Job): Promise<JobResult> {
   console.log(`[JOB RUNNER] Processing campaign job`);
   return { status: 'ready_for_chat', type: 'campaign', payload: job.payload };
@@ -320,6 +368,9 @@ async function processJob(job: Job): Promise<void> {
         break;
       case 'generate_video':
         result = await processVideoJob(job);
+        break;
+      case 'generate_long_video':
+        result = await processLongVideoJob(job);
         break;
       case 'generate_campaign':
         result = await processCampaignJob(job);

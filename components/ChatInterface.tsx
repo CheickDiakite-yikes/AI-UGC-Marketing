@@ -7,6 +7,9 @@ interface ChatInterfaceProps {
   messages: ChatMessage[];
   onSendMessage: (text: string) => void;
   onDismissResearch?: (messageId: string) => void;
+  onStoryboardAction?: (storyboardId: string, action: 'approve' | 'cancel') => void;
+  onStoryboardEdit?: (storyboardId: string) => void;
+  draftMessage?: { id: string; text: string } | null;
   isProcessing: boolean;
   processingStatus?: string;
   hasAssets: boolean;
@@ -46,6 +49,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   onSendMessage,
   onDismissResearch,
+  onStoryboardAction,
+  onStoryboardEdit,
+  draftMessage,
   isProcessing,
   processingStatus,
   hasAssets,
@@ -73,6 +79,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     window.addEventListener('open-chat', handleOpenChat);
     return () => window.removeEventListener('open-chat', handleOpenChat);
   }, []);
+
+  useEffect(() => {
+    if (!draftMessage?.text) return;
+    if (!isOpen) {
+      setIsOpen(true);
+    }
+    setInput(draftMessage.text);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [draftMessage?.id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -292,6 +307,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     <span>✕</span> Dismiss
                   </button>
                 </div>
+              </div>
+            )}
+
+            {msg.storyboardId && (
+              <div className="mt-3 ml-1 max-w-[90%] flex flex-col gap-2 animate-fade-in-up">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Storyboard</span>
+                {msg.storyboardStatus && msg.storyboardStatus !== 'pending' ? (
+                  <span className={`text-xs font-bold uppercase tracking-wider ${
+                    msg.storyboardStatus === 'approved' ? 'text-neo-lime' :
+                    msg.storyboardStatus === 'cancelled' ? 'text-gray-500' : 'text-gray-600'
+                  }`}>
+                    {msg.storyboardStatus === 'approved' ? 'Approved' :
+                      msg.storyboardStatus === 'cancelled' ? 'Cancelled' : 'Processing'}
+                  </span>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => onStoryboardEdit?.(msg.storyboardId as string)}
+                      disabled={isProcessing || msg.storyboardStatus === 'processing'}
+                      className="text-xs bg-white border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold text-gray-700 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span>✏️</span> Edit
+                    </button>
+                    <button
+                      onClick={() => onStoryboardAction?.(msg.storyboardId as string, 'approve')}
+                      disabled={isProcessing || msg.storyboardStatus === 'processing'}
+                      className="text-xs bg-neo-lime border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span>✅</span> Approve
+                    </button>
+                    <button
+                      onClick={() => onStoryboardAction?.(msg.storyboardId as string, 'cancel')}
+                      disabled={isProcessing || msg.storyboardStatus === 'processing'}
+                      className="text-xs bg-white border-2 border-black px-3 py-1.5 shadow-neo-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all font-bold text-gray-600 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span>✕</span> Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

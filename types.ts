@@ -29,11 +29,57 @@ export interface CanvasItem {
     qualityMode?: boolean;
     referenceCount?: number;
     autoReferenceUsed?: boolean;
+    autoReferenceUsedCount?: number;
     slideCount?: number;
+    durationSeconds?: number;
+    totalDurationSeconds?: number;
+    sceneCount?: number;
+    sceneIndex?: number;
+    sceneItemIds?: string[];
+    longVideoGroupId?: string;
+    isScene?: boolean;
+    isLongVideo?: boolean;
   };
   x?: number; // For future drag/drop
   y?: number;
   isFavorite?: boolean;
+}
+
+export type StoryboardStatus = 'pending' | 'processing' | 'approved' | 'cancelled';
+
+export interface LongVideoSceneInput {
+  prompt: string;
+  title?: string;
+  durationSeconds?: number;
+  camera?: string;
+  action?: string;
+  transition?: string;
+}
+
+export interface LongVideoStoryboardPayload {
+  prompt?: string;
+  continuitySpec?: string;
+  scenes: LongVideoSceneInput[];
+  aspectRatio?: string;
+  resolution?: string;
+  productId?: string;
+  ingredientAssetIds?: string[];
+  qualityMode?: boolean;
+  title?: string;
+  hook?: string;
+  caption?: string;
+  archetype?: string;
+}
+
+export interface StoryboardRecord {
+  id: string;
+  boardId: string;
+  messageId?: string | null;
+  status: StoryboardStatus;
+  payload: LongVideoStoryboardPayload;
+  totalDurationSeconds: number;
+  createdAt?: number | string;
+  updatedAt?: number | string;
 }
 
 export interface ChatMessage {
@@ -45,6 +91,8 @@ export interface ChatMessage {
   groundingLinks?: { title: string; url: string }[];
   isResearchResult?: boolean; // True when AI did research and awaiting user decision
   researchDismissed?: boolean; // True when user dismissed the research
+  storyboardId?: string;
+  storyboardStatus?: 'pending' | 'processing' | 'approved' | 'cancelled';
 }
 
 export interface BrandIdentity {
@@ -80,6 +128,7 @@ export interface Board {
   assets: ProjectAsset[];
   items: CanvasItem[];
   messages: ChatMessage[];
+  storyboards?: StoryboardRecord[];
   brandIdentity: BrandIdentity | null;
   avatarIdentity: AvatarIdentity | null;
   products?: Product[];

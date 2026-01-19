@@ -30,6 +30,15 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
   `services/videoReferenceService.ts` and passed to Veo (image-to-video).
 - Vertical references are attempted in Quality Mode with safe fallback.
 
+## Long Video (15-30s)
+- Tool: `generate_long_video` (multi-scene, 4/6/8s per scene, total <= 30s).
+- Pipeline: `services/longVideoPipeline.ts` generates scenes, extracts continuity frames, and stitches via `services/videoStitchService.ts`.
+- Storyboard approval required: chat proposes storyboard first and only queues generation after user approval.
+- Storyboards are persisted in the `storyboards` table with status and payload; chat shows approve/cancel/edit actions.
+- Each scene is stored as a `video` item with `meta.isScene` + `sceneIndex`.
+- Final stitched video is a `video` item with `meta.isLongVideo`, `sceneItemIds`, `sceneCount`, `totalDurationSeconds`.
+- Video usage/credits are charged per scene (sceneCount).
+
 ## Pricing, Credits, ROI
 - Credits (see `services/usageLimits.ts`):
   - Images: 1 credit.
@@ -65,6 +74,7 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Video jobs: `server/jobRunner.ts`, `app/api/jobs/process/route.ts`
 - Video guardrails: `services/videoPromptUtils.ts`
 - Auto references: `services/videoReferenceService.ts`
+- Long video pipeline: `services/longVideoPipeline.ts`, `services/videoStitchService.ts`
 - Pricing/limits: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
 - ROI display: `components/Sidebar.tsx`
 - Calendar actions: `app/actions/calendarActions.ts`

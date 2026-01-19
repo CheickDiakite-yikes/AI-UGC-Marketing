@@ -39,6 +39,16 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
   - Default ON in UI.
   - Uses Veo preview model and auto reference frames by default.
 
+## Long Video (15-30s)
+- Tool: `generate_long_video` (multi-scene, 4/6/8s per scene, total <= 30s).
+- Scenes are generated individually and stitched with ffmpeg.
+- Pipeline code: `services/longVideoPipeline.ts` + `services/videoStitchService.ts`.
+- Storyboard approval required: `Workspace.tsx` stores pending storyboards and only queues jobs after user approval.
+- Storyboards are persisted in the `storyboards` table (payload + status) and mapped onto chat messages for approval/edit.
+- Each scene is stored as a video item with `meta.isScene`.
+- Final stitched video is a video item with `meta.isLongVideo` and `sceneItemIds`.
+- Usage/credits are charged per scene (sceneCount).
+
 ## Image and Carousel Generation
 - All images use Nano Banana Pro via `generateMarketingImage` in `services/geminiService.ts`.
 - Carousels generate slides with the same image pipeline and store slide count metadata.

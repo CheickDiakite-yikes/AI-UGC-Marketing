@@ -8,6 +8,9 @@
 - Add a one-time free Aha Pack for free users with high-value outputs.
 - Build a profile dashboard calendar for scheduling assets across boards.
 - Add edit/reschedule, drag-and-drop, and bulk day actions for the calendar.
+- Add a long-video pipeline to deliver 15-30s stitched videos with scene consistency.
+- Require storyboard approval before long-video generation.
+- Add storyboard edit action and persist storyboards across sessions.
 
 ## Key Decisions
 - Add prompt guardrails for video quality and shorter on-screen text.
@@ -19,6 +22,8 @@
 - Aha Pack includes 1 image, 1 two-slide carousel, 1 HQ video, and is redeemable once.
 - Aha Pack jobs bypass quota checks and usage consumption.
 - Dashboard centers on a monthly calendar and weekly report, with per-day multi-asset scheduling.
+- Long videos require user approval of a storyboard before jobs are queued.
+- Storyboards persist in the database and can be edited via chat.
 
 ## Changes Implemented
 - Video prompt guardrails expanded with anatomy/physics constraints.
@@ -36,6 +41,9 @@
 - Added drag-and-drop rescheduling for pointer-fine devices.
 - Added bulk clear-day and duplicate-to-next-week actions.
 - Added undo toasts for move and bulk calendar actions.
+- Added long-video pipeline with multi-scene generation + ffmpeg stitching.
+- Added storyboard approval flow for long videos in chat (approve/cancel actions).
+- Added storyboard persistence and edit actions that prefill the chat input.
 
 ## Current Status
 - Quality Mode is ON by default and active for all video jobs unless toggled off.
@@ -47,6 +55,7 @@
 - Video guardrails: `services/videoPromptUtils.ts`
 - Auto reference frames: `services/videoReferenceService.ts`
 - Video pipeline: `server/jobRunner.ts`, `app/api/jobs/process/route.ts`, `app/actions.ts`
+- Storyboard approval UI: `components/ChatInterface.tsx`, `Workspace.tsx`
 - Plan/credits: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
 - ROI/cost: `components/Sidebar.tsx`
 - Chat Quality Mode UI: `components/ChatInterface.tsx`, `Workspace.tsx`

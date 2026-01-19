@@ -58,6 +58,43 @@ const generateVideoTool: FunctionDeclaration = {
   }
 };
 
+const generateLongVideoTool: FunctionDeclaration = {
+  name: "generate_long_video",
+  description: "Propose a long-form marketing video storyboard (15-30s) by stitching 2-5 scenes (each 4/6/8s). Generation begins after user approval.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      prompt: { type: Type.STRING, description: "High-level brief for the full video." },
+      continuitySpec: { type: Type.STRING, description: "Character + wardrobe + prop + lighting consistency rules." },
+      aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
+      resolution: { type: Type.STRING, description: "Target resolution: '720p' or '1080p'." },
+      productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
+      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." },
+      qualityMode: { type: Type.BOOLEAN, description: "Prefer higher-fidelity video generation with extra reference anchoring." },
+      title: { type: Type.STRING, description: "Short title for the asset card." },
+      hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
+      caption: { type: Type.STRING, description: "Social caption for the asset." },
+      scenes: {
+        type: Type.ARRAY,
+        description: "2-5 scenes, each max 8s. Total duration must be 30s or less.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            prompt: { type: Type.STRING, description: "Scene-specific visual prompt." },
+            durationSeconds: { type: Type.NUMBER, description: "Scene length (4, 6, or 8 seconds)." },
+            title: { type: Type.STRING, description: "Optional scene title." },
+            camera: { type: Type.STRING, description: "Camera movement or angle." },
+            action: { type: Type.STRING, description: "Primary action or motion." },
+            transition: { type: Type.STRING, description: "Transition note to next scene (optional)." }
+          },
+          required: ["prompt"]
+        }
+      }
+    },
+    required: ["scenes", "continuitySpec"]
+  }
+};
+
 const generateCampaignPackTool: FunctionDeclaration = {
   name: "generate_campaign_pack",
   description: "Generate a structured campaign pack containing 5-10 pre-designed items.",
@@ -70,18 +107,34 @@ const generateCampaignPackTool: FunctionDeclaration = {
         items: {
           type: Type.OBJECT,
           properties: {
-            type: { type: Type.STRING, enum: ["image", "video", "carousel"] },
-            title: { type: Type.STRING },
-            archetype: { type: Type.STRING },
-            hook: { type: Type.STRING },
-            visual_prompt: { type: Type.STRING },
-            carousel_prompts: { type: Type.ARRAY, items: { type: Type.STRING } },
-            caption: { type: Type.STRING },
-            aspectRatio: { type: Type.STRING },
-            productId: { type: Type.STRING },
-            ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING } },
-            qualityMode: { type: Type.BOOLEAN }
+          type: { type: Type.STRING, enum: ["image", "video", "long_video", "carousel"] },
+          title: { type: Type.STRING },
+          archetype: { type: Type.STRING },
+          hook: { type: Type.STRING },
+          visual_prompt: { type: Type.STRING },
+          carousel_prompts: { type: Type.ARRAY, items: { type: Type.STRING } },
+          scenes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                prompt: { type: Type.STRING },
+                durationSeconds: { type: Type.NUMBER },
+                title: { type: Type.STRING },
+                camera: { type: Type.STRING },
+                action: { type: Type.STRING },
+                transition: { type: Type.STRING }
+              },
+              required: ["prompt"]
+            }
           },
+          continuitySpec: { type: Type.STRING },
+          caption: { type: Type.STRING },
+          aspectRatio: { type: Type.STRING },
+          productId: { type: Type.STRING },
+          ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING } },
+          qualityMode: { type: Type.BOOLEAN }
+        },
           required: ["type", "visual_prompt", "caption", "archetype", "title", "aspectRatio"]
         }
       }
@@ -424,6 +477,9 @@ export const chatWithMarketingAgent = async (
 
     VIDEO GENERATION GUIDELINES:
     - Use generate_video for cinematic UGC-style videos, viral shorts, or Reels content
+    - Use generate_long_video for 15-30s requests that require multiple scenes stitched together
+    - For long videos, draft a storyboard first and wait for explicit user approval before generation
+    - Do not claim the long video is generating until the user approves the storyboard
     - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
     - Video prompts should describe: scene, action, movement, camera angle, mood
     - Avoid on-screen text unless the user explicitly asks for it
@@ -436,6 +492,10 @@ export const chatWithMarketingAgent = async (
     - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
     - Ingredient-based video generation is most reliable in 16:9 and 8s duration; for vertical, enable qualityMode and expect possible fallback
     - Set qualityMode: true for UGC/influencer videos, close-up hands, product interactions, or when the user asks for the best realism
+    - For generate_long_video, provide 2-5 scenes, each 4/6/8 seconds, total 30s or less
+    - For generate_long_video, include continuitySpec covering character, wardrobe, props, lighting, and camera style
+    - If you include a long video inside a campaign pack, set type: "long_video" and include scenes + continuitySpec
+    - Long videos in packs will still require storyboard approval before generation
   `;
 
   const model = "gemini-3-pro-preview";
@@ -445,7 +505,7 @@ export const chatWithMarketingAgent = async (
     { role: "user", parts: [{ text: newMessage }] }
   ];
 
-  const tools = [{ functionDeclarations: [generateImageTool, generateVideoTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
+  const tools = [{ functionDeclarations: [generateImageTool, generateVideoTool, generateLongVideoTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
 
   const response: any = await generateContentServer(model, contents, {
     systemInstruction,
