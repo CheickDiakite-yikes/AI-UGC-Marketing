@@ -5,6 +5,9 @@ interface Props {
   onSignup: () => void;
   onNavigatePrivacy: () => void;
   onNavigateTerms: () => void;
+  onNavigateAbout: () => void;
+  onNavigateHowItWorks: () => void;
+  onNavigateShowcase: () => void;
 }
 
 function useHasMounted() {
@@ -231,7 +234,15 @@ const FloatingElement = ({
   );
 };
 
-const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, onNavigateTerms }) => {
+const LandingPage: React.FC<Props> = ({
+  onLogin,
+  onSignup,
+  onNavigatePrivacy,
+  onNavigateTerms,
+  onNavigateAbout,
+  onNavigateHowItWorks,
+  onNavigateShowcase
+}) => {
   const scrollProgress = useScrollProgress();
   
   return (
@@ -856,7 +867,10 @@ const LandingPage: React.FC<Props> = ({ onLogin, onSignup, onNavigatePrivacy, on
                </div>
                <p className="text-gray-500 text-sm">© 2025 Predi Inc. All rights reserved.</p>
             </div>
-            <div className="flex gap-8 text-sm font-bold text-gray-400">
+            <div className="flex flex-wrap gap-6 text-sm font-bold text-gray-400 justify-center md:justify-end">
+               <button onClick={onNavigateAbout} className="hover:text-neo-lime transition-colors text-left">About</button>
+               <button onClick={onNavigateHowItWorks} className="hover:text-neo-yellow transition-colors text-left">How it works</button>
+               <button onClick={onNavigateShowcase} className="hover:text-neo-cyan transition-colors text-left">Showcase</button>
                <button onClick={onNavigatePrivacy} className="hover:text-neo-pink transition-colors text-left">Privacy</button>
                <button onClick={onNavigateTerms} className="hover:text-neo-cyan transition-colors text-left">Terms</button>
                <a href="#" className="hover:text-neo-yellow transition-colors">Twitter</a>

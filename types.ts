@@ -46,6 +46,15 @@ export interface CanvasItem {
   isFavorite?: boolean;
 }
 
+export type ShowcaseItem = {
+  id: string;
+  title: string;
+  type: 'image' | 'video' | 'carousel';
+  previewUrl: string | null;
+  mediaUrls: string[];
+  boardName?: string | null;
+};
+
 export type StoryboardStatus = 'pending' | 'processing' | 'approved' | 'cancelled';
 
 export interface LongVideoSceneInput {

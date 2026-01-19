@@ -3,11 +3,14 @@ import Workspace from './Workspace';
 import LandingPage from './components/LandingPage';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
+import AboutPage from './components/AboutPage';
+import HowItWorksPage from './components/HowItWorksPage';
+import ShowcasePage from './components/ShowcasePage';
 import AuthModal from './components/AuthModal';
 import { ToastProvider } from './components/Toast';
 import { getSession } from './app/actions/authActions';
 
-type ViewState = 'loading' | 'landing' | 'app' | 'privacy' | 'terms';
+type ViewState = 'loading' | 'landing' | 'app' | 'privacy' | 'terms' | 'about' | 'how' | 'showcase';
 type AuthModalMode = 'login' | 'signup' | null;
 
 const App: React.FC = () => {
@@ -65,6 +68,18 @@ const App: React.FC = () => {
   if (currentView === 'terms') {
      return <TermsPage onBack={() => setCurrentView('landing')} />;
   }
+  
+  if (currentView === 'about') {
+     return <AboutPage onBack={() => setCurrentView('landing')} />;
+  }
+
+  if (currentView === 'how') {
+     return <HowItWorksPage onBack={() => setCurrentView('landing')} />;
+  }
+  
+  if (currentView === 'showcase') {
+     return <ShowcasePage onBack={() => setCurrentView('landing')} />;
+  }
 
   return (
     <>
@@ -73,6 +88,9 @@ const App: React.FC = () => {
           onSignup={() => setAuthModalMode('signup')}
           onNavigatePrivacy={() => setCurrentView('privacy')}
           onNavigateTerms={() => setCurrentView('terms')}
+          onNavigateAbout={() => setCurrentView('about')}
+          onNavigateHowItWorks={() => setCurrentView('how')}
+          onNavigateShowcase={() => setCurrentView('showcase')}
       />
       <AuthModal
         isOpen={authModalMode !== null}
