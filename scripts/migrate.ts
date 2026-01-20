@@ -64,6 +64,28 @@ async function run() {
           shouldMigrate = false;
         }
       }
+    } else {
+      const appliedResult = await client.query(
+        'select hash from "drizzle"."__drizzle_migrations"',
+      );
+      const appliedHashes = new Set(appliedResult.rows.map((r: { hash: string }) => r.hash));
+
+      const schemaMigrations = [
+        { hash: 'dc97c2c8032e997b0e611e9ca36c63fa1664fdff9471cdd7e213efd09165e49d', when: 1768771980000, check: `SELECT to_regclass('public.calendar_items') as t` },
+        { hash: 'b01ef19f810a8008bc9962a79b2d53a016c324b4b2363c9fba243fedd953a2b7', when: 1768781160000, check: `SELECT to_regclass('public.storyboards') as t` },
+      ];
+
+      for (const m of schemaMigrations) {
+        if (appliedHashes.has(m.hash)) continue;
+        const checkResult = await client.query(m.check);
+        if (checkResult.rows[0]?.t) {
+          await client.query(
+            `INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at") VALUES ($1, $2)`,
+            [m.hash, m.when],
+          );
+          console.log(`Backfilled migration record for schema already applied via db:push`);
+        }
+      }
     }
   } finally {
     client.release();

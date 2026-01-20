@@ -46,3 +46,9 @@ The application features a clean, modern interface with components like `ChatInt
 - **Replit Object Storage**: Used for scalable and performant storage of all media assets.
 - **Stripe**: Integrated for subscription management, one-time credit pack purchases, and customer billing portal functionality. This includes webhook handling for various payment events.
 - **Replit Stripe Connector**: Securely manages Stripe API keys and credentials across development and production environments.
+
+## Admin Account
+- **Admin Email**: `zorovt18@gmail.com` - Automatically assigned Enterprise tier on signup/login
+- **Enterprise Tier**: Unlimited image/video generations, full access to all features
+- **Migration 0006**: Automatically upgrades admin to Enterprise tier on deployment
+- **Migration Backfill**: The migrate.ts script auto-detects migrations applied via db:push and records them to prevent conflicts
