@@ -9,6 +9,7 @@ import { hashPassword, verifyPassword, createSessionToken, verifySessionToken } 
 import { redirect } from 'next/navigation';
 
 const COOKIE_NAME = 'predi_session';
+const ADMIN_EMAIL = 'zorovt18@gmail.com';
 
 function maskEmail(email?: string | null) {
     if (!email) return null;
@@ -47,6 +48,7 @@ export async function signup(prevState: any, formData: FormData) {
         }
 
         const hashedPassword = await hashPassword(password);
+        const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
         const [newUser] = await db.insert(users).values({
             email,
@@ -55,7 +57,8 @@ export async function signup(prevState: any, formData: FormData) {
             company,
             jobTitle,
             referralSource,
-            avatarUrl: `https://api.dicebear.com/7.x/micah/svg?seed=${name}`
+            avatarUrl: `https://api.dicebear.com/7.x/micah/svg?seed=${name}`,
+            planTier: isAdmin ? 'enterprise' : 'free',
         }).returning();
 
         const token = await createSessionToken({ userId: newUser.id, email: newUser.email! });
@@ -99,6 +102,12 @@ export async function login(prevState: any, formData: FormData) {
 
         if (!isValid) {
             return { error: 'Invalid email or password', success: false };
+        }
+
+        // Auto-upgrade admin to enterprise tier if not already
+        const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        if (isAdmin && user.planTier !== 'enterprise') {
+            await db.update(users).set({ planTier: 'enterprise' }).where(eq(users.id, user.id));
         }
 
         const token = await createSessionToken({ userId: user.id, email: user.email! });

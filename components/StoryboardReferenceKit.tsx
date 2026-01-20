@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import type { ProjectAsset, VideoReferenceMode, VideoReferenceRole, VideoReferenceSelection } from '../types';
 
 const ROLE_SLOTS: Array<{ role: VideoReferenceRole; label: string; hint: string }> = [
@@ -25,6 +25,7 @@ interface StoryboardReferenceKitProps {
   referenceMode?: VideoReferenceMode | null;
   disabled?: boolean;
   onChange: (storyboardId: string, selections: VideoReferenceSelection[], mode: VideoReferenceMode) => void;
+  onUploadReference?: (file: File, role: VideoReferenceRole, options?: { applyAvatarIdentity?: boolean }) => Promise<string | null>;
 }
 
 const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
@@ -33,10 +34,15 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
   referenceSelections,
   referenceMode,
   disabled,
-  onChange
+  onChange,
+  onUploadReference
 }) => {
   const mode: VideoReferenceMode = referenceMode || 'hybrid';
   const aiFillEnabled = mode !== 'manual';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadRole, setUploadRole] = useState<VideoReferenceRole | null>(null);
+  const [uploadingRole, setUploadingRole] = useState<VideoReferenceRole | null>(null);
+  const [useAvatarIdentity, setUseAvatarIdentity] = useState(false);
   const selections = Array.isArray(referenceSelections) ? referenceSelections : [];
   const selectionMap = new Map<VideoReferenceRole, string>();
   const unassignedSelections: VideoReferenceSelection[] = [];
@@ -66,7 +72,8 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
       if (!nextAssetId) return null;
       return { assetId: nextAssetId, role: slot.role };
     }).filter(Boolean) as VideoReferenceSelection[];
-    onChange(storyboardId, nextSelections, mode);
+    const nextMode: VideoReferenceMode = mode === 'auto' ? 'hybrid' : mode;
+    onChange(storyboardId, nextSelections, nextMode);
   };
 
   const handleModeToggle = (enabled: boolean) => {
@@ -76,6 +83,30 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
 
   const clearRole = (role: VideoReferenceRole) => {
     updateSelections(role, '');
+  };
+
+  const handleUploadClick = (role: VideoReferenceRole) => {
+    if (!onUploadReference || disabled) return;
+    setUploadRole(role);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !uploadRole || !onUploadReference) return;
+    setUploadingRole(uploadRole);
+    try {
+      const assetId = await onUploadReference(file, uploadRole, {
+        applyAvatarIdentity: uploadRole === 'avatar' && useAvatarIdentity
+      });
+      if (assetId) {
+        updateSelections(uploadRole, assetId);
+      }
+    } finally {
+      setUploadingRole(null);
+      event.target.value = '';
+      setUploadRole(null);
+    }
   };
 
   return (
@@ -104,6 +135,7 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
           const selectedId = selectionMap.get(slot.role) || '';
           const selectedAsset = selectedId ? imageAssets.find(asset => asset.id === selectedId) : undefined;
           const previewSrc = selectedAsset ? getAssetPreview(selectedAsset) : null;
+          const isUploading = uploadingRole === slot.role;
           return (
             <div key={slot.role} className="flex items-center gap-3 border-2 border-black bg-white p-2 shadow-neo-sm">
               <div className="w-14 h-14 border-2 border-black bg-gray-100 flex items-center justify-center overflow-hidden">
@@ -130,6 +162,16 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
                       </option>
                     ))}
                   </select>
+                  {onUploadReference && (
+                    <button
+                      type="button"
+                      onClick={() => handleUploadClick(slot.role)}
+                      disabled={disabled || isUploading}
+                      className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2 py-1 bg-neo-cyan hover:bg-neo-pink hover:text-black transition-all disabled:opacity-50"
+                    >
+                      {isUploading ? 'Uploading' : 'Upload'}
+                    </button>
+                  )}
                   {selectedId ? (
                     <button
                       type="button"
@@ -141,11 +183,32 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
                     </button>
                   ) : null}
                 </div>
+                {slot.role === 'avatar' && onUploadReference && (
+                  <label className="mt-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    <input
+                      type="checkbox"
+                      checked={useAvatarIdentity}
+                      onChange={(e) => setUseAvatarIdentity(e.target.checked)}
+                      disabled={disabled}
+                      className="h-3 w-3 border-2 border-black accent-neo-pink"
+                    />
+                    Use as avatar identity
+                  </label>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+      {onUploadReference && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      )}
     </div>
   );
 };

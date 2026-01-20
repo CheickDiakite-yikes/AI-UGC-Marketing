@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CanvasItem, ChatMessage, ProjectAsset, StoryboardRecord, VideoReferenceMode, VideoReferenceSelection } from '../types';
+import { CanvasItem, ChatMessage, ProjectAsset, StoryboardRecord, VideoReferenceMode, VideoReferenceRole, VideoReferenceSelection } from '../types';
 import ReactMarkdown from 'react-markdown';
 import StoryboardReferenceKit from './StoryboardReferenceKit';
 
@@ -11,6 +11,7 @@ interface ChatInterfaceProps {
   onStoryboardAction?: (storyboardId: string, action: 'approve' | 'cancel') => void;
   onStoryboardEdit?: (storyboardId: string) => void;
   onUpdateStoryboardReferences?: (storyboardId: string, selections: VideoReferenceSelection[], mode: VideoReferenceMode) => void;
+  onUploadStoryboardReference?: (file: File, role: VideoReferenceRole, options?: { applyAvatarIdentity?: boolean }) => Promise<string | null>;
   onUploadAvatar?: (files: File[]) => void;
   onCreateAvatar?: (prompt: string) => void;
   draftMessage?: { id: string; text: string } | null;
@@ -109,6 +110,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onStoryboardAction,
   onStoryboardEdit,
   onUpdateStoryboardReferences,
+  onUploadStoryboardReference,
   onUploadAvatar,
   onCreateAvatar,
   draftMessage,
@@ -132,9 +134,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [isReferencePinnedOpen, setIsReferencePinnedOpen] = useState(true);
   const storyboardById = new Map((storyboards || []).map(storyboard => [storyboard.id, storyboard]));
   const pendingGenerations = (pendingItems || []).filter(item => item.type === 'image' || item.type === 'video' || item.type === 'carousel');
   const hasPendingGenerations = pendingGenerations.length > 0;
+  const pendingStoryboards = (storyboards || []).filter(storyboard => storyboard.status === 'pending' || storyboard.status === 'processing');
+  const pinnedStoryboard = pendingStoryboards.length > 0 ? pendingStoryboards[pendingStoryboards.length - 1] : null;
+  const pinnedReferenceCount = pinnedStoryboard?.payload?.referenceSelections?.length || 0;
+  const pinnedLabel = pinnedStoryboard?.payload?.title || pinnedStoryboard?.payload?.prompt || 'Long video storyboard';
 
   useEffect(() => {
     if (!hasPendingGenerations) return;
@@ -176,6 +183,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       scrollToBottom();
     }
   }, [messages, isProcessing, processingStatus, isOpen]);
+
+  useEffect(() => {
+    if (pinnedStoryboard?.id) {
+      setIsReferencePinnedOpen(true);
+    }
+  }, [pinnedStoryboard?.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -590,11 +603,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     </button>
                   </div>
                 )}
-                {!hasAvatar && msg.id === latestStoryboardMessageId && (!msg.storyboardStatus || msg.storyboardStatus === 'pending') && (
+                {!hasAvatar && (!msg.storyboardStatus || msg.storyboardStatus === 'pending') && (
                   <div className="border-2 border-black bg-white/80 rounded-xl p-3 shadow-neo-sm">
                     <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Character Consistency</div>
                     <p className="mt-1 text-xs font-bold text-gray-700">
-                      If this long video features a person, add an avatar to lock the character across scenes.
+                      If this long video features a person, add an avatar or drop a face reference below to lock the character across scenes.
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
@@ -646,6 +659,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       referenceMode={storyboard.payload.referenceMode}
                       disabled={isProcessing || msg.storyboardStatus === 'processing'}
                       onChange={onUpdateStoryboardReferences}
+                      onUploadReference={onUploadStoryboardReference}
                     />
                   </div>
                 )}
@@ -697,6 +711,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                {chip.label}
              </button>
            ))}
+        </div>
+      )}
+
+      {pinnedStoryboard && onUpdateStoryboardReferences && (
+        <div className="px-4 pb-3">
+          <div className="border-2 border-black bg-white/90 rounded-xl shadow-neo-sm">
+            <button
+              type="button"
+              onClick={() => setIsReferencePinnedOpen(prev => !prev)}
+              className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left"
+            >
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Pinned Reference Kit</div>
+                <div className="text-xs font-bold text-gray-700 truncate">{pinnedLabel}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  {pinnedReferenceCount} refs
+                </span>
+                <span className="text-xs font-black">{isReferencePinnedOpen ? '-' : '+'}</span>
+              </div>
+            </button>
+            {isReferencePinnedOpen && (
+              <div className="px-3 pb-3">
+                <StoryboardReferenceKit
+                  storyboardId={pinnedStoryboard.id}
+                  assets={assets}
+                  referenceSelections={pinnedStoryboard.payload.referenceSelections}
+                  referenceMode={pinnedStoryboard.payload.referenceMode}
+                  disabled={isProcessing || pinnedStoryboard.status === 'processing'}
+                  onChange={onUpdateStoryboardReferences}
+                  onUploadReference={onUploadStoryboardReference}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 

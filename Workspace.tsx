@@ -1370,6 +1370,68 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   };
 
+  const handleUploadStoryboardReference = async (
+    file: File,
+    role: VideoReferenceRole,
+    options?: { applyAvatarIdentity?: boolean }
+  ) => {
+    if (!activeBoardId || !file) return null;
+    if (!file.type.startsWith('image/')) {
+      showError('Reference files must be images.');
+      return null;
+    }
+    const traceId = crypto.randomUUID();
+    console.log(`[REFERENCE ${traceId}] Uploading reference`, {
+      boardId: activeBoardId,
+      role,
+      name: file.name
+    });
+    try {
+      const base64 = await readFileAsBase64(file);
+      const roleLabel = role === 'avatar' ? 'Avatar' : role === 'item' ? 'Item' : 'Setting';
+      const assetName = file.name || `${roleLabel} Reference`;
+      const saved = await saveAsset(activeBoardId, {
+        id: Date.now().toString(),
+        type: 'image',
+        name: assetName,
+        content: base64,
+        mimeType: file.type
+      });
+      const assetWithId: ProjectAsset = {
+        id: saved.id,
+        type: saved.type as ProjectAsset['type'],
+        name: saved.name || assetName,
+        content: saved.content || base64,
+        storageKey: saved.storageKey,
+        mimeType: saved.mimeType || file.type,
+        status: saved.status as 'digesting' | 'ready'
+      };
+      updateActiveBoard(b => ({ ...b, assets: [...b.assets, assetWithId] }));
+      if (options?.applyAvatarIdentity && role === 'avatar') {
+        const avatarTraceId = crypto.randomUUID();
+        console.log(`[REFERENCE ${avatarTraceId}] Calibrating avatar identity from reference`, {
+          boardId: activeBoardId,
+          assetId: saved.id
+        });
+        try {
+          const identity = await analyzeAvatarImage([base64]);
+          await saveAvatarIdentityAction(activeBoardId, identity);
+          updateActiveBoard(b => ({ ...b, avatarIdentity: identity }));
+          showSuccess('Avatar identity updated from reference.');
+        } catch (error) {
+          console.error(`[REFERENCE ${avatarTraceId}] Avatar calibration failed`, error);
+          showError(`Avatar calibration failed. Trace ${avatarTraceId}`);
+        }
+      }
+      showSuccess(`${roleLabel} reference uploaded.`);
+      return saved.id;
+    } catch (error) {
+      console.error(`[REFERENCE ${traceId}] Upload failed`, error);
+      showError(`Reference upload failed. Trace ${traceId}`);
+      return null;
+    }
+  };
+
   const handleCreateAiAvatar = async (description: string) => {
     if (!activeBoardId || isAvatarGenerating) return;
     const trimmed = description.trim();
@@ -2298,11 +2360,26 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         }
       }
 
-      updateActiveBoard(b => ({
-        ...b,
-        items: [...newItems, ...b.items],
-        messages: [...b.messages, ...modelMessages]
-      }));
+      if (storyboardQueue.length > 0) {
+        setPendingStoryboards(prev => {
+          const merged = new Map(prev.map(sb => [sb.id, sb]));
+          storyboardQueue.forEach(sb => merged.set(sb.id, sb));
+          return Array.from(merged.values()).filter(sb => sb.status === 'pending' || sb.status === 'processing');
+        });
+      }
+
+      updateActiveBoard(b => {
+        const existingStoryboards = b.storyboards || [];
+        const mergedStoryboards = storyboardQueue.length > 0
+          ? Array.from(new Map([...existingStoryboards, ...storyboardQueue].map(sb => [sb.id, sb])).values())
+          : existingStoryboards;
+        return {
+          ...b,
+          items: [...newItems, ...b.items],
+          messages: [...b.messages, ...modelMessages],
+          storyboards: mergedStoryboards
+        };
+      });
       refreshOnboardingState();
 
     } catch (error: any) {
@@ -2556,6 +2633,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         onStoryboardAction={handleStoryboardAction}
         onStoryboardEdit={handleStoryboardEdit}
         onUpdateStoryboardReferences={handleStoryboardReferenceUpdate}
+        onUploadStoryboardReference={handleUploadStoryboardReference}
         draftMessage={chatDraft}
         isProcessing={isProcessing}
         processingStatus={processingStatus}
