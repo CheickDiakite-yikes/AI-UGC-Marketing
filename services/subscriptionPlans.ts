@@ -25,8 +25,8 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     description: 'Best for first-time exploration.',
     features: [
       `${IMAGE_LIMIT} image generations`,
-      'No video generation',
-      'Long-form video locked',
+      'Video generation with credits',
+      'Long-form video with credits',
       'Core brand context builder',
       'Community support',
     ],

@@ -717,9 +717,9 @@ const LandingPage: React.FC<Props> = ({
                     <span className="w-6 h-6 bg-neo-lime border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
                     10 image generations
                   </li>
-                  <li className="flex items-center gap-3 font-medium text-gray-400">
-                    <span className="w-6 h-6 bg-gray-100 border-2 border-gray-300 flex items-center justify-center text-sm shrink-0">✕</span>
-                    No video generation
+                  <li className="flex items-center gap-3 font-medium">
+                    <span className="w-6 h-6 bg-neo-lime border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
+                    Video generation with credits
                   </li>
                   <li className="flex items-center gap-3 font-medium">
                     <span className="w-6 h-6 bg-neo-lime border-2 border-black flex items-center justify-center text-sm font-bold shrink-0">✓</span>
@@ -868,12 +868,16 @@ const LandingPage: React.FC<Props> = ({
                <p className="text-gray-500 text-sm">© 2025 Predi Inc. All rights reserved.</p>
             </div>
             <div className="flex flex-wrap gap-6 text-sm font-bold text-gray-400 justify-center md:justify-end">
-               <button onClick={onNavigateAbout} className="hover:text-neo-lime transition-colors text-left">About</button>
-               <button onClick={onNavigateHowItWorks} className="hover:text-neo-yellow transition-colors text-left">How it works</button>
-               <button onClick={onNavigateShowcase} className="hover:text-neo-cyan transition-colors text-left">Showcase</button>
-               <button onClick={onNavigatePrivacy} className="hover:text-neo-pink transition-colors text-left">Privacy</button>
-               <button onClick={onNavigateTerms} className="hover:text-neo-cyan transition-colors text-left">Terms</button>
-               <a href="#" className="hover:text-neo-yellow transition-colors">Twitter</a>
+               <a href="/about" onClick={onNavigateAbout} className="hover:text-neo-lime transition-colors text-left">About</a>
+               <a href="/how-it-works" onClick={onNavigateHowItWorks} className="hover:text-neo-yellow transition-colors text-left">How it works</a>
+               <a href="/showcase" onClick={onNavigateShowcase} className="hover:text-neo-cyan transition-colors text-left">Showcase</a>
+               <a href="/privacy" onClick={onNavigatePrivacy} className="hover:text-neo-pink transition-colors text-left">Privacy</a>
+               <a href="/terms" onClick={onNavigateTerms} className="hover:text-neo-cyan transition-colors text-left">Terms</a>
+               <a href="/ai-marketing-platform" className="hover:text-neo-lime transition-colors text-left">AI marketing platform</a>
+               <a href="/ai-video-ads-generator" className="hover:text-neo-yellow transition-colors text-left">AI video ads generator</a>
+               <a href="/marketing-for-small-business" className="hover:text-neo-cyan transition-colors text-left">Marketing for small business</a>
+               <a href="/long-form-ai-video" className="hover:text-neo-pink transition-colors text-left">Long-form AI video</a>
+               <a href="https://twitter.com/prediai" className="hover:text-neo-yellow transition-colors">Twitter</a>
             </div>
          </div>
       </footer>

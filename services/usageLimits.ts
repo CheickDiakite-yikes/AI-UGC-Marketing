@@ -18,13 +18,16 @@ export const VIDEO_CREDIT_COST = Math.ceil(AVG_VIDEO_COST_QUALITY / (1 - TARGET_
 
 export const getRemainingImages = (used: number, limit: number = IMAGE_LIMIT, credits: number = 0) => {
   if (!Number.isFinite(limit)) return Number.POSITIVE_INFINITY;
-  const total = limit + Math.max(0, credits);
-  return Math.max(0, total - used);
+  const planLimit = Math.max(0, limit);
+  const planRemaining = Math.max(0, planLimit - used);
+  const bonus = Math.max(0, credits);
+  return planRemaining + bonus;
 };
 
 export const getRemainingVideos = (used: number, limit: number = VIDEO_LIMIT, credits: number = 0) => {
-  if (limit <= 0) return 0;
   if (!Number.isFinite(limit)) return Number.POSITIVE_INFINITY;
+  const planLimit = Math.max(0, limit);
+  const planRemaining = Math.max(0, planLimit - used);
   const bonus = credits > 0 ? Math.floor(credits / VIDEO_CREDIT_COST) : 0;
-  return Math.max(0, limit - used + bonus);
+  return planRemaining + bonus;
 };

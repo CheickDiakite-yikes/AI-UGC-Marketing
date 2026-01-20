@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ProjectAsset, BrandIdentity, AvatarIdentity, UsageStats, Product, PlanTier, CanvasItem } from '../types';
 import { getPlanLimits, formatLimit } from '../services/subscriptionPlans';
-import { COST_PER_IMAGE, COST_PER_VIDEO_SECOND_FAST, COST_PER_VIDEO_SECOND_QUALITY, COST_PER_REFERENCE_IMAGE, VIDEO_AVG_SECONDS } from '../services/usageLimits';
+import { COST_PER_IMAGE, COST_PER_VIDEO_SECOND_FAST, COST_PER_VIDEO_SECOND_QUALITY, COST_PER_REFERENCE_IMAGE, VIDEO_AVG_SECONDS, getRemainingImages, getRemainingVideos } from '../services/usageLimits';
 import { logout } from '../app/actions/authActions';
 import { scrapeWebsiteAction, reExtractPdfAction } from '../app/actions/boardActions';
 import { getUserProfile } from '../app/actions/userActions';
@@ -315,13 +315,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const profileInitials = getProfileInitials(userProfile?.name, userProfile?.email);
   const { imageLimit, videoLimit } = getPlanLimits(planTier || 'free');
-  const imageLimitLabel = formatLimit(imageLimit);
-  const videoLimitLabel = videoLimit <= 0 ? 'Locked' : formatLimit(videoLimit);
-  const imageProgress = Number.isFinite(imageLimit) && imageLimit > 0
-    ? Math.min(100, ((usageStats?.imagesGenerated || 0) / imageLimit) * 100)
+  const imagesUsed = usageStats?.imagesGenerated || 0;
+  const videosUsed = usageStats?.videosGenerated || 0;
+  const creditsAvailable = usageStats?.creditBalance || 0;
+  const remainingImages = getRemainingImages(imagesUsed, imageLimit, creditsAvailable);
+  const remainingVideos = getRemainingVideos(videosUsed, videoLimit, creditsAvailable);
+  const totalImages = Number.isFinite(imageLimit) ? imagesUsed + remainingImages : Number.POSITIVE_INFINITY;
+  const totalVideos = Number.isFinite(videoLimit) ? videosUsed + remainingVideos : Number.POSITIVE_INFINITY;
+  const imageLimitLabel = formatLimit(totalImages);
+  const showVideoLocked = videoLimit <= 0 && remainingVideos <= 0 && videosUsed === 0;
+  const videoLimitLabel = showVideoLocked ? 'Locked' : formatLimit(totalVideos);
+  const imageProgress = Number.isFinite(totalImages) && totalImages > 0
+    ? Math.min(100, (imagesUsed / totalImages) * 100)
     : 0;
-  const videoProgress = Number.isFinite(videoLimit) && videoLimit > 0
-    ? Math.min(100, ((usageStats?.videosGenerated || 0) / videoLimit) * 100)
+  const videoProgress = Number.isFinite(totalVideos) && totalVideos > 0
+    ? Math.min(100, (videosUsed / totalVideos) * 100)
     : 0;
   const profileDisplayName = (() => {
     const name = userProfile?.name?.trim();

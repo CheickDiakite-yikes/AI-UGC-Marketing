@@ -2,6 +2,7 @@
 
 ## Product Summary
 Predi AI is an AI-native marketing OS that generates campaigns, images, videos, and carousels. It uses Gemini models for text/image generation and Veo for video generation, grounded by brand identity, avatar identity, and product catalogs.
+It includes a long-video pipeline with storyboard approval, a Reference Kit for continuity, and a public Showcase page curated from admin favorites.
 
 ## Models and Defaults
 - Images: `gemini-3-pro-image-preview` (Nano Banana Pro).
@@ -9,6 +10,7 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
   - `veo-3.1-generate-preview` when Quality Mode or references are used.
   - `veo-3.1-fast-generate-preview` otherwise.
 - Video reference frames (auto): `gemini-3-pro-image-preview`.
+- Reference slots: up to 3 ordered slots with roles `avatar`, `item`, `setting`.
 - Default video aspect ratio: 16:9 (use 9:16 for vertical/Reels/TikTok).
 - On-screen text in videos: avoid unless explicitly requested; keep 1-3 words max.
 
@@ -30,6 +32,14 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
   `services/videoReferenceService.ts` and passed to Veo (image-to-video).
 - Vertical references are attempted in Quality Mode with safe fallback.
 
+## Reference Kit and Continuity
+- Reference Kit UI: `components/StoryboardReferenceKit.tsx` (roles: avatar, item, setting).
+- Reference inputs flow through `referenceSelections` + `referenceMode` (manual, hybrid, auto).
+- Resolution lives in `services/videoIngredientService.ts`:
+  - Manual selections are honored.
+  - Hybrid/auto can fill missing slots and inject avatar identity references.
+- Long-video pipeline uses continuity references even when avatar assets exist.
+
 ## Long Video (15-30s)
 - Tool: `generate_long_video` (multi-scene, 4/6/8s per scene, total <= 30s).
 - Pipeline: `services/longVideoPipeline.ts` generates scenes, extracts continuity frames, and stitches via `services/videoStitchService.ts`.
@@ -40,17 +50,32 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Each scene is stored as a `video` item with `meta.isScene` + `sceneIndex`.
 - Final stitched video is a `video` item with `meta.isLongVideo`, `sceneItemIds`, `sceneCount`, `totalDurationSeconds`.
 - Video usage/credits are charged per scene (sceneCount).
+- Long video is a paid feature (locked on Free plan).
 
 ## Pricing, Credits, ROI
 - Credits (see `services/usageLimits.ts`):
   - Images: 1 credit.
-  - Videos: 9 credits (8s + 1 reference frame).
+  - Videos: derived from target margin and credit pack price floor; do not hardcode.
+- Credit pricing helpers: `services/pricing.ts`.
 - Plans (see `services/subscriptionPlans.ts`):
   - Basic: 50 images, 3 videos.
   - Pro: 150 images, 10 videos.
   - Credit packs: 50/$20, 100/$38, 200/$75.
 - ROI/Cost in `components/Sidebar.tsx` uses per-item metadata:
   - `qualityMode`, `referenceCount`, `autoReferenceUsed`, `slideCount`.
+
+## Research Ideas UX
+- Research outputs include an "IDEA OPTIONS" block with clickable ideas in chat.
+- Idea parsing lives in `components/ChatInterface.tsx`.
+
+## Generation Progress UX
+- Chat shows a Generation Queue with per-item ETA/progress for image/video jobs.
+- Progress metadata is stored in pending items as `meta.queuedAt`.
+
+## Showcase Page
+- Public showcase view aggregates admin favorites (`zorovt18@gmail.com`).
+- Data: `app/actions/showcaseActions.ts`.
+- UI: `components/ShowcasePage.tsx`, routed in `App.tsx`.
 
 ## Aha Pack (Freebie)
 - One-time free pack for free users: 1 image, 1 two-slide carousel, 1 HQ video.
@@ -78,6 +103,10 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Auto references: `services/videoReferenceService.ts`
 - Long video pipeline: `services/longVideoPipeline.ts`, `services/videoStitchService.ts`
 - Pricing/limits: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
+- Pricing helpers: `services/pricing.ts`
 - ROI display: `components/Sidebar.tsx`
 - Calendar actions: `app/actions/calendarActions.ts`
 - Calendar UI: `components/DashboardCalendar.tsx`
+- Showcase UI: `components/ShowcasePage.tsx`
+- Showcase data: `app/actions/showcaseActions.ts`
+- Reference Kit: `components/StoryboardReferenceKit.tsx`

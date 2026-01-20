@@ -20,7 +20,7 @@ import { useToast } from './components/Toast';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
-import { getRemainingImages, getRemainingVideos } from './services/usageLimits';
+import { getRemainingVideos, IMAGE_CREDIT_COST, VIDEO_CREDIT_COST } from './services/usageLimits';
 import { getPlanLimits } from './services/subscriptionPlans';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
 import {
@@ -68,6 +68,39 @@ interface FailedJob {
   payload: any;
 }
 
+const getRemainingImagesWithPending = (
+  used: number,
+  pending: number,
+  limit: number,
+  credits: number
+) => {
+  if (!Number.isFinite(limit)) return Number.POSITIVE_INFINITY;
+  const safeLimit = Math.max(0, limit);
+  const planRemaining = Math.max(0, safeLimit - used);
+  const pendingPlanUse = Math.min(pending, planRemaining);
+  const pendingBeyondPlan = Math.max(0, pending - pendingPlanUse);
+  const effectiveCredits = Math.max(0, credits - pendingBeyondPlan * IMAGE_CREDIT_COST);
+  const remainingPlanAfterPending = planRemaining - pendingPlanUse;
+  return remainingPlanAfterPending + effectiveCredits;
+};
+
+const getRemainingVideosWithPending = (
+  used: number,
+  pending: number,
+  limit: number,
+  credits: number
+) => {
+  if (!Number.isFinite(limit)) return Number.POSITIVE_INFINITY;
+  const safeLimit = Math.max(0, limit);
+  const planRemaining = Math.max(0, safeLimit - used);
+  const pendingPlanUse = Math.min(pending, planRemaining);
+  const pendingBeyondPlan = Math.max(0, pending - pendingPlanUse);
+  const effectiveCredits = Math.max(0, credits - pendingBeyondPlan * VIDEO_CREDIT_COST);
+  const remainingPlanAfterPending = planRemaining - pendingPlanUse;
+  const creditVideos = effectiveCredits > 0 ? Math.floor(effectiveCredits / VIDEO_CREDIT_COST) : 0;
+  return remainingPlanAfterPending + creditVideos;
+};
+
 const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const { showError, showSuccess, showToast } = useToast();
   const [usage, setUsage] = useState<UsageStats>({ imagesGenerated: 0, videosGenerated: 0, creditBalance: 0, lastResetDate: 0 });
@@ -89,7 +122,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [activeBoardId, setActiveBoardId] = useState<string>('');
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const planLimits = getPlanLimits(planTier);
-  const isVideoLocked = planLimits.videoLimit <= 0;
+  const hasVideoAllowance = getRemainingVideos(
+    usage.videosGenerated,
+    planLimits.videoLimit,
+    usage.creditBalance
+  ) > 0;
+  const isVideoLocked = planLimits.videoLimit <= 0 && !hasVideoAllowance;
 
   const openPaywall = useCallback((reason: 'image_limit' | 'video_limit' | 'video_locked') => {
     setPaywallState((prev) => (prev.isOpen ? prev : { isOpen: true, reason }));
@@ -587,22 +625,23 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       return { ok: false, message: 'Total duration exceeds 30 seconds.' };
     }
     if (isVideoLocked) {
-      showError('Video generation requires a subscription.');
+      showError('Video generation requires credits or a subscription.');
       openPaywall('video_locked');
-      return { ok: false, message: 'Video generation requires a subscription.' };
+      return { ok: false, message: 'Video generation requires credits or a subscription.' };
     }
 
     const pendingVideoCount = pendingItems
       .filter(item => item.type === 'video')
       .reduce((sum, item) => sum + (typeof item.meta?.sceneCount === 'number' ? item.meta.sceneCount : 1), 0);
-    const remainingVideos = getRemainingVideos(
-      usage.videosGenerated + pendingVideoCount,
+    const remainingVideos = getRemainingVideosWithPending(
+      usage.videosGenerated,
+      pendingVideoCount,
       planLimits.videoLimit,
       usage.creditBalance
     );
 
     if (remainingVideos < sceneCount) {
-      const message = `Video quota too low for ${sceneCount} scenes (${usage.videosGenerated}/${planLimits.videoLimit}).`;
+      const message = `Video quota too low for ${sceneCount} scenes. ${remainingVideos} available.`;
       showError(message);
       openPaywall('video_limit');
       return { ok: false, message };
@@ -1539,8 +1578,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         .reduce((sum, item) => sum + (typeof item.meta?.sceneCount === 'number' ? item.meta.sceneCount : 1), 0);
       const imageLimit = planLimits.imageLimit;
       const videoLimit = planLimits.videoLimit;
-      let remainingImages = getRemainingImages(usage.imagesGenerated + pendingImageCount, imageLimit, usage.creditBalance);
-      let remainingVideos = getRemainingVideos(usage.videosGenerated + pendingVideoCount, videoLimit, usage.creditBalance);
+      let remainingImages = getRemainingImagesWithPending(usage.imagesGenerated, pendingImageCount, imageLimit, usage.creditBalance);
+      let remainingVideos = getRemainingVideosWithPending(usage.videosGenerated, pendingVideoCount, videoLimit, usage.creditBalance);
 
       const modelParts = response.candidates[0].content.parts || [];
       let responseText = response.text || "";
@@ -1637,12 +1676,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
             const traceId = crypto.randomUUID();
             if (isVideoLocked) {
-              showError('Video generation requires a subscription.');
+              showError('Video generation requires credits or a subscription.');
               openPaywall('video_locked');
               continue;
             }
             if (remainingVideos <= 0) {
-              const message = `Video quota reached (${usage.videosGenerated}/${videoLimit}).`;
+              const message = 'Video quota reached. Add credits or upgrade to generate more.';
               showError(message);
               openPaywall('video_limit');
               continue;
@@ -1721,7 +1760,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
             const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
             if (isVideoLocked) {
-              showError('Long video generation requires a subscription.');
+              showError('Long video generation requires credits or a subscription.');
               openPaywall('video_locked');
               continue;
             }
@@ -2092,7 +2131,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                 if (isVideoLocked) {
                   openPaywall('video_locked');
                   skippedCount++;
-                  skippedReasons.push('Video generation requires a subscription.');
+                  skippedReasons.push('Video generation requires credits or a subscription.');
                   continue;
                 }
                 if (remainingVideos < 1) {

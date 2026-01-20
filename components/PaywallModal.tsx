@@ -1,6 +1,6 @@
 import React from 'react';
 import { CREDIT_PACKS, PLAN_CATALOG, VIDEO_AVG_SECONDS, formatLimit } from '../services/subscriptionPlans';
-import { VIDEO_CREDIT_COST } from '../services/usageLimits';
+import { VIDEO_CREDIT_COST, getRemainingImages, getRemainingVideos } from '../services/usageLimits';
 import type { PlanTier, UsageStats } from '../types';
 
 type PaywallReason = 'image_limit' | 'video_limit' | 'video_locked' | null;
@@ -27,8 +27,8 @@ const reasonCopy: Record<Exclude<PaywallReason, null>, { title: string; body: st
     body: 'Upgrade for more video capacity and faster creative testing.',
   },
   video_locked: {
-    title: 'Video generation is a premium feature',
-    body: 'Unlock video with a subscription. Basic includes a 3-day free trial.',
+    title: 'Video generation needs credits or a plan',
+    body: 'Add credits for immediate access or upgrade for monthly video capacity.',
   },
 };
 
@@ -96,8 +96,16 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
   if (!isOpen) return null;
 
   const reasonBlock = reason ? reasonCopy[reason] : null;
-  const imageLimitLabel = formatLimit(imageLimit);
-  const videoLimitLabel = videoLimit <= 0 ? 'Locked' : formatLimit(videoLimit);
+  const imagesUsed = usage.imagesGenerated || 0;
+  const videosUsed = usage.videosGenerated || 0;
+  const creditsAvailable = usage.creditBalance || 0;
+  const remainingImages = getRemainingImages(imagesUsed, imageLimit, creditsAvailable);
+  const remainingVideos = getRemainingVideos(videosUsed, videoLimit, creditsAvailable);
+  const totalImages = Number.isFinite(imageLimit) ? imagesUsed + remainingImages : Number.POSITIVE_INFINITY;
+  const totalVideos = Number.isFinite(videoLimit) ? videosUsed + remainingVideos : Number.POSITIVE_INFINITY;
+  const imageLimitLabel = formatLimit(totalImages);
+  const showVideoLocked = videoLimit <= 0 && remainingVideos <= 0 && videosUsed === 0;
+  const videoLimitLabel = showVideoLocked ? 'Locked' : formatLimit(totalVideos);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -135,10 +143,10 @@ const PaywallModal: React.FC<PaywallModalProps> = ({
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Current plan</p>
               <p className="text-sm font-black capitalize">{planTier}</p>
               <div className="mt-2 text-[10px] font-bold text-gray-600">
-                Images: {usage.imagesGenerated}/{imageLimitLabel}
+                Images: {imagesUsed}/{imageLimitLabel}
               </div>
               <div className="text-[10px] font-bold text-gray-600">
-                Videos: {usage.videosGenerated}/{videoLimitLabel}
+                Videos: {videosUsed}/{videoLimitLabel}
               </div>
               <div className="text-[10px] font-bold text-gray-600">
                 Credits: {usage.creditBalance}

@@ -64,14 +64,6 @@ export async function POST(request: NextRequest) {
         ? payload.scenes.length
         : 1;
 
-      if ((type === 'generate_video' || type === 'generate_long_video') && videoLimit <= 0) {
-        return NextResponse.json({
-          error: 'Video generation requires a subscription.',
-          code: 'PLAN_REQUIRED',
-          plan: 'basic',
-        }, { status: 402 });
-      }
-
       if (type === 'generate_image' && remainingImages <= 0) {
         return NextResponse.json({
           error: 'Image quota exceeded',
@@ -83,9 +75,13 @@ export async function POST(request: NextRequest) {
       }
 
       if ((type === 'generate_video' || type === 'generate_long_video') && remainingVideos < requestedScenes) {
+        const code = videoLimit <= 0 && remainingVideos <= 0 ? 'PLAN_REQUIRED' : 'QUOTA_EXCEEDED';
+        const errorMessage = code === 'PLAN_REQUIRED'
+          ? 'Video generation requires credits or a subscription.'
+          : 'Video quota exceeded';
         return NextResponse.json({
-          error: 'Video quota exceeded',
-          code: 'QUOTA_EXCEEDED',
+          error: errorMessage,
+          code,
           limit: videoLimit,
           used: user.videosGenerated,
           remaining: remainingVideos,

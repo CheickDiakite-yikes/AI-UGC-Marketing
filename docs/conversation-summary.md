@@ -1,58 +1,37 @@
 # Conversation Summary
 
 ## Goals
-- Improve video generation quality: reduce morphing, extra limbs, text misspellings, and improve physics.
-- Enable stronger reference usage for videos, including auto-generated reference frames.
-- Ensure pricing, credits, and ROI math reflect Quality Mode changes.
-- Rebalance plan limits and credit pack pricing to match higher costs.
-- Add a one-time free Aha Pack for free users with high-value outputs.
-- Build a profile dashboard calendar for scheduling assets across boards.
-- Add edit/reschedule, drag-and-drop, and bulk day actions for the calendar.
-- Add a long-video pipeline to deliver 15-30s stitched videos with scene consistency.
-- Require storyboard approval before long-video generation.
-- Add storyboard edit action and persist storyboards across sessions.
-- Add a lightweight in-chat tracker for long-video rendering.
+- Improve video generation quality and continuity across scenes.
+- Add reference kits for video continuity (avatar/item/setting).
+- Add a long-video pipeline with storyboard approval.
+- Add a showcase page for admin-favorited content.
+- Improve research UX with idea selection.
+- Add chat-side progress tracking for image/video generation.
+- Keep pricing/credits aligned to target margin with clear ROI display.
 
 ## Key Decisions
-- Add prompt guardrails for video quality and shorter on-screen text.
-- Introduce Quality Mode (default ON) to drive higher-fidelity video generation.
-- Auto-generate a reference frame for videos (image-to-video) using Nano Banana Pro.
-- Use Veo 3.1 preview when Quality Mode or references are present.
-- Update credit costs for video to include the reference frame.
-- Move ROI/cost calculations to item-level metadata rather than global averages.
-- Aha Pack includes 1 image, 1 two-slide carousel, 1 HQ video, and is redeemable once.
-- Aha Pack jobs bypass quota checks and usage consumption.
-- Dashboard centers on a monthly calendar and weekly report, with per-day multi-asset scheduling.
-- Long videos require user approval of a storyboard before jobs are queued.
-- Storyboards persist in the database and can be edited via chat.
-- Chat shows a long-video rendering tracker while jobs run.
+- Reference kits use ordered roles (avatar, item, setting) with manual/hybrid/auto modes.
+- Long video uses continuity references and supports storyboard editing before approval.
+- Showcase page pulls admin favorites (`zorovt18@gmail.com`) as a curated gallery.
+- Research responses include "IDEA OPTIONS" parsed into clickable actions.
+- Credits for video are computed from target margin and credit pack price floor.
 
 ## Changes Implemented
-- Video prompt guardrails expanded with anatomy/physics constraints.
-- Quality Mode toggle added to chat header (default ON).
-- Auto reference frames generated via `gemini-3-pro-image-preview`.
-- Reference usage allowed for vertical aspect ratios in Quality Mode with fallback.
-- Video usage credits updated to 9 (8s + 1 reference image).
-- Plan limits adjusted: Basic 3 videos, Pro 10 videos.
-- Credit pack pricing updated: 50/$20, 100/$38, 200/$75.
-- ROI/cost now uses per-item metadata (quality mode, reference count, carousel slides).
-- Added Aha Pack redemption flow and server-side checks.
-- Added calendar scheduling UI with weekly report and per-day asset lists.
-- Added new dashboard tab at `/profile/dashboard`.
-- Added calendar entry edit/reschedule flow with date + note updates.
-- Added drag-and-drop rescheduling for pointer-fine devices.
-- Added bulk clear-day and duplicate-to-next-week actions.
-- Added undo toasts for move and bulk calendar actions.
-- Added long-video pipeline with multi-scene generation + ffmpeg stitching.
-- Added storyboard approval flow for long videos in chat (approve/cancel actions).
-- Added storyboard persistence and edit actions that prefill the chat input.
-- Added long-video rendering tracker in chat and 1080p duration guardrails.
+- Added Reference Kit with role-based selections and auto/hybrid fill logic.
+- Added avatar-aware continuity references for long video scenes.
+- Added in-chat Generation Queue for images/videos with ETA/progress.
+- Added research idea selection UI parsed from "IDEA OPTIONS".
+- Added About, How It Works, and Showcase pages to landing navigation.
+- Showcase pulls admin favorites and renders modal viewer for video/image/carousel.
+- Credits now derive from margin target; pricing helpers moved to `services/pricing.ts`.
 
 ## Current Status
 - Quality Mode is ON by default and active for all video jobs unless toggled off.
 - Images and carousels already use Nano Banana Pro.
 - Free users can redeem the Aha Pack once, even when out of quota.
 - Dashboard calendar supports add/remove scheduling per day.
+- Long video remains a paid feature (locked for Free plan).
+- Showcase page is populated via admin favorites.
 
 ## Relevant Files
 - Video guardrails: `services/videoPromptUtils.ts`
@@ -66,3 +45,5 @@
 - Calendar actions: `app/actions/calendarActions.ts`
 - Calendar UI: `components/DashboardCalendar.tsx`
 - Dashboard page: `app/profile/dashboard/page.tsx`
+- Showcase: `components/ShowcasePage.tsx`, `app/actions/showcaseActions.ts`
+- Reference Kit: `components/StoryboardReferenceKit.tsx`

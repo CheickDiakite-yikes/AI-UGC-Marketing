@@ -23,6 +23,9 @@ const syne = Syne({
 })
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
+const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'c6ippGeHmi8FWQsc-ClDfZ-ZZnks_pLQWB9EKIu6BrA'
+const bingVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+const yandexVerification = process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
@@ -90,6 +93,11 @@ export const metadata: Metadata = {
     },
     alternates: {
         canonical: siteUrl,
+    },
+    verification: {
+        google: googleVerification,
+        yandex: yandexVerification,
+        other: bingVerification ? { 'msvalidate.01': bingVerification } : undefined,
     },
     category: 'technology',
     classification: 'Business Software',

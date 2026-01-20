@@ -2,6 +2,7 @@
 
 ## Product Summary
 Predi AI is an AI-native marketing OS that generates campaigns, images, videos, and carousels. It uses Gemini models for text/image generation and Veo for video generation, grounded by brand identity, avatar identity, and product catalogs.
+It includes a multi-scene long-video pipeline, a Reference Kit for continuity, and a Showcase page curated from admin favorites.
 
 ## Core Architecture
 - Frontend: React/TypeScript app with a central `Workspace` orchestrating chat and generation jobs.
@@ -38,6 +39,10 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Quality Mode:
   - Default ON in UI.
   - Uses Veo preview model and auto reference frames by default.
+- Reference Kit:
+  - Roles: avatar, item, setting.
+  - Inputs: `referenceSelections` + `referenceMode` (manual, hybrid, auto).
+  - Resolution happens in `services/videoIngredientService.ts`.
 
 ## Long Video (15-30s)
 - Tool: `generate_long_video` (multi-scene, 4/6/8s per scene, total <= 30s).
@@ -50,6 +55,7 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Each scene is stored as a video item with `meta.isScene`.
 - Final stitched video is a video item with `meta.isLongVideo` and `sceneItemIds`.
 - Usage/credits are charged per scene (sceneCount).
+- Long video is locked for Free users (paid plans only).
 
 ## Image and Carousel Generation
 - All images use Nano Banana Pro via `generateMarketingImage` in `services/geminiService.ts`.
@@ -73,7 +79,7 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 ## Pricing, Credits, and ROI
 - Credits:
   - Images: 1 credit.
-  - Videos: 9 credits (8s + 1 reference frame).
+  - Videos: derived from target margin and the lowest credit pack price (see `services/usageLimits.ts`).
   - Logic in `services/usageLimits.ts` and `services/usageConsumption.ts`.
 - Plans:
   - Free: images only.
@@ -87,6 +93,19 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
   - Video cost uses quality mode, reference usage, and 8s baseline.
   - Carousel cost/value scales by slide count.
 
+## Research Ideas UX
+- Research outputs include an "IDEA OPTIONS" block for click-to-run ideas.
+- Parsing and UI lives in `components/ChatInterface.tsx`.
+
+## Generation Progress UX
+- Chat shows a Generation Queue with per-item ETA/progress for image/video jobs.
+- Queue data is derived from pending items and `meta.queuedAt`.
+
+## Showcase Page
+- Uses admin favorites (email: zorovt18@gmail.com).
+- Data: `app/actions/showcaseActions.ts`.
+- UI: `components/ShowcasePage.tsx` (routed in `App.tsx`).
+
 ## Important Files
 - Chat and tools: `services/geminiService.ts`
 - Video API: `app/actions.ts`
@@ -95,9 +114,13 @@ Predi AI is an AI-native marketing OS that generates campaigns, images, videos, 
 - Video guardrails: `services/videoPromptUtils.ts`
 - Identity grounding: `services/identityPromptService.ts`, `services/identityPromptUtils.ts`
 - Plans and usage: `services/subscriptionPlans.ts`, `services/usageLimits.ts`
+- Pricing helpers: `services/pricing.ts`
 - Sidebar ROI: `components/Sidebar.tsx`
 - Calendar actions: `app/actions/calendarActions.ts`
 - Calendar UI: `components/DashboardCalendar.tsx`
+- Showcase data: `app/actions/showcaseActions.ts`
+- Showcase UI: `components/ShowcasePage.tsx`
+- Reference Kit UI: `components/StoryboardReferenceKit.tsx`
 
 ## Defaults and Toggles
 - Quality Mode is ON by default in the chat header.

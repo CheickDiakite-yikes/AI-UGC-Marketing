@@ -30,13 +30,11 @@ const calculateCharges = (
     return { planUsed, creditsNeeded };
   }
 
-  if (videoLimit <= 0) {
-    throw new Error('PLAN_REQUIRED');
-  }
   if (!Number.isFinite(videoLimit)) {
     return { planUsed: count, creditsNeeded: 0 };
   }
-  const remainingPlan = Math.max(0, videoLimit - user.videosGenerated);
+  const planLimit = Math.max(0, videoLimit);
+  const remainingPlan = Math.max(0, planLimit - user.videosGenerated);
   const planUsed = Math.min(count, remainingPlan);
   const creditsNeeded = Math.max(0, count - planUsed) * VIDEO_CREDIT_COST;
   return { planUsed, creditsNeeded };

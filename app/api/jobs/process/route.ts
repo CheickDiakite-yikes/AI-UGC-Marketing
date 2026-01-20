@@ -62,11 +62,11 @@ const assertVideoQuota = async (userId: string, count: number = 1) => {
     throw new Error('User not found for quota check');
   }
   const { videoLimit } = getPlanLimits((user.planTier as PlanTier) || 'free');
-  if (videoLimit <= 0) {
-    throw new Error('Video generation requires a subscription');
-  }
   const remaining = getRemainingVideos(user.videosGenerated, videoLimit, user.creditBalance || 0);
   if (remaining < count) {
+    if (videoLimit <= 0 && remaining <= 0) {
+      throw new Error('Video generation requires credits or a subscription');
+    }
     throw new Error('Video quota exceeded');
   }
 };
