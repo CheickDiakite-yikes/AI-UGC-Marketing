@@ -110,15 +110,15 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
   };
 
   return (
-    <div className="border-2 border-black rounded-xl bg-white/90 p-3 shadow-neo-sm">
-      <div className="flex items-center justify-between gap-2">
+    <div className="w-full border-2 border-black rounded-xl bg-white/90 p-3 shadow-neo-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Reference Kit</div>
           <p className="text-xs font-bold text-gray-700">
             Up to 3 reference images per scene. Order: avatar → item → setting.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+        <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500 self-start sm:self-auto">
           <input
             type="checkbox"
             checked={aiFillEnabled}
@@ -137,23 +137,23 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
           const previewSrc = selectedAsset ? getAssetPreview(selectedAsset) : null;
           const isUploading = uploadingRole === slot.role;
           return (
-            <div key={slot.role} className="flex items-center gap-3 border-2 border-black bg-white p-2 shadow-neo-sm">
-              <div className="w-14 h-14 border-2 border-black bg-gray-100 flex items-center justify-center overflow-hidden">
+            <div key={slot.role} className="flex flex-col gap-3 border-2 border-black bg-white p-2 rounded-lg shadow-neo-sm sm:flex-row sm:items-center">
+              <div className="w-14 h-14 border-2 border-black bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                 {previewSrc ? (
                   <img src={previewSrc} alt={selectedAsset?.name || slot.label} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-[9px] font-bold text-gray-400 uppercase">{slot.role}</span>
                 )}
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{slot.label}</div>
                 <div className="text-[10px] text-gray-500">{slot.hint}</div>
-                <div className="mt-1 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <select
                     value={selectedId}
                     onChange={(e) => updateSelections(slot.role, e.target.value)}
                     disabled={disabled}
-                    className="flex-1 border-2 border-black bg-white text-xs font-bold px-2 py-1"
+                    className="w-full sm:w-auto sm:flex-1 sm:min-w-[160px] border-2 border-black bg-white text-xs font-bold px-2 py-1"
                   >
                     <option value="">Auto</option>
                     {imageAssets.map(asset => (
@@ -167,7 +167,7 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
                       type="button"
                       onClick={() => handleUploadClick(slot.role)}
                       disabled={disabled || isUploading}
-                      className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2 py-1 bg-neo-cyan hover:bg-neo-pink hover:text-black transition-all disabled:opacity-50"
+                      className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2 py-1 bg-neo-cyan hover:bg-neo-pink hover:text-black transition-all disabled:opacity-50 whitespace-nowrap"
                     >
                       {isUploading ? 'Uploading' : 'Upload'}
                     </button>
@@ -177,14 +177,14 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
                       type="button"
                       onClick={() => clearRole(slot.role)}
                       disabled={disabled}
-                      className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2 py-1 bg-white hover:bg-black hover:text-white transition-all"
+                      className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2 py-1 bg-white hover:bg-black hover:text-white transition-all whitespace-nowrap"
                     >
                       Clear
                     </button>
                   ) : null}
                 </div>
                 {slot.role === 'avatar' && onUploadReference && (
-                  <label className="mt-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  <label className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
                     <input
                       type="checkbox"
                       checked={useAvatarIdentity}

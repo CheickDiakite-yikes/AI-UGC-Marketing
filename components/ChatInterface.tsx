@@ -454,6 +454,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           const ideaPayload = msg.role === 'model' ? extractIdeaOptions(msg.text) : { cleanedText: msg.text, ideas: [] };
           const displayText = msg.role === 'model' ? ideaPayload.cleanedText : msg.text;
           const ideaOptions = ideaPayload.ideas;
+          const isPinnedStoryboardMessage = Boolean(pinnedStoryboard?.id && msg.storyboardId === pinnedStoryboard.id);
+          const showInlineReferenceKit = Boolean(
+            storyboard
+              && onUpdateStoryboardReferences
+              && (!msg.storyboardStatus || msg.storyboardStatus === 'pending')
+              && !isPinnedStoryboardMessage
+          );
           return (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fade-in-up`}>
             <div 
@@ -655,8 +662,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     )}
                   </div>
                 )}
-                {storyboard && onUpdateStoryboardReferences && (!msg.storyboardStatus || msg.storyboardStatus === 'pending') && (
-                  <div className="mt-3">
+                {showInlineReferenceKit && storyboard && (
+                  <div className="mt-3 w-full">
                     <StoryboardReferenceKit
                       storyboardId={storyboard.id}
                       assets={assets}

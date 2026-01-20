@@ -165,8 +165,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const VALUE_PER_VIDEO = 350.00; // High-fidelity social video motion
 
   const fallbackQualityMode = videoQualityMode ?? true;
-  const itemList = items || [];
-  const hasItemEconomics = itemList.length > 0;
+  const itemList = Array.isArray(items) ? items : [];
+  const hasItemEconomics = Array.isArray(items);
 
   const calculateItemEconomics = (entry: CanvasItem) => {
     if (entry.type === 'image') {
