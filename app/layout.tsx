@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { Space_Grotesk, Syne } from 'next/font/google'
 import './globals.css'
 import ToastProvider from '@/components/Toast'
@@ -26,6 +27,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
 const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'c6ippGeHmi8FWQsc-ClDfZ-ZZnks_pLQWB9EKIu6BrA'
 const bingVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
 const yandexVerification = process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-RFRC5MQFSL'
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
@@ -234,6 +236,15 @@ export default function RootLayout({
                 />
             </head>
             <body className={`${spaceGrotesk.variable} ${syne.variable} font-sans`}>
+                <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`} strategy="afterInteractive" />
+                <Script id="ga-config" strategy="afterInteractive">
+                    {`
+                      window.dataLayer = window.dataLayer || [];
+                      function gtag(){dataLayer.push(arguments);}
+                      gtag('js', new Date());
+                      gtag('config', '${gaMeasurementId}');
+                    `}
+                </Script>
                 <ToastProvider>{children}</ToastProvider>
             </body>
         </html>
