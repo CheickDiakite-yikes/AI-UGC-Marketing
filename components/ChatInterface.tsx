@@ -134,7 +134,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [isReferencePinnedOpen, setIsReferencePinnedOpen] = useState(true);
+  const [isReferencePinnedOpen, setIsReferencePinnedOpen] = useState(false);
   const storyboardById = new Map((storyboards || []).map(storyboard => [storyboard.id, storyboard]));
   const pendingGenerations = (pendingItems || []).filter(item => item.type === 'image' || item.type === 'video' || item.type === 'carousel');
   const hasPendingGenerations = pendingGenerations.length > 0;
@@ -186,7 +186,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   useEffect(() => {
     if (pinnedStoryboard?.id) {
-      setIsReferencePinnedOpen(true);
+      setIsReferencePinnedOpen(false);
     }
   }, [pinnedStoryboard?.id]);
 
@@ -364,21 +364,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onChange={handleAvatarFiles}
       />
       
-      <div className="bg-white/60 border-b border-white/20 p-4 flex items-center justify-between backdrop-blur-md flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-neo-pink to-neo-cyan flex items-center justify-center border-2 border-white shadow-sm">
-            <span className="text-xl">✨</span>
+      <div className="bg-white/60 border-b border-white/20 px-3 py-2 flex items-center justify-between backdrop-blur-md flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-neo-pink to-neo-cyan flex items-center justify-center border-2 border-white shadow-sm">
+            <span className="text-base">✨</span>
           </div>
-          <div>
-            <h3 className="font-display font-bold text-gray-900 leading-none">Marketing Agent</h3>
-            <p className="text-[10px] text-gray-700 font-bold uppercase mt-1">Real-Time Search Enabled</p>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h3 className="font-display font-bold text-sm text-gray-900 leading-none">Marketing Agent</h3>
+              <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 bg-white/70 border border-black/10 px-1.5 py-0.5 rounded">
+                Search on
+              </span>
+            </div>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-[9px] font-bold uppercase tracking-wide text-gray-600">Quality Mode</span>
+              <span className="text-[8px] font-bold uppercase tracking-wide text-gray-600">Quality</span>
               <button
                 type="button"
                 onClick={onToggleVideoQuality}
                 aria-pressed={videoQualityMode}
-                className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border-2 transition-all ${
+                className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider border-2 transition-all ${
                   videoQualityMode
                     ? 'bg-neo-black text-white border-black'
                     : 'bg-white/70 text-gray-700 border-black/30'
@@ -389,11 +393,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setIsOpen(false)}
-          className="p-2 hover:bg-black/10 rounded-full transition-colors"
+          className="p-1.5 hover:bg-black/10 rounded-full transition-colors"
+          aria-label="Collapse chat"
         >
-          <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
