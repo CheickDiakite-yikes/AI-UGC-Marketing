@@ -90,9 +90,9 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
   const isLongVideo = item.type === 'video' && !item.meta?.isScene && (item.meta?.isLongVideo || sceneCount > 1);
 
   return (
-    <div className="bg-gradient-to-br from-white/80 via-white/70 to-neo-cyan/20 backdrop-blur-lg border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
+    <div className="bg-white/60 backdrop-blur-xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1),0_0_20px_rgba(128,240,240,0.3)] p-0 flex flex-col max-w-sm w-full animate-fade-in-up ring-1 ring-white/50">
       {/* Header */}
-      <div className="border-b-4 border-black bg-gradient-to-r from-neo-pink/95 to-neo-pink/80 backdrop-blur-sm p-2 flex justify-between items-center relative overflow-hidden group/header">
+      <div className="border-b-4 border-black bg-neo-pink/80 backdrop-blur-md p-2 flex justify-between items-center relative overflow-hidden group/header">
         <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
         <div className="flex items-center gap-2 z-10 relative">
           {isLongVideo && (
@@ -237,7 +237,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
       </div>
       
       {/* Caption & Actions Section */}
-      <div className="border-t-4 border-black bg-gradient-to-b from-white/90 to-white/70 backdrop-blur-sm p-3 flex flex-col gap-3">
+      <div className="border-t-4 border-black bg-white/70 backdrop-blur-md p-3 flex flex-col gap-3">
          {item.meta?.hook && (
             <div className="bg-neo-yellow/30 border-l-4 border-neo-yellow p-2 text-xs">
                <span className="font-bold block text-[10px] uppercase text-gray-500">Hook Strategy</span>
