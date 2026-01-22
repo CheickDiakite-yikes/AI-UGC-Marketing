@@ -2546,8 +2546,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         </button>
         <h2 className="font-display font-black text-base truncate flex-1">{activeBoard.name}</h2>
         <div className="flex gap-1 flex-shrink-0">
-          <button onClick={() => setShowBoardListModal(true)} data-tour="boards" className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">📋</button>
-          <button onClick={() => setShowNewBoardModal(true)} className="p-2 bg-neo-black text-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all">+</button>
+          <button onClick={() => setShowBoardListModal(true)} data-tour="boards" className="px-2 py-1 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-1">
+            <span>📋</span>
+            <span className="text-xs font-bold">Boards</span>
+          </button>
+          <button onClick={() => setShowNewBoardModal(true)} className="px-2 py-1 bg-neo-black text-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-1">
+            <span>+</span>
+            <span className="text-xs font-bold">New</span>
+          </button>
         </div>
       </div>
 
