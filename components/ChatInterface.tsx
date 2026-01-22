@@ -26,6 +26,7 @@ interface ChatInterfaceProps {
   videoQualityMode: boolean;
   onToggleVideoQuality: () => void;
   ahaPackAvailable: boolean;
+  variant?: 'classic' | 'canvas';
 }
 
 // Helper to format long URLs into readable short versions
@@ -124,7 +125,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   avatarBusy,
   videoQualityMode,
   onToggleVideoQuality,
-  ahaPackAvailable
+  ahaPackAvailable,
+  variant = 'classic'
 }) => {
   const [input, setInput] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -142,6 +144,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const pinnedStoryboard = pendingStoryboards.length > 0 ? pendingStoryboards[pendingStoryboards.length - 1] : null;
   const pinnedReferenceCount = pinnedStoryboard?.payload?.referenceSelections?.length || 0;
   const pinnedLabel = pinnedStoryboard?.payload?.title || pinnedStoryboard?.payload?.prompt || 'Long video storyboard';
+  const isCanvas = variant === 'canvas';
 
   useEffect(() => {
     if (!hasPendingGenerations) return;
@@ -150,10 +153,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [hasPendingGenerations]);
 
   useEffect(() => {
-    if (window.innerWidth >= 768) {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768 && !isCanvas) {
       setIsOpen(true);
     }
-  }, []);
+  }, [isCanvas]);
 
   useEffect(() => {
     const handleOpenChat = () => {
@@ -339,7 +342,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 md:w-16 md:h-16 rounded-full bg-neo-black text-white border-2 border-white shadow-neo-lg flex items-center justify-center hover:scale-110 transition-transform animate-bounce-in"
+        className={`fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center hover:scale-110 transition-transform animate-bounce-in ${
+          isCanvas
+            ? 'bg-white/30 text-neo-black border border-white/60 backdrop-blur-xl shadow-[0_12px_30px_rgba(0,0,0,0.2)]'
+            : 'bg-neo-black text-white border-2 border-white shadow-neo-lg'
+        }`}
       >
         <span className="text-2xl md:text-3xl">✨</span>
         {isProcessing && (
@@ -350,11 +357,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }
 
   return (
-    <div className={`
-      fixed z-30 flex flex-col bg-white/30 backdrop-blur-xl border border-white/40 shadow-2xl transition-all duration-300
-      inset-x-0 top-16 bottom-0
-      md:z-50 md:inset-auto md:top-auto md:bottom-6 md:right-6 md:w-96 md:h-[650px] md:rounded-2xl md:border-2 md:border-white/50
-    `}>
+    <div
+      className={isCanvas
+        ? 'fixed inset-0 z-40 flex items-end md:items-center justify-center p-4 md:p-8'
+        : 'fixed z-30 inset-x-0 top-16 bottom-0 md:z-50 md:inset-auto md:top-auto md:bottom-6 md:right-6 md:w-96 md:h-[650px]'
+      }
+    >
+      {isCanvas && (
+        <button
+          type="button"
+          onClick={() => setIsOpen(false)}
+          className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+          aria-label="Close chat overlay"
+        />
+      )}
+      <div
+        className={isCanvas
+          ? 'relative z-10 w-full md:max-w-3xl h-[82vh] md:h-[720px] rounded-t-[28px] md:rounded-[28px] bg-gradient-to-br from-white/30 via-white/10 to-white/5 backdrop-blur-2xl border border-white/50 shadow-[0_24px_80px_rgba(0,0,0,0.35)] flex flex-col overflow-hidden animate-slide-up md:animate-none'
+          : 'flex flex-col bg-white/30 backdrop-blur-xl border border-white/40 shadow-2xl transition-all duration-300 h-full md:rounded-2xl md:border-2 md:border-white/50'
+        }
+      >
       <input
         ref={avatarInputRef}
         type="file"
@@ -364,7 +386,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         onChange={handleAvatarFiles}
       />
       
-      <div className="bg-white/60 border-b border-white/20 px-3 py-2 flex items-center justify-between backdrop-blur-md flex-shrink-0">
+      <div className={`px-3 py-2 flex items-center justify-between backdrop-blur-md flex-shrink-0 ${isCanvas ? 'bg-white/20 border-b border-white/30' : 'bg-white/60 border-b border-white/20'}`}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-neo-pink to-neo-cyan flex items-center justify-center border-2 border-white shadow-sm">
             <span className="text-base">✨</span>
@@ -404,7 +426,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-black/20 bg-white/20">
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-black/20 ${isCanvas ? 'bg-white/10' : 'bg-white/20'}`}>
         {hasPendingGenerations && (
           <div className="border-2 border-black bg-white/90 p-3 rounded-xl shadow-neo-sm animate-fade-in-up">
             <div className="flex items-center justify-between">
@@ -762,14 +784,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
       )}
 
-      <div className="p-4 bg-white/60 border-t border-white/20 backdrop-blur-md flex-shrink-0">
+      <div className={`p-4 backdrop-blur-md flex-shrink-0 ${isCanvas ? 'bg-white/20 border-t border-white/30' : 'bg-white/60 border-t border-white/20'}`}>
         <form onSubmit={handleSubmit} className="relative">
           <button
             type="button"
             onClick={handleAvatarUploadClick}
             disabled={avatarBusy || isProcessing || !onUploadAvatar}
             title="Upload avatar"
-            className="absolute left-2 top-2 bottom-2 aspect-square bg-white/80 border-2 border-black rounded-lg hover:bg-neo-cyan transition-colors disabled:opacity-50 flex items-center justify-center"
+            className={`absolute left-2 top-2 bottom-2 aspect-square border-2 border-black rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${isCanvas ? 'bg-white/60 hover:bg-neo-cyan' : 'bg-white/80 hover:bg-neo-cyan'}`}
           >
             <span className="text-base">👤</span>
           </button>
@@ -780,7 +802,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             placeholder="Scan trends or generate campaigns..."
             ref={inputRef}
             data-tour="chat-input"
-            className="w-full bg-white/80 border-2 border-transparent focus:border-neo-pink rounded-xl py-4 pl-12 pr-14 text-base text-gray-800 placeholder-gray-500 outline-none transition-all shadow-inner"
+            className={`w-full border-2 border-transparent focus:border-neo-pink rounded-xl py-4 pl-12 pr-14 text-base text-gray-800 placeholder-gray-500 outline-none transition-all shadow-inner ${isCanvas ? 'bg-white/50' : 'bg-white/80'}`}
           />
           <button 
             type="submit"
@@ -792,6 +814,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </svg>
           </button>
         </form>
+      </div>
       </div>
     </div>
   );

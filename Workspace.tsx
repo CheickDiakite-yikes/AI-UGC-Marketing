@@ -107,6 +107,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [planTier, setPlanTier] = useState<PlanTier>('free');
   const [videoQualityMode, setVideoQualityMode] = useState(true);
   const [ahaPackAvailable, setAhaPackAvailable] = useState(false);
+  const [uiVariant, setUiVariant] = useState<'classic' | 'canvas'>(() => {
+    if (typeof window === 'undefined') return 'classic';
+    const params = new URLSearchParams(window.location.search);
+    const param = params.get('ui');
+    const stored = window.localStorage.getItem('predi-ui-variant');
+    const candidate = param ?? stored;
+    if (candidate === 'classic' || candidate === 'canvas') return candidate;
+    const assigned = Math.random() < 0.5 ? 'classic' : 'canvas';
+    window.localStorage.setItem('predi-ui-variant', assigned);
+    return assigned;
+  });
+  const [companyPanelOpen, setCompanyPanelOpen] = useState(false);
+  const isCanvasUi = uiVariant === 'canvas';
   const [paywallState, setPaywallState] = useState<{ isOpen: boolean; reason: 'image_limit' | 'video_limit' | 'video_locked' | null }>({
     isOpen: false,
     reason: null,
@@ -128,6 +141,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     usage.creditBalance
   ) > 0;
   const isVideoLocked = planLimits.videoLimit <= 0 && !hasVideoAllowance;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const param = params.get('ui');
+    if (param === 'classic' || param === 'canvas') {
+      window.localStorage.setItem('predi-ui-variant', param);
+      setUiVariant(param);
+    }
+  }, []);
 
   const openPaywall = useCallback((reason: 'image_limit' | 'video_limit' | 'video_locked') => {
     setPaywallState((prev) => (prev.isOpen ? prev : { isOpen: true, reason }));
@@ -1102,10 +1125,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   }, []);
 
   const handleOpenLinkModal = useCallback(() => {
+    if (isCanvasUi) {
+      setCompanyPanelOpen(true);
+    }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('open-link-modal'));
     }
-  }, []);
+  }, [isCanvasUi]);
 
   const handleOpenChat = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -1266,7 +1292,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       .finally(() => setShowOnboardingGuide(false));
   }, [refreshOnboardingState]);
 
-  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null;
+  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null || companyPanelOpen;
 
   useEffect(() => {
     if (!onboardingState) return;
@@ -1295,12 +1321,16 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     if (!showOnboardingGuide || !activeOnboardingStep) return;
     const sidebarStepIds = new Set(['website-link', 'logo', 'avatar', 'product', 'sources']);
     if (sidebarStepIds.has(activeOnboardingStep.id) && window.innerWidth < 768) {
-      setSidebarOpen(true);
+      if (isCanvasUi) {
+        setCompanyPanelOpen(true);
+      } else {
+        setSidebarOpen(true);
+      }
     }
     if (activeOnboardingStep.id === 'campaign') {
       handleOpenChat();
     }
-  }, [activeOnboardingStep, handleOpenChat, showOnboardingGuide]);
+  }, [activeOnboardingStep, handleOpenChat, isCanvasUi, showOnboardingGuide]);
 
   const handleSaveProduct = async (product: Omit<Product, 'id' | 'boardId' | 'assets' | 'createdAt'>, assignments: Omit<ProductAsset, 'id' | 'productId' | 'createdAt'>[]) => {
     if (!activeBoardId) return;
@@ -2524,7 +2554,222 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const hasAvatar = Boolean(activeBoard.avatarIdentity) || activeBoard.assets.some(asset => asset.type === 'avatar');
   const avatarBusy = isAvatarUploading || isAvatarGenerating;
 
-  return (
+  const chatInterface = (
+    <ChatInterface
+      messages={activeBoard.messages}
+      onSendMessage={handleSendMessage}
+      onDismissResearch={handleDismissResearch}
+      onStoryboardAction={handleStoryboardAction}
+      onStoryboardEdit={handleStoryboardEdit}
+      onUpdateStoryboardReferences={handleStoryboardReferenceUpdate}
+      onUploadStoryboardReference={handleUploadStoryboardReference}
+      draftMessage={chatDraft}
+      isProcessing={isProcessing}
+      processingStatus={processingStatus}
+      hasAssets={activeBoard.assets.length > 0}
+      assets={activeBoard.assets}
+      storyboards={activeBoard.storyboards || pendingStoryboards}
+      pendingItems={pendingItems}
+      hasAvatar={hasAvatar}
+      avatarBusy={avatarBusy}
+      videoQualityMode={videoQualityMode}
+      onToggleVideoQuality={() => setVideoQualityMode(prev => !prev)}
+      ahaPackAvailable={ahaPackAvailable}
+      onUploadAvatar={handleUploadAvatarFiles}
+      onCreateAvatar={handleCreateAiAvatar}
+      variant={isCanvasUi ? 'canvas' : 'classic'}
+    />
+  );
+
+  const activeJobsToast = activeJobs.length > 0 && (
+    <div className={`fixed ${isCanvasUi ? 'bottom-4 left-4 md:bottom-6 md:left-8' : 'bottom-4 right-4 md:bottom-28 md:right-8'} z-30`}>
+      <div className="bg-neo-yellow border-2 md:border-4 border-black shadow-neo px-3 py-1.5 md:px-4 md:py-2 flex items-center gap-2 rounded-full md:rounded-none">
+        <span className="animate-spin text-sm md:text-base">⚙️</span>
+        <span className="font-bold text-xs md:text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
+        <button
+          onClick={async () => {
+            if (confirm('Clear all stuck jobs? This will cancel any pending generations.')) {
+              try {
+                await fetch(`/api/jobs?boardId=${activeBoardId}&action=clear-stuck`, { method: 'DELETE' });
+                setActiveJobs([]);
+                showToast('Stuck jobs cleared', 'info');
+              } catch (e) {
+                console.error('Failed to clear jobs:', e);
+              }
+            }
+          }}
+          className="ml-1 text-xs font-bold bg-white/50 hover:bg-white px-2 py-0.5 rounded border border-black/30"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
+
+  const failedJobsToast = failedJobs.length > 0 && (
+    <div className={`fixed ${isCanvasUi ? 'bottom-20 left-4 md:bottom-28 md:left-8' : 'bottom-20 right-4 md:bottom-40 md:right-8'} z-30 max-w-xs`}>
+      <div className="bg-[#FF6B6B] border-2 md:border-4 border-black shadow-neo p-3 rounded-lg md:rounded-none">
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-bold text-sm text-white">{failedJobs.length} failed</span>
+          <button 
+            onClick={() => setFailedJobs([])}
+            className="text-white hover:text-black text-lg font-bold"
+            aria-label="Dismiss all"
+          >X</button>
+        </div>
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          {failedJobs.slice(0, 3).map(job => (
+            <div key={job.id} className="bg-white border-2 border-black p-2 text-xs">
+              <p className="font-bold truncate">{job.title}</p>
+              <p className="text-gray-600 truncate">{job.error}</p>
+              <div className="flex gap-2 mt-1">
+                <button 
+                  onClick={() => handleRetryJob(job)}
+                  className="bg-neo-lime border border-black px-2 py-0.5 font-bold hover:bg-lime-300"
+                >Retry</button>
+                <button 
+                  onClick={() => handleDismissFailedJob(job.id)}
+                  className="text-gray-500 hover:text-black"
+                >Dismiss</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const companyPanel = isCanvasUi ? (
+    <div
+      className={`fixed inset-0 z-[60] flex items-end md:items-center justify-center p-4 md:p-8 transition-opacity ${companyPanelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      aria-hidden={!companyPanelOpen}
+    >
+      <div
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity ${companyPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+        onClick={() => setCompanyPanelOpen(false)}
+      />
+      <div
+        className={`relative w-full md:w-[min(100%-4rem,960px)] h-[85vh] md:h-[85vh] transition-transform ${companyPanelOpen ? 'translate-y-0' : 'translate-y-2'} animate-slide-up md:animate-none`}
+      >
+        <div className="relative h-full rounded-t-[28px] md:rounded-[28px] overflow-hidden border border-white/60 bg-white/60 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <button
+            type="button"
+            onClick={() => setCompanyPanelOpen(false)}
+            className="absolute right-4 top-4 z-10 w-10 h-10 rounded-full bg-white/80 border border-black/10 shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:bg-white transition-all font-bold"
+            aria-label="Close company page"
+          >
+            X
+          </button>
+          <Sidebar
+            assets={activeBoard.assets} brandIdentity={activeBoard.brandIdentity} avatarIdentity={activeBoard.avatarIdentity} products={activeBoard.products}
+            onAddAsset={handleAddAsset} onDeleteAsset={handleDeleteAsset} onEditBrand={() => setShowBrandModal(true)} onEditAvatar={() => setShowAvatarModal(true)}
+            onOpenProductModal={handleOpenProductModal}
+            onStartCapture={() => { setIsCameraActive(true); setCompanyPanelOpen(false); }}
+            onClose={() => setCompanyPanelOpen(false)}
+            onExitApp={onExitApp} usageStats={usage}
+            planTier={planTier}
+            boardId={activeBoardId}
+            videoQualityMode={videoQualityMode}
+            items={activeBoard.items}
+          />
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const canvasLayout = (
+    <div className="relative min-h-[100dvh] w-full font-sans text-neo-black overflow-hidden bg-[#F7F6F0]">
+      {isCameraActive && (
+        <CameraModal
+          onCapture={() => { }}
+          onFinish={handleCameraFinish}
+          onClose={() => setIsCameraActive(false)}
+        />
+      )}
+
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-32 -left-24 w-80 h-80 bg-neo-yellow/40 blur-3xl"></div>
+        <div className="absolute top-10 right-10 w-72 h-72 bg-neo-pink/25 blur-3xl"></div>
+        <div className="absolute -bottom-24 right-0 w-96 h-96 bg-neo-cyan/25 blur-3xl"></div>
+        <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(to_right,rgba(26,26,26,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(26,26,26,0.06)_1px,transparent_1px)] [background-size:32px_32px]"></div>
+      </div>
+
+      <div className="relative z-10 flex min-h-[100dvh] flex-col">
+        <header className="sticky top-0 z-20 px-4 md:px-10 pt-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-[28px] border border-white/60 bg-white/30 backdrop-blur-xl px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
+            <div className="flex flex-col items-center md:items-start text-center md:text-left">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Campaign board</span>
+              <h2 className="font-display font-black text-xl md:text-2xl">{activeBoard.name}</h2>
+            </div>
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-2 w-full md:w-auto">
+              <button
+                onClick={() => setCompanyPanelOpen(true)}
+                className="rounded-full bg-white/80 border border-black/10 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-gray-700 shadow-[0_8px_24px_rgba(0,0,0,0.15)] hover:bg-white transition-all"
+              >
+                Company
+              </button>
+              <button
+                onClick={() => setShowBoardListModal(true)}
+                data-tour="boards"
+                className="rounded-full bg-white/70 border border-black/10 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-gray-700 shadow-[0_8px_24px_rgba(0,0,0,0.12)] hover:bg-white transition-all"
+              >
+                Boards
+              </button>
+              <button
+                onClick={() => setShowNewBoardModal(true)}
+                className="rounded-full bg-neo-black text-white border border-black px-4 py-2 text-[11px] font-bold uppercase tracking-widest shadow-[0_8px_24px_rgba(0,0,0,0.2)] hover:bg-black transition-all"
+              >
+                + New
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 px-4 md:px-10 pb-32 pt-6">
+          {isOnboardingLoading && <OnboardingPanelSkeleton />}
+          {!isOnboardingLoading && onboardingState && !onboardingState.completed && !onboardingState.dismissed && activeOnboardingStep?.id !== 'campaign' && (
+            <OnboardingPanel
+              state={onboardingState}
+              onOpenLinkModal={handleOpenLinkModal}
+              onOpenChat={handleOpenChat}
+              onOpenBoards={() => setShowBoardListModal(true)}
+              onOpenProduct={() => handleOpenProductModal()}
+              onSnooze={handleDismissOnboarding}
+              onSkipTutorial={handleSkipOnboarding}
+            />
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 pb-32">
+            {activeBoard.items.length === 0 && pendingItems.length === 0 && !isProcessing && (
+              <div className="col-span-full py-16 md:py-24 flex justify-center">
+                <div className="max-w-xl text-center rounded-[24px] border border-white/70 bg-white/40 backdrop-blur-lg px-6 py-8 shadow-[0_12px_40px_rgba(0,0,0,0.15)]">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Start here</p>
+                  <p className="mt-3 font-display text-2xl md:text-3xl font-black">
+                    Open the chat bubble to create your first campaign asset.
+                  </p>
+                  <p className="mt-2 text-sm text-gray-600">Describe the campaign, hook, or offer you want to ship.</p>
+                </div>
+              </div>
+            )}
+            {[...pendingItems, ...activeBoard.items].map(item => (
+              <CanvasItemCard
+                key={item.id}
+                item={item}
+                variant={isCanvasUi ? 'canvas' : 'classic'}
+                onExpand={setSelectedItem}
+                onDelete={handleDeleteItem}
+                onToggleFavorite={handleToggleFavorite}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      {chatInterface}
+      {companyPanel}
+    </div>
+  );
+
+  const classicLayout = (
     <div className="flex flex-col md:flex-row min-h-[100dvh] md:h-screen w-full font-sans text-neo-black relative md:overflow-hidden bg-gray-50">
       {isCameraActive && (
         <CameraModal
@@ -2618,6 +2863,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             <CanvasItemCard
               key={item.id}
               item={item}
+              variant={isCanvasUi ? 'canvas' : 'classic'}
               onExpand={setSelectedItem}
               onDelete={handleDeleteItem}
               onToggleFavorite={handleToggleFavorite}
@@ -2626,87 +2872,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         </div>
       </div>
 
-      <ChatInterface
-        messages={activeBoard.messages}
-        onSendMessage={handleSendMessage}
-        onDismissResearch={handleDismissResearch}
-        onStoryboardAction={handleStoryboardAction}
-        onStoryboardEdit={handleStoryboardEdit}
-        onUpdateStoryboardReferences={handleStoryboardReferenceUpdate}
-        onUploadStoryboardReference={handleUploadStoryboardReference}
-        draftMessage={chatDraft}
-        isProcessing={isProcessing}
-        processingStatus={processingStatus}
-        hasAssets={activeBoard.assets.length > 0}
-        assets={activeBoard.assets}
-        storyboards={activeBoard.storyboards || pendingStoryboards}
-        pendingItems={pendingItems}
-        hasAvatar={hasAvatar}
-        avatarBusy={avatarBusy}
-        videoQualityMode={videoQualityMode}
-        onToggleVideoQuality={() => setVideoQualityMode(prev => !prev)}
-        ahaPackAvailable={ahaPackAvailable}
-        onUploadAvatar={handleUploadAvatarFiles}
-        onCreateAvatar={handleCreateAiAvatar}
-      />
-      
-      {activeJobs.length > 0 && (
-        <div className="fixed bottom-4 right-4 md:bottom-28 md:right-8 z-30">
-          <div className="bg-neo-yellow border-2 md:border-4 border-black shadow-neo px-3 py-1.5 md:px-4 md:py-2 flex items-center gap-2 rounded-full md:rounded-none">
-            <span className="animate-spin text-sm md:text-base">⚙️</span>
-            <span className="font-bold text-xs md:text-sm">{activeJobs.length} job{activeJobs.length > 1 ? 's' : ''} running</span>
-            <button
-              onClick={async () => {
-                if (confirm('Clear all stuck jobs? This will cancel any pending generations.')) {
-                  try {
-                    await fetch(`/api/jobs?boardId=${activeBoardId}&action=clear-stuck`, { method: 'DELETE' });
-                    setActiveJobs([]);
-                    showToast('Stuck jobs cleared', 'info');
-                  } catch (e) {
-                    console.error('Failed to clear jobs:', e);
-                  }
-                }
-              }}
-              className="ml-1 text-xs font-bold bg-white/50 hover:bg-white px-2 py-0.5 rounded border border-black/30"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {failedJobs.length > 0 && (
-        <div className="fixed bottom-20 right-4 md:bottom-40 md:right-8 z-30 max-w-xs">
-          <div className="bg-[#FF6B6B] border-2 md:border-4 border-black shadow-neo p-3 rounded-lg md:rounded-none">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-sm text-white">{failedJobs.length} failed</span>
-              <button 
-                onClick={() => setFailedJobs([])}
-                className="text-white hover:text-black text-lg font-bold"
-                aria-label="Dismiss all"
-              >×</button>
-            </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {failedJobs.slice(0, 3).map(job => (
-                <div key={job.id} className="bg-white border-2 border-black p-2 text-xs">
-                  <p className="font-bold truncate">{job.title}</p>
-                  <p className="text-gray-600 truncate">{job.error}</p>
-                  <div className="flex gap-2 mt-1">
-                    <button 
-                      onClick={() => handleRetryJob(job)}
-                      className="bg-neo-lime border border-black px-2 py-0.5 font-bold hover:bg-lime-300"
-                    >Retry</button>
-                    <button 
-                      onClick={() => handleDismissFailedJob(job.id)}
-                      className="text-gray-500 hover:text-black"
-                    >Dismiss</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {chatInterface}
+    </div>
+  );
+
+  return (
+    <>
+      {isCanvasUi ? canvasLayout : classicLayout}
+      {activeJobsToast}
+      {failedJobsToast}
       <PaywallModal
         isOpen={paywallState.isOpen}
         reason={paywallState.reason}
@@ -2752,7 +2926,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           hidden={anyModalOpen}
         />
       )}
-    </div>
+    </>
   );
 };
 
