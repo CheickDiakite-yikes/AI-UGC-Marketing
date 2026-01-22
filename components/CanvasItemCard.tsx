@@ -90,9 +90,9 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
   const isLongVideo = item.type === 'video' && !item.meta?.isScene && (item.meta?.isLongVideo || sceneCount > 1);
 
   return (
-    <div className="bg-white border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
+    <div className="bg-white/70 backdrop-blur-md border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
       {/* Header */}
-      <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden group/header">
+      <div className="border-b-4 border-black bg-neo-pink/90 backdrop-blur-sm p-2 flex justify-between items-center relative overflow-hidden group/header">
         <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
         <div className="flex items-center gap-2 z-10 relative">
           {isLongVideo && (
@@ -134,7 +134,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
       </div>
       
       {/* Media Content */}
-      <div className="relative group bg-gray-100 min-h-[200px] flex items-center justify-center overflow-hidden">
+      <div className="relative group bg-gray-100/80 backdrop-blur-sm min-h-[200px] flex items-center justify-center overflow-hidden">
         {!isContentReady && (
           <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded border border-white/30">
             {pendingLabel}
@@ -237,7 +237,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
       </div>
       
       {/* Caption & Actions Section */}
-      <div className="border-t-4 border-black bg-white p-3 flex flex-col gap-3">
+      <div className="border-t-4 border-black bg-white/80 backdrop-blur-sm p-3 flex flex-col gap-3">
          {item.meta?.hook && (
             <div className="bg-neo-yellow/30 border-l-4 border-neo-yellow p-2 text-xs">
                <span className="font-bold block text-[10px] uppercase text-gray-500">Hook Strategy</span>
