@@ -123,6 +123,21 @@ body {
   animation: coach-pulse 1.6s ease-in-out infinite;
 }
 
+@keyframes pulse-soft {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 4px 4px 0 0 #1a1a1a, 0 0 0 0 rgba(128, 240, 240, 0.4);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 4px 4px 0 0 #1a1a1a, 0 0 20px 8px rgba(128, 240, 240, 0.3);
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
 @keyframes skeleton-shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }

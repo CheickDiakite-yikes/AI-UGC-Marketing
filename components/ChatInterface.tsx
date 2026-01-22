@@ -339,11 +339,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 md:w-16 md:h-16 rounded-full bg-neo-black text-white border-2 border-white shadow-neo-lg flex items-center justify-center hover:scale-110 transition-transform animate-bounce-in"
+        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-neo-pink via-neo-cyan to-neo-lime text-neo-black border-2 border-black shadow-neo-lg flex items-center justify-center hover:scale-110 transition-transform animate-pulse-soft"
+        style={{ animation: 'pulse-soft 2s ease-in-out infinite' }}
       >
-        <span className="text-2xl md:text-3xl">✨</span>
+        <svg className="w-7 h-7 md:w-8 md:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <path d="M8 10h.01M12 10h.01M16 10h.01" />
+        </svg>
         {isProcessing && (
-           <span className="absolute top-0 right-0 w-4 h-4 bg-neo-pink rounded-full border-2 border-black animate-pulse"></span>
+           <span className="absolute top-0 right-0 w-4 h-4 bg-neo-yellow rounded-full border-2 border-black animate-pulse"></span>
         )}
       </button>
     );
