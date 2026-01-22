@@ -129,24 +129,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const deckAssets = nonProductAssets.filter(asset => asset.type === 'pdf');
   const avatarAssets = nonProductAssets.filter(asset => asset.type === 'avatar');
   const imageAssets = nonProductAssets.filter(asset => asset.type === 'image');
-  const surfaceClass = 'rounded-2xl border border-white/70 bg-white/70 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)]';
-  const surfaceMutedClass = 'rounded-2xl border border-white/60 bg-white/50 backdrop-blur-lg shadow-[0_10px_30px_rgba(0,0,0,0.1)]';
-  const pillClass = 'rounded-full bg-white/70 border border-black/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600';
-  const inputClass = 'w-full rounded-lg border border-black/10 bg-white/80 p-3 text-sm font-semibold text-gray-800 placeholder-gray-400 shadow-inner focus:outline-none focus:ring-2 focus:ring-black/10';
-  const inputMutedClass = 'w-full rounded-lg border border-black/10 bg-gray-100 p-3 text-sm font-semibold text-gray-500';
-  const buttonPrimary = 'rounded-lg bg-black text-white border border-black px-4 py-2 text-xs font-semibold uppercase tracking-widest hover:bg-gray-900 transition-all';
-  const buttonGhost = 'rounded-lg bg-white/70 text-gray-700 border border-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-widest hover:bg-white transition-all';
-  const buttonQuiet = 'rounded-lg bg-white/60 text-gray-700 border border-white/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest hover:bg-white transition-all';
 
   return (
-    <div className="min-h-screen bg-[#F7F6F0] text-gray-900 relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-16 w-72 h-72 bg-amber-100/60 blur-3xl"></div>
-        <div className="absolute top-1/4 right-0 w-80 h-80 bg-rose-100/50 blur-3xl"></div>
-        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-emerald-100/40 blur-3xl"></div>
-        <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] [background-size:36px_36px]"></div>
-      </div>
-      <header className="relative z-20 sticky top-0 border-b border-white/60 bg-white/70 backdrop-blur">
+    <div className="min-h-screen bg-neo-yellow text-black">
+      <header className="sticky top-0 z-20 border-b-4 border-black bg-neo-yellow/90 backdrop-blur">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-display font-black text-lg border-2 border-black">
@@ -159,18 +145,18 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
           <Link
             href="/"
-            className="rounded-full bg-white/80 border border-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 shadow-[0_8px_24px_rgba(0,0,0,0.12)] hover:bg-white transition-all"
+            className="bg-white border-2 border-black shadow-neo-sm px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
           >
             Back to Workspace
           </Link>
         </div>
       </header>
 
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-10">
+      <main className="max-w-6xl mx-auto px-6 py-10">
         {banner && (
           <div
-            className={`mb-6 rounded-xl border px-4 py-3 text-sm font-semibold ${
-              banner.tone === 'success' ? 'border-emerald-200 bg-emerald-100 text-emerald-900' : 'border-rose-200 bg-rose-100 text-rose-900'
+            className={`mb-6 border-2 border-black px-4 py-3 font-bold text-sm ${
+              banner.tone === 'success' ? 'bg-neo-lime text-black' : 'bg-neo-pink text-black'
             }`}
           >
             {banner.message}
@@ -180,21 +166,21 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         <div className="flex flex-wrap gap-2 mb-6">
           <Link
             href="/profile"
-            className="rounded-full bg-black text-white border border-black px-4 py-2 text-xs font-semibold uppercase tracking-widest"
+            className="bg-black text-white border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest"
           >
             Profile
           </Link>
           <Link
             href="/profile/dashboard"
-            className="rounded-full bg-white/80 text-gray-700 border border-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-widest hover:bg-white transition-all"
+            className="bg-white text-black border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-yellow transition-all"
           >
             Dashboard
           </Link>
         </div>
 
-        <section className={`${surfaceClass} p-6 md:p-8 mb-8`}>
+        <section className="bg-white border-4 border-black shadow-neo p-6 md:p-8 mb-8">
           <div className="flex flex-col md:flex-row gap-6 md:items-center">
-            <div className="w-20 h-20 rounded-full border border-white/80 bg-white/80 flex items-center justify-center font-display font-black text-2xl overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.15)]">
+            <div className="w-20 h-20 rounded-full border-4 border-black bg-neo-lime flex items-center justify-center font-display font-black text-2xl overflow-hidden">
               {profile.avatarUrl ? (
                 <img src={profile.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
               ) : (
@@ -203,24 +189,24 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             </div>
             <div className="flex-1">
               <h1 className="text-3xl md:text-4xl font-display font-black">Account Profile</h1>
-              <p className="text-sm font-semibold text-gray-600 mt-1">{profile.email || 'Email not set'}</p>
+              <p className="text-sm font-bold text-gray-600 mt-1">{profile.email || 'Email not set'}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className={pillClass}>
+                <span className="bg-neo-lime border-2 border-black px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
                   {profile.company || 'Add company'}
                 </span>
-                <span className={pillClass}>
+                <span className="bg-neo-pink border-2 border-black px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
                   {profile.jobTitle || 'Add role'}
                 </span>
               </div>
             </div>
-            <div className={pillClass}>
+            <div className="bg-black text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest border-2 border-black">
               Profile Hub
             </div>
           </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className={`${surfaceClass} p-6`}>
+          <section className="bg-white border-4 border-black shadow-neo p-6">
             <h2 className="font-display font-black text-xl mb-4">Account Details</h2>
             <form action={updateUserProfile} className="space-y-4">
               <div className="space-y-2">
@@ -230,7 +216,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   name="name"
                   required
                   defaultValue={profile.name || ''}
-                  className={inputClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
                 />
               </div>
               <div className="space-y-2">
@@ -240,7 +226,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   name="company"
                   defaultValue={profile.company || ''}
                   placeholder="Predi AI"
-                  className={inputClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
                 />
               </div>
               <div className="space-y-2">
@@ -250,7 +236,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   name="jobTitle"
                   defaultValue={profile.jobTitle || ''}
                   placeholder="Marketing Lead"
-                  className={inputClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
                 />
               </div>
               <div className="space-y-2">
@@ -259,19 +245,19 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   type="email"
                   defaultValue={profile.email || ''}
                   disabled
-                  className={inputMutedClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-100 text-gray-500"
                 />
               </div>
               <button
                 type="submit"
-                className={`${buttonPrimary} w-full`}
+                className="w-full bg-black text-white border-2 border-black py-3 font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all"
               >
                 Update Profile
               </button>
             </form>
           </section>
 
-          <section className={`${surfaceClass} p-6`}>
+          <section className="bg-white border-4 border-black shadow-neo p-6">
             <h2 className="font-display font-black text-xl mb-4">Security</h2>
             <form action={updateUserPassword} className="space-y-4">
               <div className="space-y-2">
@@ -281,7 +267,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   name="currentPassword"
                   autoComplete="current-password"
                   required
-                  className={inputClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-cyan/10"
                 />
               </div>
               <div className="space-y-2">
@@ -292,7 +278,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   autoComplete="new-password"
                   minLength={8}
                   required
-                  className={inputClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-cyan/10"
                 />
               </div>
               <div className="space-y-2">
@@ -303,12 +289,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                   autoComplete="new-password"
                   minLength={8}
                   required
-                  className={inputClass}
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-cyan/10"
                 />
               </div>
               <button
                 type="submit"
-                className={`${buttonPrimary} w-full`}
+                className="w-full bg-black text-white border-2 border-black py-3 font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all"
               >
                 Update Password
               </button>
@@ -319,7 +305,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </section>
         </div>
 
-        <section className={`${surfaceClass} p-6 mt-8`}>
+        <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
           <h2 className="font-display font-black text-xl mb-4">Brand Basics</h2>
           <form action={updateProfileBasics} className="space-y-4">
             <div className="space-y-2">
@@ -329,7 +315,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 name="websiteUrl"
                 defaultValue={profile.websiteUrl || ''}
                 placeholder="https://yourcompany.com"
-                className={inputClass}
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
               />
             </div>
             <div className="space-y-2">
@@ -339,12 +325,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 rows={4}
                 defaultValue={profile.overview || ''}
                 placeholder="Describe your company in a few sentences."
-                className={inputClass}
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
               />
             </div>
             <button
               type="submit"
-              className={buttonPrimary}
+              className="bg-black text-white border-2 border-black px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all"
             >
               Save Brand Basics
             </button>
@@ -355,21 +341,21 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2 mt-8">
-          <section className={`${surfaceClass} p-6`}>
+          <section className="bg-white border-4 border-black shadow-neo p-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display font-black text-xl">Favorites</h2>
-              <span className={pillClass}>
+              <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
                 {favoriteItems.length} Items
               </span>
             </div>
             {favoriteItems.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-dashed border-black/20 p-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+              <div className="mt-4 border-2 border-dashed border-black/30 p-4 text-xs font-bold uppercase tracking-widest text-gray-400">
                 No favorites yet
               </div>
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                 {favoriteItems.map(item => (
-                  <div key={`${item.boardId}-${item.id}`} className="rounded-xl border border-white/70 bg-white/60 overflow-hidden">
+                  <div key={`${item.boardId}-${item.id}`} className="border-2 border-black bg-white overflow-hidden">
                     {item.previewUrl ? (
                       item.type === 'video' ? (
                         <video
@@ -383,12 +369,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                         <img src={item.previewUrl} alt={item.title} className="w-full h-24 object-cover" />
                       )
                     ) : (
-                      <div className="h-24 flex items-center justify-center text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                      <div className="h-24 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
                         No preview
                       </div>
                     )}
-                    <div className="border-t border-white/70 px-2 py-1">
-                      <div className="text-[10px] font-semibold uppercase tracking-widest truncate">{item.title}</div>
+                    <div className="border-t-2 border-black px-2 py-1">
+                      <div className="text-[10px] font-bold uppercase tracking-widest truncate">{item.title}</div>
                       <div className="text-[9px] uppercase tracking-widest text-gray-500 truncate">
                         {item.boardName}
                       </div>
@@ -399,17 +385,17 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             )}
           </section>
 
-          <section className={`${surfaceClass} p-6`}>
+          <section className="bg-white border-4 border-black shadow-neo p-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display font-black text-xl">Subscriptions and Billing</h2>
-              <span className={pillClass}>
+              <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
                 Live
               </span>
             </div>
             <p className="text-sm text-gray-600">
               Manage plans, payment methods, and add-on credits.
             </p>
-            <div className="mt-4 rounded-xl border border-white/70 bg-white/60 p-4">
+            <div className="mt-4 border-2 border-black p-4">
               <BillingControls
                 planTier={subscriptionState.planTier}
                 creditBalance={subscriptionState.creditBalance}
@@ -419,10 +405,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </section>
         </div>
 
-        <section className={`${surfaceClass} p-6 mt-8`}>
+        <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display font-black text-xl">Onboarding Tutorial</h2>
-            <span className={pillClass}>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
               {onboardingState.completed ? 'Complete' : (onboardingState.dismissed ? 'Paused' : 'Active')}
             </span>
           </div>
@@ -435,7 +421,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <form action={dismissOnboardingAction}>
                   <button
                     type="submit"
-                    className={buttonQuiet}
+                    className="bg-white border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
                   >
                     Later
                   </button>
@@ -443,7 +429,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <form action={completeOnboardingAction}>
                   <button
                     type="submit"
-                    className={buttonGhost}
+                    className="bg-neo-pink border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
                   >
                     Skip Tutorial
                   </button>
@@ -454,7 +440,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               <form action={resumeOnboardingAction}>
                 <button
                   type="submit"
-                  className={buttonGhost}
+                  className="bg-neo-lime border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
                 >
                   Resume Tutorial
                 </button>
@@ -464,7 +450,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               <form action={resetOnboardingAction}>
                 <button
                   type="submit"
-                  className={buttonGhost}
+                  className="bg-neo-yellow border-2 border-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
                 >
                   Restart Tutorial
                 </button>
@@ -473,10 +459,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         </section>
 
-        <section className={`${surfaceClass} p-6 mt-8`}>
+        <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display font-black text-xl">Asset Library</h2>
-            <span className={pillClass}>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
               Source of Truth
             </span>
           </div>
@@ -484,7 +470,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             Upload assets once and pull them into new boards during creation.
           </p>
           <div className="grid gap-6 md:grid-cols-2">
-            <div className={`${surfaceMutedClass} p-4 space-y-3`}>
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Company Decks</p>
                 <p className="text-[11px] text-gray-600">PDF decks and one-pagers.</p>
@@ -493,23 +479,23 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <input type="hidden" name="assetType" value="pdf" />
                 <input type="hidden" name="category" value="company_deck" />
                 <input type="file" name="file" accept="application/pdf,.pdf" className="text-xs font-bold" required />
-                <button type="submit" className={`${buttonPrimary} w-full`}>
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all">
                   Upload Deck
                 </button>
               </form>
               <div className="space-y-2">
                 {deckAssets.length === 0 ? (
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">No decks yet</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No decks yet</p>
                 ) : (
                   deckAssets.map(asset => (
-                    <div key={asset.id} className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/70 p-2">
-                      <div className="w-10 h-10 border border-black/10 bg-white/80 flex items-center justify-center text-[9px] font-bold">
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
+                      <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
                         PDF
                       </div>
                       <span className="text-xs font-bold truncate">{asset.name}</span>
                       <form action={deleteProfileAssetAction} className="ml-auto">
                         <input type="hidden" name="assetId" value={asset.id} />
-                        <button className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700">
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
                           Remove
                         </button>
                       </form>
@@ -519,7 +505,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               </div>
             </div>
 
-            <div className={`${surfaceMutedClass} p-4 space-y-3`}>
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Logos</p>
                 <p className="text-[11px] text-gray-600">Primary and alternate logos.</p>
@@ -528,27 +514,27 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <input type="hidden" name="assetType" value="logo" />
                 <input type="hidden" name="category" value="logo" />
                 <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
-                <button type="submit" className={`${buttonPrimary} w-full`}>
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all">
                   Upload Logo
                 </button>
               </form>
               <div className="space-y-2">
                 {logoAssets.length === 0 ? (
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">No logos yet</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No logos yet</p>
                 ) : (
                   logoAssets.map(asset => (
-                    <div key={asset.id} className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/70 p-2">
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
                       {asset.previewUrl ? (
-                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border border-black/10 object-cover rounded-lg" />
+                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border-2 border-black object-cover" />
                       ) : (
-                        <div className="w-10 h-10 border border-black/10 bg-white/80 flex items-center justify-center text-[9px] font-bold rounded-lg">
+                        <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
                           LOGO
                         </div>
                       )}
                       <span className="text-xs font-bold truncate">{asset.name}</span>
                       <form action={deleteProfileAssetAction} className="ml-auto">
                         <input type="hidden" name="assetId" value={asset.id} />
-                        <button className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700">
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
                           Remove
                         </button>
                       </form>
@@ -558,7 +544,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               </div>
             </div>
 
-            <div className={`${surfaceMutedClass} p-4 space-y-3`}>
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Brand Images</p>
                 <p className="text-[11px] text-gray-600">Approved imagery for campaigns.</p>
@@ -567,27 +553,27 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <input type="hidden" name="assetType" value="image" />
                 <input type="hidden" name="category" value="brand_image" />
                 <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
-                <button type="submit" className={`${buttonPrimary} w-full`}>
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all">
                   Upload Image
                 </button>
               </form>
               <div className="space-y-2">
                 {imageAssets.length === 0 ? (
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">No brand images yet</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No brand images yet</p>
                 ) : (
                   imageAssets.map(asset => (
-                    <div key={asset.id} className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/70 p-2">
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
                       {asset.previewUrl ? (
-                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border border-black/10 object-cover rounded-lg" />
+                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border-2 border-black object-cover" />
                       ) : (
-                        <div className="w-10 h-10 border border-black/10 bg-white/80 flex items-center justify-center text-[9px] font-bold rounded-lg">
+                        <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
                           IMG
                         </div>
                       )}
                       <span className="text-xs font-bold truncate">{asset.name}</span>
                       <form action={deleteProfileAssetAction} className="ml-auto">
                         <input type="hidden" name="assetId" value={asset.id} />
-                        <button className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700">
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
                           Remove
                         </button>
                       </form>
@@ -597,7 +583,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
               </div>
             </div>
 
-            <div className={`${surfaceMutedClass} p-4 space-y-3`}>
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Avatar Library</p>
                 <p className="text-[11px] text-gray-600">Spokespeople and persona shots.</p>
@@ -606,27 +592,27 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <input type="hidden" name="assetType" value="avatar" />
                 <input type="hidden" name="category" value="avatar" />
                 <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
-                <button type="submit" className={`${buttonPrimary} w-full`}>
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all">
                   Upload Avatar
                 </button>
               </form>
               <div className="space-y-2">
                 {avatarAssets.length === 0 ? (
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">No avatars yet</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No avatars yet</p>
                 ) : (
                   avatarAssets.map(asset => (
-                    <div key={asset.id} className="flex items-center gap-2 rounded-xl border border-white/70 bg-white/70 p-2">
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
                       {asset.previewUrl ? (
-                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border border-black/10 object-cover rounded-lg" />
+                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border-2 border-black object-cover" />
                       ) : (
-                        <div className="w-10 h-10 border border-black/10 bg-white/80 flex items-center justify-center text-[9px] font-bold rounded-lg">
+                        <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
                           AVTR
                         </div>
                       )}
                       <span className="text-xs font-bold truncate">{asset.name}</span>
                       <form action={deleteProfileAssetAction} className="ml-auto">
                         <input type="hidden" name="assetId" value={asset.id} />
-                        <button className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700">
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
                           Remove
                         </button>
                       </form>
@@ -638,10 +624,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           </div>
         </section>
 
-        <section className={`${surfaceClass} p-6 mt-8`}>
+        <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display font-black text-xl">Product Catalog</h2>
-            <span className={pillClass}>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
               Profile Products
             </span>
           </div>
@@ -652,14 +638,14 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 name="name"
                 required
                 placeholder="New product name"
-                className={`mt-2 ${inputClass}`}
+                className="mt-2 w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
               />
             </div>
             <div className="md:col-span-1">
               <label className="text-[10px] font-bold uppercase tracking-widest">Type</label>
               <select
                 name="productType"
-                className={`mt-2 ${inputClass}`}
+                className="mt-2 w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
                 defaultValue="physical_product"
               >
                 {PRODUCT_TYPES.map(option => (
@@ -675,13 +661,13 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 name="description"
                 rows={3}
                 placeholder="Short product summary"
-                className={`mt-2 ${inputClass}`}
+                className="mt-2 w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
               />
             </div>
             <div className="md:col-span-3">
               <button
                 type="submit"
-                className={buttonPrimary}
+                className="bg-black text-white border-2 border-black px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all"
               >
                 Add Product
               </button>
@@ -690,12 +676,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
           <div className="mt-6 space-y-4">
             {products.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-black/20 p-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+              <div className="border-2 border-dashed border-black/30 p-4 text-xs font-bold uppercase tracking-widest text-gray-400">
                 No products yet
               </div>
             ) : (
               products.map(product => (
-                <div key={product.id} className={`${surfaceMutedClass} p-4`}>
+                <div key={product.id} className="border-2 border-black bg-gray-50 p-4">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-bold">{product.name}</h3>
@@ -706,7 +692,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     </div>
                     <form action={deleteProfileProductAction}>
                       <input type="hidden" name="productId" value={product.id} />
-                      <button className="text-[10px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700">
+                      <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
                         Delete Product
                       </button>
                     </form>
@@ -714,22 +700,22 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
                     {(product.assets || []).length === 0 ? (
-                      <div className="col-span-full text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                      <div className="col-span-full text-[10px] font-bold uppercase tracking-widest text-gray-400">
                         No product assets yet
                       </div>
                     ) : (
                       (product.assets || []).map(asset => (
-                        <div key={asset.id} className="rounded-xl border border-white/70 bg-white/70 overflow-hidden">
+                        <div key={asset.id} className="border-2 border-black bg-white overflow-hidden">
                           {asset.previewUrl ? (
                             <img src={asset.previewUrl} alt={product.name} className="w-full h-20 object-cover" />
                           ) : (
                             <div className="h-20 flex items-center justify-center text-[9px] font-bold">IMG</div>
                           )}
-                          <div className="border-t border-white/70 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest flex items-center justify-between">
+                          <div className="border-t-2 border-black px-2 py-1 text-[9px] font-bold uppercase tracking-widest flex items-center justify-between">
                             <span className="truncate">{asset.role.replace('_', ' ')}</span>
                             <form action={deleteProfileAssetAction}>
                               <input type="hidden" name="assetId" value={asset.assetId} />
-                              <button className="text-[9px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700">
+                              <button className="text-[9px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
                                 Remove
                               </button>
                             </form>
@@ -746,7 +732,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                         <label className="text-[10px] font-bold uppercase tracking-widest">Role</label>
                         <select
                           name="role"
-                          className={`mt-1 ${inputClass}`}
+                          className="mt-1 w-full border-2 border-black p-2 text-xs font-bold bg-white"
                           defaultValue="hero"
                         >
                           {PRODUCT_ASSET_ROLES.map(role => (
@@ -763,7 +749,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     </div>
                     <button
                       type="submit"
-                      className={buttonPrimary}
+                      className="bg-black text-white border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all"
                     >
                       Add Product Image
                     </button>

@@ -7,14 +7,12 @@ interface Props {
   onExpand?: (item: CanvasItem) => void;
   onDelete?: (itemId: string) => void;
   onToggleFavorite?: (itemId: string, nextState: boolean) => void;
-  variant?: 'classic' | 'canvas';
 }
 
-const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFavorite, variant = 'classic' }) => {
+const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFavorite }) => {
   const [copied, setCopied] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const isFavorite = Boolean(item.isFavorite);
-  const isCanvas = variant === 'canvas';
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -90,40 +88,22 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
     ? Math.max(1, item.meta.totalDurationSeconds)
     : sceneCount > 1 ? sceneCount * 8 : undefined;
   const isLongVideo = item.type === 'video' && !item.meta?.isScene && (item.meta?.isLongVideo || sceneCount > 1);
-  const containerClass = isCanvas
-    ? 'rounded-2xl overflow-hidden border border-white/70 bg-white/60 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.16)]'
-    : 'bg-white border-4 border-black shadow-neo-lg';
-  const headerClass = isCanvas
-    ? 'border-b border-white/60 bg-white/40'
-    : 'border-b-4 border-black bg-neo-pink';
-  const favoriteButtonClass = isCanvas
-    ? 'p-1 border border-black/10 rounded bg-white/70 text-gray-700 hover:bg-white transition-colors'
-    : `p-1 border-2 border-black rounded transition-colors ${isFavorite ? 'bg-neo-lime text-black' : 'bg-white text-black hover:bg-neo-lime'}`;
-  const deleteButtonClass = isCanvas
-    ? 'p-1 rounded text-gray-400 hover:text-black transition-colors'
-    : `${isContentReady ? 'opacity-0 group-hover/header:opacity-100' : 'opacity-100'} transition-opacity p-1 hover:bg-red-500 hover:text-white rounded text-red-600`;
-  const badgeClass = isCanvas
-    ? 'bg-white/70 border border-black/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gray-600 rounded-full'
-    : 'bg-white/80 border border-black px-1 py-0.5 text-[9px] font-bold rounded';
-  const contentPanelClass = isCanvas
-    ? 'border-t border-white/60 bg-white/40'
-    : 'border-t-4 border-black bg-white';
 
   return (
-    <div className={`${containerClass} p-0 flex flex-col max-w-sm w-full animate-fade-in-up`}>
+    <div className="bg-white border-4 border-black shadow-neo-lg p-0 flex flex-col max-w-sm w-full animate-fade-in-up">
       {/* Header */}
-      <div className={`${headerClass} p-2 flex justify-between items-center relative overflow-hidden group/header`}>
-        <h3 className={`font-display font-bold text-sm truncate max-w-[60%] z-10 relative ${isCanvas ? 'text-gray-800' : ''}`}>{item.title}</h3>
+      <div className="border-b-4 border-black bg-neo-pink p-2 flex justify-between items-center relative overflow-hidden group/header">
+        <h3 className="font-display font-bold text-sm truncate max-w-[60%] z-10 relative">{item.title}</h3>
         <div className="flex items-center gap-2 z-10 relative">
           {isLongVideo && (
-            <div className={badgeClass}>
+            <div className="text-[9px] uppercase font-bold text-black/70 bg-white/80 border border-black px-1 py-0.5 rounded">
               Long {sceneCount} scenes
             </div>
           )}
           {onToggleFavorite && isContentReady && (
             <button
               onClick={handleToggleFavorite}
-              className={favoriteButtonClass}
+              className={`p-1 border-2 border-black rounded transition-colors ${isFavorite ? 'bg-neo-lime text-black' : 'bg-white text-black hover:bg-neo-lime'}`}
               title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill={isFavorite ? 'currentColor' : 'none'}>
@@ -134,7 +114,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
           {onDelete && isContentReady && (
             <button
               onClick={handleDelete}
-              className={deleteButtonClass}
+              className={`${isContentReady ? 'opacity-0 group-hover/header:opacity-100' : 'opacity-100'} transition-opacity p-1 hover:bg-red-500 hover:text-white rounded text-red-600`}
               title="Delete item"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,15 +134,15 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
       </div>
       
       {/* Media Content */}
-      <div className={`relative group min-h-[200px] flex items-center justify-center overflow-hidden ${isCanvas ? 'bg-white/30' : 'bg-gray-100'}`}>
+      <div className="relative group bg-gray-100 min-h-[200px] flex items-center justify-center overflow-hidden">
         {!isContentReady && (
-          <div className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded ${isCanvas ? 'bg-black/70 text-white border border-white/30' : 'bg-black text-white border border-white/30'}`}>
+          <div className="absolute top-2 left-2 bg-black text-white text-[10px] font-bold px-2 py-0.5 rounded border border-white/30">
             {pendingLabel}
           </div>
         )}
         {(item.type === 'image' || item.type === 'carousel') && (
            <div 
-             className={`cursor-zoom-in relative w-full h-full flex items-center justify-center ${isCanvas ? 'bg-white/60' : 'bg-gray-200'}`}
+             className="cursor-zoom-in relative w-full h-full flex items-center justify-center bg-gray-200"
              onClick={() => onExpand && onExpand(item)}
            >
              {isContentReady ? (
@@ -182,7 +162,7 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
              
              {isContentReady && (
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-                  <span className={`px-3 py-1 text-xs font-bold shadow-sm ${isCanvas ? 'bg-white/80 border border-black/10 rounded-full' : 'bg-white border-2 border-black shadow-neo-sm'}`}>View Full</span>
+                  <span className="bg-white border-2 border-black px-3 py-1 text-xs font-bold shadow-neo-sm">View Full</span>
                 </div>
              )}
 
@@ -191,22 +171,22 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
                <>
                  <button 
                    onClick={handlePrevSlide}
-                   className={`absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 ${isCanvas ? 'bg-white/80 border border-black/10 hover:bg-white' : 'bg-white/80 hover:bg-white border-2 border-black'}`}
+                   className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white border-2 border-black w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
                  >
                    ←
                  </button>
                  <button 
                    onClick={handleNextSlide}
-                   className={`absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 ${isCanvas ? 'bg-white/80 border border-black/10 hover:bg-white' : 'bg-white/80 hover:bg-white border-2 border-black'}`}
+                   className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white border-2 border-black w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
                  >
                    →
                  </button>
                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 pointer-events-none z-20">
                     {item.carouselUrls.map((_, i) => (
-                      <div key={i} className={`w-2 h-2 rounded-full border ${isCanvas ? 'border-black/20' : 'border-black'} ${i === currentSlide ? (isCanvas ? 'bg-black/40' : 'bg-neo-pink') : 'bg-white'}`}></div>
+                      <div key={i} className={`w-2 h-2 rounded-full border border-black ${i === currentSlide ? 'bg-neo-pink' : 'bg-white'}`}></div>
                     ))}
                  </div>
-                 <div className={`absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded z-20 ${isCanvas ? 'bg-black/70 text-white' : 'bg-black text-white'}`}>
+                 <div className="absolute top-2 left-2 bg-black text-white text-[9px] font-bold px-1.5 py-0.5 rounded z-20">
                     {currentSlide + 1}/{item.carouselUrls.length}
                  </div>
                </>
@@ -244,12 +224,12 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
         {/* Labels / Badges */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end pointer-events-none z-10">
           {item.meta?.aspectRatio && (
-             <span className={`${isCanvas ? 'bg-white/70 border border-black/10 text-gray-600' : 'bg-neo-lime border-2 border-black shadow-neo-sm'} px-1 text-[10px] font-bold rounded`}>
+             <span className="bg-neo-lime border-2 border-black px-1 text-[10px] font-bold shadow-neo-sm">
                {item.meta.aspectRatio}
              </span>
           )}
           {item.meta?.resolution && (
-             <span className={`${isCanvas ? 'bg-white/70 border border-black/10 text-gray-600' : 'bg-neo-cyan border-2 border-black shadow-neo-sm'} px-1 text-[10px] font-bold rounded`}>
+             <span className="bg-neo-cyan border-2 border-black px-1 text-[10px] font-bold shadow-neo-sm">
                {item.meta.resolution}
              </span>
           )}
@@ -257,9 +237,9 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
       </div>
       
       {/* Caption & Actions Section */}
-      <div className={`${contentPanelClass} p-3 flex flex-col gap-3`}>
+      <div className="border-t-4 border-black bg-white p-3 flex flex-col gap-3">
          {item.meta?.hook && (
-            <div className={`p-2 text-xs ${isCanvas ? 'bg-white/70 border border-black/10 rounded-lg' : 'bg-neo-yellow/30 border-l-4 border-neo-yellow'}`}>
+            <div className="bg-neo-yellow/30 border-l-4 border-neo-yellow p-2 text-xs">
                <span className="font-bold block text-[10px] uppercase text-gray-500">Hook Strategy</span>
                "{item.meta.hook}"
             </div>
@@ -267,23 +247,23 @@ const CanvasItemCard: React.FC<Props> = ({ item, onExpand, onDelete, onToggleFav
 
          {item.meta?.caption && (
            <div className="relative group/caption">
-              <div className={`text-xs font-medium text-gray-600 line-clamp-3 italic ${isCanvas ? 'bg-white/70 p-3 rounded-lg border border-black/10' : 'bg-gray-50 p-2 rounded-sm border border-gray-100'}`}>
+              <div className="text-xs font-medium text-gray-600 line-clamp-3 bg-gray-50 p-2 rounded-sm border border-gray-100 italic">
                  {item.meta.caption}
               </div>
               <button 
                 onClick={copyCaption}
-                className={`mt-2 w-full text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 py-1 transition-colors ${isCanvas ? 'rounded-lg border border-black/10 bg-white/70 hover:bg-white' : 'hover:bg-gray-100 border border-gray-200'}`}
+                className="mt-2 w-full text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 py-1 hover:bg-gray-100 transition-colors border border-gray-200"
               >
                 {copied ? '✅ Copied!' : '📄 Copy Caption'}
               </button>
            </div>
          )}
          
-         <div className={`flex justify-between items-center pt-2 mt-1 ${isCanvas ? 'border-t border-white/60' : 'border-t border-gray-100'}`}>
+         <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-1">
            <span className="text-[10px] font-bold text-gray-400 uppercase">{item.type} Generated</span>
            <button 
             onClick={handleDownload}
-            className={`text-xs font-bold transition-colors ${isCanvas ? 'text-gray-600 hover:text-gray-900' : 'hover:underline hover:text-neo-pink'}`}
+            className="text-xs font-bold hover:underline hover:text-neo-pink transition-colors"
            >
             Download
            </button>

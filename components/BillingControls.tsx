@@ -12,7 +12,7 @@ type BillingControlsProps = {
 };
 
 const CheckIcon = () => (
-  <svg className="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+  <svg className="w-5 h-5 text-neo-lime flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
   </svg>
 );
@@ -38,12 +38,6 @@ const featureMatrix = [
   { label: 'Brand consistency checks', free: false, basic: false, pro: true },
   { label: 'Faster turnaround', free: false, basic: false, pro: true },
 ];
-
-const surfaceClass = 'rounded-2xl border border-white/70 bg-white/70 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)]';
-const panelClass = 'rounded-xl border border-white/70 bg-white/60 backdrop-blur-lg';
-const pillClass = 'rounded-full bg-white/70 border border-black/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600';
-const buttonPrimary = 'rounded-lg bg-black text-white border border-black px-4 py-3 text-sm font-semibold uppercase tracking-widest hover:bg-gray-900 transition-all disabled:opacity-60 disabled:cursor-not-allowed';
-const buttonGhost = 'rounded-lg bg-white/70 text-gray-700 border border-black/10 px-4 py-3 text-sm font-semibold uppercase tracking-widest hover:bg-white transition-all disabled:opacity-60 disabled:cursor-not-allowed';
 
 const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalance, subscriptionStatus }) => {
   const [error, setError] = useState<string | null>(null);
@@ -92,30 +86,30 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
   const renderFeatureValue = (value: boolean | string) => {
     if (value === false) return <XIcon />;
     if (value === true) return <CheckIcon />;
-    return <span className="text-gray-900 font-semibold">{value}</span>;
+    return <span className="text-white font-bold">{value}</span>;
   };
 
   if (!isFree) {
     return (
-      <div className={`${surfaceClass} p-6`}>
+      <div className="bg-gradient-to-br from-neo-black via-gray-900 to-gray-800 rounded-xl border-4 border-black p-6 shadow-neo-lg">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-neo-lime flex items-center justify-center">
             <SparkleIcon />
           </div>
           <div>
-            <p className="text-emerald-600 text-xs font-semibold uppercase tracking-widest">Active Plan</p>
-            <p className="text-gray-900 font-display font-black text-xl capitalize">{planTier}</p>
+            <p className="text-neo-lime text-xs font-bold uppercase tracking-widest">Active Plan</p>
+            <p className="text-white font-display font-black text-xl capitalize">{planTier}</p>
           </div>
         </div>
-
+        
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className={`${panelClass} p-3`}>
-            <p className="text-gray-500 text-[10px] uppercase tracking-widest">Status</p>
-            <p className="text-gray-900 font-semibold capitalize">{subscriptionStatus || 'Active'}</p>
+          <div className="bg-white/10 rounded-lg p-3 border border-white/20">
+            <p className="text-gray-400 text-[10px] uppercase tracking-widest">Status</p>
+            <p className="text-white font-bold capitalize">{subscriptionStatus || 'Active'}</p>
           </div>
-          <div className={`${panelClass} p-3`}>
-            <p className="text-gray-500 text-[10px] uppercase tracking-widest">Credits</p>
-            <p className="text-gray-900 font-semibold">{creditBalance}</p>
+          <div className="bg-white/10 rounded-lg p-3 border border-white/20">
+            <p className="text-gray-400 text-[10px] uppercase tracking-widest">Credits</p>
+            <p className="text-neo-cyan font-bold">{creditBalance}</p>
           </div>
         </div>
 
@@ -123,11 +117,11 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
           type="button"
           onClick={handleManageBilling}
           disabled={isPending || !hasActiveBilling}
-          className={`${buttonPrimary} w-full`}
+          className="w-full bg-white text-neo-black border-2 border-white py-3 text-sm font-black uppercase tracking-widest hover:bg-neo-lime hover:border-neo-lime transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg shadow-neo-sm"
         >
           {isPending ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-neo-black border-t-transparent rounded-full animate-spin" />
               Opening...
             </span>
           ) : (
@@ -136,7 +130,7 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
         </button>
 
         {error && (
-          <p className="mt-3 text-sm text-rose-900 bg-rose-100 rounded-lg p-2 border border-rose-200">
+          <p className="mt-3 text-sm text-red-400 bg-red-500/10 rounded-lg p-2 border border-red-500/20">
             {error}
           </p>
         )}
@@ -145,41 +139,46 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
   }
 
   return (
-    <div className={`${surfaceClass} overflow-hidden animate-fade-in`}>
-      <div className="p-6 pb-4 border-b border-white/70">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-emerald-600">
-            <SparkleIcon />
-          </span>
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600">
-            Upgrade your plan
-          </span>
+    <div className="bg-gradient-to-br from-neo-black via-gray-900 to-gray-800 rounded-xl border-4 border-black shadow-neo-lg overflow-hidden animate-fade-in">
+      <div className="relative p-6 pb-4">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-neo-pink/20 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-neo-cyan/20 rounded-full blur-2xl" />
+        
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-neo-lime">
+              <SparkleIcon />
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-neo-lime animate-pulse">
+              Unlock Your Full Potential
+            </span>
+          </div>
+          <h2 className="font-display font-black text-2xl md:text-3xl text-white leading-tight">
+            Create Without
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-neo-cyan to-neo-lime">
+              Limits
+            </span>
+          </h2>
+          <p className="mt-2 text-gray-400 text-sm">
+            Join creators shipping campaigns 10x faster
+          </p>
         </div>
-        <h2 className="font-display font-black text-2xl md:text-3xl text-gray-900 leading-tight">
-          Create without
-          <span className="block text-gray-500">limits</span>
-        </h2>
-        <p className="mt-2 text-gray-600 text-sm">
-          Join creators shipping campaigns 10x faster
-        </p>
       </div>
 
       <div className="px-4 pb-4">
-        <div className={`${panelClass} overflow-hidden`}>
-          <div className="grid grid-cols-4 text-[10px] font-semibold uppercase tracking-widest border-b border-white/70">
+        <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+          <div className="grid grid-cols-4 text-[10px] font-black uppercase tracking-widest border-b border-white/10">
             <div className="p-3 text-gray-500">Feature</div>
             <div className="p-3 text-center text-gray-500">Free</div>
-            <div className="p-3 text-center text-gray-700">Basic</div>
-            <div className="p-3 text-center text-gray-700">Pro</div>
+            <div className="p-3 text-center text-neo-pink">Basic</div>
+            <div className="p-3 text-center text-neo-cyan">Pro</div>
           </div>
           {featureMatrix.map((feature, idx) => (
-            <div
-              key={feature.label}
-              className={`grid grid-cols-4 text-xs border-b border-white/60 last:border-0 ${
-                idx % 2 === 0 ? 'bg-white/40' : 'bg-white/20'
-              }`}
+            <div 
+              key={feature.label} 
+              className={`grid grid-cols-4 text-xs border-b border-white/5 last:border-0 ${idx % 2 === 0 ? 'bg-white/[0.02]' : ''}`}
             >
-              <div className="p-3 text-gray-700 font-medium">{feature.label}</div>
+              <div className="p-3 text-gray-300 font-medium">{feature.label}</div>
               <div className="p-3 flex items-center justify-center">{renderFeatureValue(feature.free)}</div>
               <div className="p-3 flex items-center justify-center">{renderFeatureValue(feature.basic)}</div>
               <div className="p-3 flex items-center justify-center">{renderFeatureValue(feature.pro)}</div>
@@ -189,25 +188,25 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
       </div>
 
       <div className="px-4 pb-4 grid gap-3">
-        <div className="relative rounded-xl border border-emerald-200 bg-white/80 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.12)]">
-          <div className="absolute -top-3 left-4 bg-emerald-100 text-emerald-700 text-[10px] font-semibold uppercase tracking-widest px-3 py-1 rounded-full shadow">
+        <div className="relative bg-gradient-to-r from-neo-pink/20 to-neo-pink/10 rounded-xl border-2 border-neo-pink p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-neo-pink/20">
+          <div className="absolute -top-3 left-4 bg-neo-pink text-neo-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
             Most Popular
           </div>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-gray-900 font-display font-black text-xl">Basic</h3>
-              <p className="text-gray-500 text-xs mt-1">{PLAN_CATALOG.basic.description}</p>
+              <h3 className="text-white font-display font-black text-xl">Basic</h3>
+              <p className="text-gray-400 text-xs mt-1">{PLAN_CATALOG.basic.description}</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-gray-900 font-black text-2xl">${PLAN_CATALOG.basic.priceMonthly}</span>
+                <span className="text-white font-black text-2xl">${PLAN_CATALOG.basic.priceMonthly}</span>
                 <span className="text-gray-500 text-sm">/month</span>
               </div>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-            <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">
+            <span className="bg-neo-pink/20 text-neo-pink px-2 py-1 rounded-full font-bold">
               {formatLimit(PLAN_CATALOG.basic.images)} images
             </span>
-            <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-semibold">
+            <span className="bg-neo-pink/20 text-neo-pink px-2 py-1 rounded-full font-bold">
               {PLAN_CATALOG.basic.videos} videos
             </span>
           </div>
@@ -215,17 +214,17 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
             type="button"
             onClick={() => handleUpgrade('basic')}
             disabled={isPending}
-            className={`${buttonPrimary} mt-4 w-full`}
+            className="mt-4 w-full bg-neo-pink text-neo-black border-2 border-neo-pink py-3 text-sm font-black uppercase tracking-widest hover:bg-white hover:border-white transition-all duration-300 disabled:opacity-60 rounded-lg shadow-lg hover:shadow-xl"
           >
             {pendingPlan === 'basic' ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-neo-black border-t-transparent rounded-full animate-spin" />
                 Loading...
               </span>
             ) : (
               <>
                 Start 3-Day Free Trial
-                <span className="block text-[10px] font-semibold opacity-80 normal-case mt-0.5">
+                <span className="block text-[10px] font-bold opacity-80 normal-case mt-0.5">
                   No credit card required to try
                 </span>
               </>
@@ -233,27 +232,27 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
           </button>
         </div>
 
-        <div className="rounded-xl border border-white/70 bg-white/70 p-4 shadow-[0_12px_30px_rgba(0,0,0,0.1)]">
+        <div className="bg-gradient-to-r from-neo-cyan/10 to-neo-cyan/5 rounded-xl border-2 border-white/20 p-4 transition-all duration-300 hover:border-neo-cyan/50 hover:scale-[1.01]">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-gray-900 font-display font-black text-xl">Pro</h3>
-                <span className={pillClass}>
+                <h3 className="text-white font-display font-black text-xl">Pro</h3>
+                <span className="text-[10px] font-black uppercase tracking-widest text-neo-cyan bg-neo-cyan/20 px-2 py-0.5 rounded-full">
                   Scale Mode
                 </span>
               </div>
-              <p className="text-gray-500 text-xs mt-1">{PLAN_CATALOG.pro.description}</p>
+              <p className="text-gray-400 text-xs mt-1">{PLAN_CATALOG.pro.description}</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-gray-900 font-black text-2xl">${PLAN_CATALOG.pro.priceMonthly}</span>
+                <span className="text-white font-black text-2xl">${PLAN_CATALOG.pro.priceMonthly}</span>
                 <span className="text-gray-500 text-sm">/month</span>
               </div>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-semibold">
+            <span className="bg-neo-cyan/20 text-neo-cyan px-2 py-1 rounded-full font-bold">
               {formatLimit(PLAN_CATALOG.pro.images)} images
             </span>
-            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-semibold">
+            <span className="bg-neo-cyan/20 text-neo-cyan px-2 py-1 rounded-full font-bold">
               {PLAN_CATALOG.pro.videos} videos
             </span>
           </div>
@@ -261,11 +260,11 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
             type="button"
             onClick={() => handleUpgrade('pro')}
             disabled={isPending}
-            className={`${buttonGhost} mt-4 w-full`}
+            className="mt-4 w-full bg-transparent text-neo-cyan border-2 border-neo-cyan py-3 text-sm font-black uppercase tracking-widest hover:bg-neo-cyan hover:text-neo-black transition-all duration-300 disabled:opacity-60 rounded-lg"
           >
             {pendingPlan === 'pro' ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-neo-cyan border-t-transparent rounded-full animate-spin" />
                 Loading...
               </span>
             ) : (
@@ -276,17 +275,17 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
       </div>
 
       <div className="px-4 pb-6">
-        <div className={`${panelClass} flex items-center justify-between p-3`}>
+        <div className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/10">
           <div>
-            <p className="text-gray-500 text-[10px] uppercase tracking-widest">Current: Free Plan</p>
-            <p className="text-gray-800 text-xs font-semibold">
+            <p className="text-gray-400 text-[10px] uppercase tracking-widest">Current: Free Plan</p>
+            <p className="text-white text-xs font-bold">
               {creditBalance} credits remaining
             </p>
           </div>
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="text-gray-600 text-xs font-semibold hover:text-gray-900 transition-colors underline underline-offset-2"
+            className="text-gray-500 text-xs hover:text-white transition-colors underline-offset-2 hover:underline"
           >
             Continue with Free
           </button>
@@ -295,13 +294,13 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
 
       {error && (
         <div className="px-4 pb-4">
-          <p className="text-sm text-rose-900 bg-rose-100 rounded-lg p-3 border border-rose-200">
+          <p className="text-sm text-red-400 bg-red-500/10 rounded-lg p-3 border border-red-500/20">
             {error}
           </p>
         </div>
       )}
 
-      <div className="border-t border-white/70 px-4 py-3">
+      <div className="bg-white/5 border-t border-white/10 px-4 py-3">
         <p className="text-[10px] text-gray-500 text-center">
           Cancel anytime · Secure payment · Instant access
         </p>

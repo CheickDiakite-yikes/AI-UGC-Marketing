@@ -93,11 +93,11 @@ const getMonthGrid = (monthDate: Date) => {
 const typeBadge = (type: CalendarEntry['itemType']) => {
   switch (type) {
     case 'video':
-      return 'bg-amber-200';
+      return 'bg-neo-pink';
     case 'carousel':
-      return 'bg-sky-200';
+      return 'bg-neo-cyan';
     case 'image':
-      return 'bg-emerald-200';
+      return 'bg-neo-lime';
     default:
       return 'bg-gray-200';
   }
@@ -107,7 +107,7 @@ const renderPreview = (item: { previewUrl: string | null; itemType?: CalendarEnt
   const preview = item.previewUrl;
   if (!preview) {
     return (
-      <div className="w-full h-20 rounded-lg bg-white/70 border border-white/70 flex items-center justify-center text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+      <div className="w-full h-20 bg-gray-100 border-2 border-black flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-gray-500">
         No preview
       </div>
     );
@@ -117,26 +117,15 @@ const renderPreview = (item: { previewUrl: string | null; itemType?: CalendarEnt
     return (
       <video
         src={preview}
-        className="w-full h-20 object-cover rounded-lg border border-white/70"
+        className="w-full h-20 object-cover border-2 border-black"
         muted
         playsInline
         preload="metadata"
       />
     );
   }
-  return <img src={preview} alt="Preview" className="w-full h-20 object-cover rounded-lg border border-white/70" />;
+  return <img src={preview} alt="Preview" className="w-full h-20 object-cover border-2 border-black" />;
 };
-
-const surfaceClass = 'rounded-2xl border border-white/70 bg-white/70 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.12)]';
-const panelClass = 'rounded-2xl border border-white/60 bg-white/60 backdrop-blur-lg shadow-[0_10px_30px_rgba(0,0,0,0.1)]';
-const softCardClass = 'rounded-xl border border-white/70 bg-white/70';
-const pillClass = 'rounded-full bg-white/70 border border-black/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600';
-const inputClass = 'w-full rounded-lg border border-black/10 bg-white/80 p-2 text-xs font-semibold text-gray-800 placeholder-gray-400 shadow-inner focus:outline-none focus:ring-2 focus:ring-black/10';
-const buttonGhost = 'rounded-lg bg-white/70 border border-black/10 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-700 hover:bg-white transition-all';
-const buttonPrimary = 'rounded-lg bg-black text-white border border-black px-4 py-3 text-xs font-semibold uppercase tracking-widest hover:bg-gray-900 transition-all disabled:opacity-60 disabled:cursor-not-allowed';
-const buttonQuiet = 'rounded-lg bg-white/60 border border-white/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-gray-600 hover:bg-white transition-all disabled:opacity-60 disabled:cursor-not-allowed';
-const buttonSmall = 'rounded-md bg-black text-white border border-black px-3 py-1 text-[9px] font-semibold uppercase tracking-widest hover:bg-gray-900 transition-all';
-const buttonSmallGhost = 'rounded-md bg-white/70 border border-black/10 px-3 py-1 text-[9px] font-semibold uppercase tracking-widest text-gray-700 hover:bg-white transition-all';
 
 const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarItems }) => {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
@@ -490,31 +479,31 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
 
   return (
     <div className="space-y-6">
-      <section className={`${surfaceClass} p-6`}>
+      <section className="bg-white border-4 border-black shadow-neo p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Weekly Report</p>
             <h2 className="font-display font-black text-2xl">Week of {weekStart.toLocaleDateString()}</h2>
             <p className="text-sm text-gray-600">Track how your assets line up for the current week.</p>
           </div>
-          <div className={pillClass}>
+          <div className="bg-neo-yellow border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest">
             {weeklyTotal} Scheduled Assets
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className={`${softCardClass} p-4`}>
+          <div className="border-2 border-black bg-gray-50 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Images</p>
             <p className="text-2xl font-black">{weeklyImages}</p>
           </div>
-          <div className={`${softCardClass} p-4`}>
+          <div className="border-2 border-black bg-gray-50 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Videos</p>
             <p className="text-2xl font-black">{weeklyVideos}</p>
           </div>
-          <div className={`${softCardClass} p-4`}>
+          <div className="border-2 border-black bg-gray-50 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Carousels</p>
             <p className="text-2xl font-black">{weeklyCarousels}</p>
           </div>
-          <div className={`${softCardClass} p-4`}>
+          <div className="border-2 border-black bg-gray-50 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Focus Day</p>
             <p className="text-sm font-bold">
               {selectedDayItems.length > 0 ? `${selectedDayItems.length} assets on ${selectedDate.toLocaleDateString()}` : 'Pick a day'}
@@ -524,7 +513,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className={`${surfaceClass} p-6`}>
+        <div className="bg-white border-4 border-black shadow-neo p-6">
           <div className="flex items-center justify-between gap-4 mb-4">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Calendar</p>
@@ -536,14 +525,14 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className={buttonGhost}
+                className="border-2 border-black bg-white px-3 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan transition-all"
               >
                 Prev
               </button>
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className={buttonGhost}
+                className="border-2 border-black bg-white px-3 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink transition-all"
               >
                 Next
               </button>
@@ -573,14 +562,14 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                   onDragOver={handleDragOver(key)}
                   onDragLeave={handleDragLeave(key)}
                   onDrop={handleDropOnDay(key)}
-                  className={`rounded-xl border border-white/70 p-2 text-left min-h-[110px] transition-all ${
-                    inMonth ? 'bg-white/60' : 'bg-white/30 text-gray-400'
-                  } ${isSelected ? 'ring-2 ring-black/10 bg-white/80' : ''} ${
-                    isDragOver ? 'ring-2 ring-black/20 bg-white/80' : ''
+                  className={`border-2 border-black p-2 text-left min-h-[110px] transition-all ${
+                    inMonth ? 'bg-white' : 'bg-gray-100 text-gray-400'
+                  } ${isSelected ? 'shadow-neo-sm bg-neo-yellow/30' : ''} ${
+                    isDragOver ? 'bg-neo-cyan/30 shadow-neo-sm' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-black ${isToday ? 'text-emerald-600' : ''}`}>
+                    <span className={`text-xs font-black ${isToday ? 'text-neo-pink' : ''}`}>
                       {date.getDate()}
                     </span>
                     {dayItems.length > 0 && (
@@ -592,7 +581,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                   <div className="space-y-1">
                     {dayItems.slice(0, 2).map(item => (
                       <div key={item.id} className="flex items-center gap-1">
-                        <span className={`w-2 h-2 rounded-full border border-black/10 ${typeBadge(item.itemType)}`} />
+                        <span className={`w-2 h-2 border border-black ${typeBadge(item.itemType)}`} />
                         <span className="text-[9px] font-bold uppercase tracking-widest truncate">
                           {item.itemTitle}
                         </span>
@@ -610,7 +599,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
           </div>
         </div>
 
-        <div className={`${panelClass} p-5 flex flex-col gap-4`}>
+        <div className="bg-white border-4 border-black shadow-neo p-5 flex flex-col gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Schedule Panel</p>
             <h3 className="font-display font-black text-xl">{formatLongDate(selectedDate)}</h3>
@@ -624,7 +613,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
             <select
               value={selectedBoardId}
               onChange={event => setSelectedBoardId(event.target.value)}
-              className={inputClass}
+              className="w-full border-2 border-black p-2 text-xs font-bold bg-gray-50"
               disabled={boards.length === 0}
             >
               {boards.map(board => (
@@ -645,7 +634,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
             <select
               value={selectedItemId}
               onChange={event => setSelectedItemId(event.target.value)}
-              className={inputClass}
+              className="w-full border-2 border-black p-2 text-xs font-bold bg-gray-50"
               disabled={!selectedBoard || selectedBoard.items.length === 0}
             >
               {(selectedBoard?.items || []).map(item => (
@@ -674,7 +663,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
               value={note}
               onChange={event => setNote(event.target.value)}
               rows={3}
-              className={inputClass}
+              className="w-full border-2 border-black p-2 text-xs font-bold bg-gray-50"
               placeholder="Add any reminder or caption goal..."
             />
           </div>
@@ -683,18 +672,18 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
             type="button"
             onClick={handleSchedule}
             disabled={isPending || !selectedItemId || boards.length === 0}
-            className={buttonPrimary}
+            className="bg-black text-white border-2 border-black px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isPending ? 'Scheduling...' : 'Schedule Asset'}
           </button>
 
           {error && (
-            <div className="rounded-lg border border-rose-200 bg-rose-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-rose-900">
+            <div className="border-2 border-black bg-neo-pink px-3 py-2 text-[10px] font-bold uppercase tracking-widest">
               {error}
             </div>
           )}
 
-          <div className="border-t border-white/70 pt-4 space-y-3">
+          <div className="border-t-2 border-black pt-4 space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                 Scheduled for {formatLongDate(selectedDate)}
@@ -708,7 +697,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                 type="button"
                 onClick={handleDuplicateDay}
                 disabled={selectedDayItems.length === 0 || isPending}
-                className={buttonQuiet}
+                className="border-2 border-black bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-neo-cyan transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Duplicate to {nextWeekKey}
               </button>
@@ -716,13 +705,13 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                 type="button"
                 onClick={handleClearDay}
                 disabled={selectedDayItems.length === 0 || isPending}
-                className={buttonQuiet}
+                className="border-2 border-black bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-neo-pink transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Clear Day
               </button>
             </div>
             {selectedDayItems.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-black/20 p-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+              <div className="border-2 border-dashed border-black/30 p-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
                 Nothing scheduled yet.
               </div>
             ) : (
@@ -734,13 +723,13 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                     onDragStart={handleDragStart(item.id)}
                     onDragEnd={handleDragEnd}
                     aria-grabbed={draggedEntryId === item.id}
-                    className={`rounded-xl border border-white/70 bg-white/70 p-2 transition-opacity ${
+                    className={`border-2 border-black bg-gray-50 p-2 transition-opacity ${
                       draggedEntryId === item.id ? 'opacity-60' : ''
                     } ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : ''}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className={`w-3 h-3 rounded-full border border-black/10 ${typeBadge(item.itemType)}`} />
+                        <span className={`w-3 h-3 border border-black ${typeBadge(item.itemType)}`} />
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-widest">{item.itemTitle}</p>
                           <p className="text-[9px] uppercase tracking-widest text-gray-500">{item.boardName}</p>
@@ -750,28 +739,28 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                         <button
                           type="button"
                           onClick={() => handleStartEdit(item)}
-                          className="text-[9px] font-semibold uppercase tracking-widest text-gray-600 hover:text-gray-900"
+                          className="text-[9px] font-bold uppercase tracking-widest text-black hover:text-neo-pink"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRemove(item.id)}
-                          className="text-[9px] font-semibold uppercase tracking-widest text-rose-500 hover:text-rose-700"
+                          className="text-[9px] font-bold uppercase tracking-widest text-red-600 hover:text-black"
                         >
                           Remove
                         </button>
                       </div>
                     </div>
                     {editingEntryId === item.id ? (
-                      <div className="mt-2 border-t border-white/70 pt-2 space-y-2">
+                      <div className="mt-2 border-t-2 border-black pt-2 space-y-2">
                         <div className="space-y-1">
                           <label className="text-[9px] font-bold uppercase tracking-widest text-gray-500">Move to day</label>
                           <input
                             type="date"
                             value={editDate}
                             onChange={event => setEditDate(event.target.value)}
-                            className={inputClass}
+                            className="w-full border-2 border-black p-2 text-[10px] font-bold bg-white"
                           />
                         </div>
                         <div className="space-y-1">
@@ -780,7 +769,7 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                             value={editNote}
                             onChange={event => setEditNote(event.target.value)}
                             rows={2}
-                            className={inputClass}
+                            className="w-full border-2 border-black p-2 text-[10px] font-bold bg-white"
                             placeholder="Add a reminder..."
                           />
                         </div>
@@ -788,14 +777,14 @@ const DashboardCalendar: React.FC<DashboardCalendarProps> = ({ boards, calendarI
                           <button
                             type="button"
                             onClick={() => handleSaveEdit(item.id)}
-                            className={buttonSmall}
+                            className="border-2 border-black bg-black text-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all"
                           >
                             Save
                           </button>
                           <button
                             type="button"
                             onClick={handleCancelEdit}
-                            className={buttonSmallGhost}
+                            className="border-2 border-black bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest hover:bg-neo-yellow transition-all"
                           >
                             Cancel
                           </button>
