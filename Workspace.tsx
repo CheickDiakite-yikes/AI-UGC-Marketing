@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import Sidebar from './components/Sidebar';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import ChatInterface from './components/ChatInterface';
 import CanvasItemCard from './components/CanvasItemCard';
 import BrandIdentityModal from './components/BrandIdentityModal';
@@ -53,6 +53,7 @@ import {
 } from './app/actions/boardActions';
 import { getSubscriptionStateAction, createCheckoutSessionAction, createCreditsCheckoutSessionAction } from './app/actions/subscriptionActions';
 import { toggleFavoriteAction } from './app/actions/favoriteActions';
+import { getUserProfile } from './app/actions/userActions';
 import type { PlanTier } from './types';
 
 
@@ -223,6 +224,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     });
   }, []);
 
+  // Load user profile for profile dropdown
+  useEffect(() => {
+    getUserProfile().then((profile) => {
+      if (profile) {
+        setUserProfile({ name: profile.name, email: profile.email });
+      }
+    }).catch(() => {});
+  }, []);
+
   // Refresh onboarding state helper - must be defined before useEffects that use it
   const refreshOnboardingState = useCallback(async () => {
     setIsOnboardingLoading(true);
@@ -332,7 +342,41 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [showNewBoardModal, setShowNewBoardModal] = useState(false);
   const [showBoardListModal, setShowBoardListModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar state
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{ name: string | null; email: string | null } | null>(null);
+  const mobileProfileDropdownRef = useRef<HTMLDivElement>(null);
+  const desktopProfileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close profile dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const isMobileDropdown = mobileProfileDropdownRef.current && mobileProfileDropdownRef.current.contains(target);
+      const isDesktopDropdown = desktopProfileDropdownRef.current && desktopProfileDropdownRef.current.contains(target);
+      
+      if (!isMobileDropdown && !isDesktopDropdown) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileDropdownOpen]);
+
+  const getProfileInitials = (name?: string | null, email?: string | null) => {
+    const safeName = name?.trim();
+    if (safeName) {
+      const parts = safeName.split(/\s+/).filter(Boolean);
+      return parts.slice(0, 2).map(part => part[0]?.toUpperCase() || '').join('') || '?';
+    }
+    if (email && email.length > 0) {
+      return email[0].toUpperCase();
+    }
+    return '?';
+  };
 
   const [pendingScannedIdentity, setPendingScannedIdentity] = useState<BrandIdentity | null>(null);
   const [pendingScannedAvatar, setPendingScannedAvatar] = useState<AvatarIdentity | null>(null);
@@ -1293,10 +1337,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   useEffect(() => {
     if (!showOnboardingGuide || !activeOnboardingStep) return;
-    const sidebarStepIds = new Set(['website-link', 'logo', 'avatar', 'product', 'sources']);
-    if (sidebarStepIds.has(activeOnboardingStep.id) && window.innerWidth < 768) {
-      setSidebarOpen(true);
-    }
     if (activeOnboardingStep.id === 'campaign') {
       handleOpenChat();
     }
@@ -2536,14 +2576,43 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
       {/* Mobile Header Bar */}
       <div className="md:hidden flex items-center justify-between p-3 gap-2 bg-neo-yellow border-b-4 border-black sticky top-0 z-40 h-16">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none flex-shrink-0"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+        <div className="relative" ref={mobileProfileDropdownRef}>
+          <button
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className="w-10 h-10 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none flex-shrink-0 flex items-center justify-center font-bold text-sm"
+          >
+            {userProfile ? getProfileInitials(userProfile.name, userProfile.email) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            )}
+          </button>
+          {profileDropdownOpen && (
+            <div className="absolute top-full left-0 mt-2 w-48 bg-white border-2 border-black shadow-neo-sm z-50">
+              <Link
+                href="/profile"
+                className="block px-4 py-2 text-sm font-bold hover:bg-neo-yellow border-b border-black transition-colors"
+                onClick={() => setProfileDropdownOpen(false)}
+              >
+                Profile
+              </Link>
+              <Link
+                href="/profile/dashboard"
+                className="block px-4 py-2 text-sm font-bold hover:bg-neo-yellow border-b border-black transition-colors"
+                onClick={() => setProfileDropdownOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/profile/company"
+                className="block px-4 py-2 text-sm font-bold hover:bg-neo-yellow transition-colors"
+                onClick={() => setProfileDropdownOpen(false)}
+              >
+                Company
+              </Link>
+            </div>
+          )}
+        </div>
         <h2 className="font-display font-black text-base truncate flex-1">{activeBoard.name}</h2>
         <div className="flex gap-1 flex-shrink-0">
           <button onClick={() => setShowBoardListModal(true)} data-tour="boards" className="px-2 py-1 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none transition-all flex items-center gap-1">
@@ -2555,37 +2624,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             <span className="text-xs font-bold">New</span>
           </button>
         </div>
-      </div>
-
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black/50 z-50 animate-fade-in"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar - Slide-out on mobile, fixed on desktop */}
-      <div className={`
-        fixed md:relative inset-y-0 left-0 z-50
-        w-[85%] max-w-[320px] md:w-[220px] md:max-w-none
-        transform transition-transform duration-300 ease-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        ${!sidebarOpen && 'md:pointer-events-auto pointer-events-none'}
-        h-full
-      `}>
-        <Sidebar
-          assets={activeBoard.assets} brandIdentity={activeBoard.brandIdentity} avatarIdentity={activeBoard.avatarIdentity} products={activeBoard.products}
-          onAddAsset={handleAddAsset} onDeleteAsset={handleDeleteAsset} onEditBrand={() => setShowBrandModal(true)} onEditAvatar={() => setShowAvatarModal(true)}
-          onOpenProductModal={handleOpenProductModal}
-          onStartCapture={() => { setIsCameraActive(true); setSidebarOpen(false); }}
-          onClose={() => setSidebarOpen(false)}
-          onExitApp={onExitApp} usageStats={usage}
-          planTier={planTier}
-          boardId={activeBoardId}
-          videoQualityMode={videoQualityMode}
-          items={activeBoard.items}
-        />
       </div>
 
       {/* Main Content */}
@@ -2604,7 +2642,46 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         )}
         {/* Desktop Header - Hidden on mobile */}
         <header className="hidden md:flex justify-between items-center mb-12">
-          <h2 className="text-5xl font-display font-black tracking-tight">{activeBoard.name}</h2>
+          <div className="flex items-center gap-4">
+            <div className="relative" ref={desktopProfileDropdownRef}>
+              <button
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="w-12 h-12 bg-white border-2 border-black shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center font-bold text-base"
+              >
+                {userProfile ? getProfileInitials(userProfile.name, userProfile.email) : (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                )}
+              </button>
+              {profileDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white border-2 border-black shadow-neo-sm z-50">
+                  <Link
+                    href="/profile"
+                    className="block px-4 py-3 text-sm font-bold hover:bg-neo-yellow border-b border-black transition-colors"
+                    onClick={() => setProfileDropdownOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                  <Link
+                    href="/profile/dashboard"
+                    className="block px-4 py-3 text-sm font-bold hover:bg-neo-yellow border-b border-black transition-colors"
+                    onClick={() => setProfileDropdownOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/profile/company"
+                    className="block px-4 py-3 text-sm font-bold hover:bg-neo-yellow transition-colors"
+                    onClick={() => setProfileDropdownOpen(false)}
+                  >
+                    Company
+                  </Link>
+                </div>
+              )}
+            </div>
+            <h2 className="text-5xl font-display font-black tracking-tight">{activeBoard.name}</h2>
+          </div>
           <div className="flex gap-3">
             <button onClick={() => setShowBoardListModal(true)} data-tour="boards" className="bg-white border-4 border-black shadow-neo px-6 py-2 font-black uppercase text-sm">Boards</button>
             <button onClick={() => setShowNewBoardModal(true)} className="bg-neo-black text-white border-4 border-black shadow-neo px-6 py-2 font-black uppercase text-sm">+ New</button>

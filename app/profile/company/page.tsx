@@ -112,7 +112,7 @@ export default async function CompanyPage() {
           {logoAssets.length === 0 ? (
             <div className="border-2 border-dashed border-black/30 p-6 text-center">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">No logos uploaded yet</p>
-              <form action={uploadProfileAssetAction} className="inline-block">
+              <form action={uploadProfileAssetAction} encType="multipart/form-data" className="inline-block">
                 <input type="hidden" name="assetType" value="logo" />
                 <label className="cursor-pointer bg-neo-lime border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all inline-block">
                   Upload Logo
@@ -125,14 +125,20 @@ export default async function CompanyPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {logoAssets.map(asset => (
                   <div key={asset.id} className="border-4 border-black bg-white p-2">
-                    {asset.previewUrl && (
+                    {asset.previewUrl ? (
                       <img src={asset.previewUrl} alt={asset.name} className="w-full h-24 object-contain" />
+                    ) : asset.storageKey ? (
+                      <img src={`/api/storage?key=${asset.storageKey}`} alt={asset.name} className="w-full h-24 object-contain" />
+                    ) : (
+                      <div className="w-full h-24 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
+                        LOGO
+                      </div>
                     )}
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mt-2 truncate">{asset.name}</p>
                   </div>
                 ))}
               </div>
-              <form action={uploadProfileAssetAction}>
+              <form action={uploadProfileAssetAction} encType="multipart/form-data">
                 <input type="hidden" name="assetType" value="logo" />
                 <label className="cursor-pointer bg-neo-lime border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all inline-block">
                   Upload Logo
@@ -153,7 +159,7 @@ export default async function CompanyPage() {
           {avatarAssets.length === 0 ? (
             <div className="border-2 border-dashed border-black/30 p-6 text-center">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">No avatars uploaded yet</p>
-              <form action={uploadProfileAssetAction} className="inline-block">
+              <form action={uploadProfileAssetAction} encType="multipart/form-data" className="inline-block">
                 <input type="hidden" name="assetType" value="avatar" />
                 <label className="cursor-pointer bg-neo-cyan border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all inline-block">
                   Upload Avatar
@@ -166,14 +172,20 @@ export default async function CompanyPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {avatarAssets.map(asset => (
                   <div key={asset.id} className="border-4 border-black bg-white p-2">
-                    {asset.previewUrl && (
+                    {asset.previewUrl ? (
                       <img src={asset.previewUrl} alt={asset.name} className="w-full h-24 object-cover rounded-full" />
+                    ) : asset.storageKey ? (
+                      <img src={`/api/storage?key=${asset.storageKey}`} alt={asset.name} className="w-full h-24 object-cover rounded-full" />
+                    ) : (
+                      <div className="w-full h-24 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold rounded-full">
+                        AVTR
+                      </div>
                     )}
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mt-2 truncate text-center">{asset.name}</p>
                   </div>
                 ))}
               </div>
-              <form action={uploadProfileAssetAction}>
+              <form action={uploadProfileAssetAction} encType="multipart/form-data">
                 <input type="hidden" name="assetType" value="avatar" />
                 <label className="cursor-pointer bg-neo-cyan border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all inline-block">
                   Upload Avatar
@@ -269,9 +281,9 @@ export default async function CompanyPage() {
                       <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{asset.type}</p>
                     </div>
                   </div>
-                  {asset.previewUrl && (
+                  {(asset.previewUrl || asset.storageKey) && (
                     <a
-                      href={asset.previewUrl}
+                      href={asset.previewUrl || `/api/storage?key=${asset.storageKey}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-white border-2 border-black px-3 py-1 text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
