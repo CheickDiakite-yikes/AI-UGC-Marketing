@@ -15,7 +15,16 @@ I prefer clear, concise instructions and explanations. I value iterative develop
 - **Language**: TypeScript
 
 ### UI/UX Decisions
-The application features a clean, modern interface with components like `ChatInterface`, `LandingPage`, and `Sidebar`. Authentication is managed via email/password using JWT sessions, presented through an `AuthModal` component. All media files are served via an API route after being stored in Object Storage. SEO is a priority, with dynamic `robots.txt`, `sitemap.ts`, and JSON-LD structured data implemented, along with Open Graph and Twitter Card support.
+The application features a clean, simplified interface focused on content generation:
+- **Main Workspace**: Minimalist layout with just the chat interface and content canvas. No sidebar - all brand context is managed separately.
+- **Profile Section**: Three-tab navigation at `/profile`, `/profile/dashboard`, and `/profile/company`:
+  - **Profile Tab**: Account details, password management, billing controls, favorites
+  - **Dashboard Tab**: Marketing calendar with scheduled content
+  - **Company Tab**: Brand context management - logos, avatars/spokespersons, products, and source documents
+- **Navigation**: Profile menu dropdown in workspace header (both mobile and desktop) for quick access to profile pages
+- **Authentication**: Email/password using JWT sessions, presented through `AuthModal` component
+- **Media Storage**: All media files served via `/api/storage` route after being stored in Object Storage
+- **SEO**: Dynamic `robots.txt`, `sitemap.ts`, JSON-LD structured data, Open Graph and Twitter Card support
 
 ### Technical Implementations
 - **Database**: PostgreSQL with Drizzle ORM, managing tables for `users`, `boards`, `assets`, `generated_items`, `messages`, `brand_identities`, and `avatar_identities`.
