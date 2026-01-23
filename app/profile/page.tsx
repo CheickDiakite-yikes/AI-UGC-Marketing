@@ -176,6 +176,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           >
             Dashboard
           </Link>
+          <Link
+            href="/profile/company"
+            className="bg-white text-black border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-yellow transition-all"
+          >
+            Company
+          </Link>
         </div>
 
         <section className="bg-white border-4 border-black shadow-neo p-6 md:p-8 mb-8">
