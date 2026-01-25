@@ -91,11 +91,14 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
                 setUrl(e.target.value);
                 if (error) setError('');
               }}
-              placeholder="yourcompany.com"
+              placeholder="https://yourcompany.com"
               className="w-full bg-white border-3 border-black px-4 py-3 font-bold text-base focus:outline-none focus:ring-2 focus:ring-neo-pink placeholder:text-gray-400"
               disabled={isLoading}
               autoFocus
             />
+            <p className="text-[10px] text-gray-500 mt-1">
+              Include the full URL with https://
+            </p>
             {error && (
               <p className="text-xs text-red-600 font-bold mt-1">{error}</p>
             )}
