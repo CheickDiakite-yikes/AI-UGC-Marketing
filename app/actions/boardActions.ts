@@ -985,11 +985,22 @@ export async function analyzeWebsiteAction(url: string): Promise<{ success: bool
 
     const TIMEOUT_MS = 30000;
     const prompt = `Analyze this website URL and extract brand information. Return a JSON object with these fields:
+
+Required fields:
 - companyName: The company or brand name (string)
 - description: A short overview of what the company does, 1-2 sentences (string)
 - industry: The primary industry or sector (string)
 - keyOfferings: 3-5 main products or services offered (array of strings)
 - targetAudience: Who the company primarily serves (string)
+
+Optional fields (include only if found on the website):
+- tagline: Brand tagline or slogan if visible (string)
+- brandColors: Primary brand colors as hex codes, max 5 (array of strings like "#FF5500")
+- socialLinks: Social media links found (array of objects with platform and url)
+- contactEmail: Contact email if visible (string)
+- missionStatement: Company mission or vision statement if found (string)
+- foundedYear: Year the company was founded if mentioned (string like "2020")
+- teamSize: Company size indicator if found (string like "50-100" or "Enterprise")
 
 URL to analyze: ${url}
 
@@ -1009,7 +1020,25 @@ Return ONLY valid JSON, no markdown, no explanations.`;
                     description: { type: Type.STRING },
                     industry: { type: Type.STRING },
                     keyOfferings: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    targetAudience: { type: Type.STRING }
+                    targetAudience: { type: Type.STRING },
+                    tagline: { type: Type.STRING, nullable: true },
+                    brandColors: { type: Type.ARRAY, items: { type: Type.STRING }, nullable: true },
+                    socialLinks: { 
+                        type: Type.ARRAY, 
+                        items: { 
+                            type: Type.OBJECT,
+                            properties: {
+                                platform: { type: Type.STRING },
+                                url: { type: Type.STRING }
+                            },
+                            required: ['platform', 'url']
+                        }, 
+                        nullable: true 
+                    },
+                    contactEmail: { type: Type.STRING, nullable: true },
+                    missionStatement: { type: Type.STRING, nullable: true },
+                    foundedYear: { type: Type.STRING, nullable: true },
+                    teamSize: { type: Type.STRING, nullable: true }
                 },
                 required: ['companyName', 'description', 'industry', 'keyOfferings', 'targetAudience']
             }
@@ -1039,7 +1068,7 @@ Return ONLY valid JSON, no markdown, no explanations.`;
 
 export async function submitWebsiteOnboardingAction(
     websiteUrl: string,
-    overview?: string
+    data?: { companyName?: string; overview?: string }
 ): Promise<{ success: boolean; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
@@ -1094,8 +1123,12 @@ export async function submitWebsiteOnboardingAction(
         onboardingDismissedAt: null
     };
 
-    if (overview) {
-        updateData.overview = overview;
+    if (data?.companyName) {
+        updateData.company = data.companyName;
+    }
+    
+    if (data?.overview) {
+        updateData.overview = data.overview;
     }
 
     await db.update(users)

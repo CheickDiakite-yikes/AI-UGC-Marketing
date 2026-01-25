@@ -353,4 +353,11 @@ export interface ExtractedBrandData {
   industry: string;
   keyOfferings: string[];
   targetAudience: string;
+  tagline?: string;
+  brandColors?: string[];
+  socialLinks?: { platform: string; url: string }[];
+  contactEmail?: string;
+  missionStatement?: string;
+  foundedYear?: string;
+  teamSize?: string;
 }

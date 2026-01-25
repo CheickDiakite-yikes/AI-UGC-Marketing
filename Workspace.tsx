@@ -1339,7 +1339,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const handleWebsiteConfirm = useCallback(async (url: string, data: ExtractedBrandData) => {
     setIsWebsiteSubmitting(true);
     try {
-      const result = await submitWebsiteOnboardingAction(url, data.description);
+      const result = await submitWebsiteOnboardingAction(url, {
+        companyName: data.companyName,
+        overview: data.description
+      });
       if (result.success) {
         showSuccess(`${data.companyName} is ready! Let's create some magic.`);
         await refreshOnboardingState();

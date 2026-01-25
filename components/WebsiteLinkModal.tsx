@@ -249,11 +249,28 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
     </div>
   );
 
+  const getSocialIcon = (platform: string) => {
+    const p = platform.toLowerCase();
+    if (p.includes('twitter') || p.includes('x')) return '𝕏';
+    if (p.includes('linkedin')) return 'in';
+    if (p.includes('facebook')) return 'f';
+    if (p.includes('instagram')) return '📷';
+    if (p.includes('youtube')) return '▶';
+    if (p.includes('tiktok')) return '♪';
+    if (p.includes('github')) return '⌘';
+    return '🔗';
+  };
+
   const renderConfirmationState = () => {
     if (!extractedData) return null;
     
+    const hasExtras = extractedData.tagline || 
+      (extractedData.brandColors && extractedData.brandColors.length > 0) ||
+      (extractedData.socialLinks && extractedData.socialLinks.length > 0) ||
+      extractedData.foundedYear || extractedData.teamSize;
+    
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto">
         <div className="text-center mb-4">
           <div className="inline-block bg-neo-lime border-2 border-black px-3 py-1 mb-3">
             <span className="text-[10px] font-black uppercase tracking-widest">✓ Brand Detected</span>
@@ -274,6 +291,9 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
               onChange={(e) => setEditedCompanyName(e.target.value)}
               className="w-full bg-white border-2 border-black px-3 py-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-neo-pink"
             />
+            {extractedData.tagline && (
+              <p className="mt-1 text-xs italic text-gray-600">"{extractedData.tagline}"</p>
+            )}
           </div>
 
           <div>
@@ -312,6 +332,64 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
               ))}
             </div>
           </div>
+
+          {hasExtras && (
+            <div className="border-t-2 border-dashed border-gray-300 pt-3 space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Additional Info Detected</p>
+              
+              {extractedData.brandColors && extractedData.brandColors.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-500">Colors:</span>
+                  <div className="flex gap-1">
+                    {extractedData.brandColors.slice(0, 5).map((color, idx) => (
+                      <div
+                        key={idx}
+                        className="w-5 h-5 rounded-full border-2 border-black"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {extractedData.socialLinks && extractedData.socialLinks.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-gray-500">Social:</span>
+                  {extractedData.socialLinks.slice(0, 5).map((link, idx) => (
+                    <a
+                      key={idx}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center w-6 h-6 bg-black text-white text-[10px] font-bold hover:bg-neo-pink transition-colors"
+                      title={link.platform}
+                    >
+                      {getSocialIcon(link.platform)}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-3 text-[10px]">
+                {extractedData.foundedYear && (
+                  <span className="text-gray-600">
+                    <span className="font-bold">Founded:</span> {extractedData.foundedYear}
+                  </span>
+                )}
+                {extractedData.teamSize && (
+                  <span className="text-gray-600">
+                    <span className="font-bold">Team:</span> {extractedData.teamSize}
+                  </span>
+                )}
+                {extractedData.contactEmail && (
+                  <span className="text-gray-600">
+                    <span className="font-bold">Email:</span> {extractedData.contactEmail}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {error && (
