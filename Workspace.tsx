@@ -1374,7 +1374,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       if (!onboardingState.required.websiteLink && !showWebsiteLinkModal) {
         setShowWebsiteLinkModal(true);
       }
-      if (!showOnboardingGuide) {
+      if (onboardingState.required.websiteLink && !showOnboardingGuide) {
         setShowOnboardingGuide(true);
       }
     }
