@@ -850,7 +850,7 @@ export async function getOnboardingStateAction() {
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, session.userId as string),
-        columns: { onboardingCompleted: true, onboardingDismissedAt: true }
+        columns: { onboardingCompleted: true, onboardingDismissedAt: true, websiteUrl: true }
     });
 
     const userBoards = await db.query.boards.findMany({
@@ -864,7 +864,7 @@ export async function getOnboardingStateAction() {
         : [];
     const assetTypeSet = new Set(assetTypes.map(asset => asset.type));
 
-    const hasWebsiteLink = assetTypeSet.has('link');
+    const hasWebsiteLink = Boolean(user?.websiteUrl);
     const hasLogo = assetTypeSet.has('logo');
     const hasAvatar = assetTypeSet.has('avatar');
     const hasSources = assetTypeSet.has('pdf') || assetTypeSet.has('text');
@@ -963,7 +963,7 @@ export async function resetOnboardingAction(): Promise<void> {
     }
 
     await db.update(users)
-        .set({ onboardingCompleted: false, onboardingCompletedAt: null, onboardingDismissedAt: null })
+        .set({ onboardingCompleted: false, onboardingCompletedAt: null, onboardingDismissedAt: null, websiteUrl: null })
         .where(eq(users.id, session.userId as string));
 
     revalidatePath('/');
