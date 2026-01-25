@@ -346,3 +346,11 @@ export interface VeoConfig {
   durationSeconds?: 4 | 6 | 8;
   qualityMode?: boolean;
 }
+
+export interface ExtractedBrandData {
+  companyName: string;
+  description: string;
+  industry: string;
+  keyOfferings: string[];
+  targetAudience: string;
+}

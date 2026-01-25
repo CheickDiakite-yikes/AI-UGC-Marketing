@@ -1,22 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ExtractedBrandData } from '@/types';
+
+type ModalState = 'input' | 'analyzing' | 'confirmation';
 
 interface WebsiteLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (url: string) => Promise<void>;
+  onAnalyze: (url: string) => Promise<{ success: boolean; data?: ExtractedBrandData; error?: string }>;
+  onConfirm: (url: string, data: ExtractedBrandData) => Promise<void>;
   isLoading?: boolean;
 }
+
+const PROGRESS_MESSAGES = [
+  'Fetching website...',
+  'Reading content...',
+  'Analyzing brand...',
+  'Extracting info...',
+  'Almost there...',
+];
 
 const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  onAnalyze,
+  onConfirm,
   isLoading = false,
 }) => {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
+  const [modalState, setModalState] = useState<ModalState>('input');
+  const [progressIndex, setProgressIndex] = useState(0);
+  const [extractedData, setExtractedData] = useState<ExtractedBrandData | null>(null);
+  const [editedCompanyName, setEditedCompanyName] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  useEffect(() => {
+    if (modalState !== 'analyzing') return;
+    
+    const interval = setInterval(() => {
+      setProgressIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [modalState]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setModalState('input');
+      setProgressIndex(0);
+      setExtractedData(null);
+      setError('');
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -48,84 +88,269 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
       finalUrl = 'https://' + finalUrl;
     }
     
-    await onSubmit(finalUrl);
+    setModalState('analyzing');
+    setProgressIndex(0);
+    setError('');
+    
+    try {
+      const result = await onAnalyze(finalUrl);
+      
+      if (result.success && result.data) {
+        setExtractedData(result.data);
+        setEditedCompanyName(result.data.companyName);
+        setEditedDescription(result.data.description);
+        setModalState('confirmation');
+      } else {
+        setError(result.error || 'Failed to analyze website. You can try again or skip.');
+        setModalState('input');
+      }
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+      setModalState('input');
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!extractedData) return;
+    
+    setIsConfirming(true);
+    try {
+      const finalData: ExtractedBrandData = {
+        ...extractedData,
+        companyName: editedCompanyName || extractedData.companyName,
+        description: editedDescription || extractedData.description,
+      };
+      
+      let finalUrl = url.trim();
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = 'https://' + finalUrl;
+      }
+      
+      await onConfirm(finalUrl, finalData);
+    } catch (err) {
+      setError('Failed to save. Please try again.');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleUseDifferentUrl = () => {
+    setModalState('input');
+    setExtractedData(null);
+    setError('');
   };
 
   const handleSkip = () => {
     onClose();
   };
 
+  const renderInputState = () => (
+    <>
+      <div className="text-center mb-6">
+        <div className="inline-block bg-neo-pink border-2 border-black px-3 py-1 mb-4">
+          <span className="text-[10px] font-black uppercase tracking-widest">Quick Setup</span>
+        </div>
+        <h2 className="font-display font-black text-2xl md:text-3xl mb-2">
+          Link to Campaign
+        </h2>
+        <p className="text-sm text-gray-600">
+          Share your website and we'll instantly understand your brand.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label 
+            htmlFor="website-url" 
+            className="block text-xs font-black uppercase tracking-widest mb-2"
+          >
+            Your Website
+          </label>
+          <input
+            id="website-url"
+            type="text"
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              if (error) setError('');
+            }}
+            placeholder="https://yourcompany.com"
+            className="w-full bg-white border-3 border-black px-4 py-3 font-bold text-base focus:outline-none focus:ring-2 focus:ring-neo-pink placeholder:text-gray-400"
+            disabled={isLoading}
+            autoFocus
+          />
+          <p className="text-[10px] text-gray-500 mt-1">
+            Include the full URL with https://
+          </p>
+          {error && (
+            <p className="text-xs text-red-600 font-bold mt-1">{error}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-neo-pink border-3 border-black px-6 py-3 font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Analyzing...' : 'Analyze My Brand'}
+          </button>
+          <button
+            type="button"
+            onClick={handleSkip}
+            disabled={isLoading}
+            className="w-full bg-white border-2 border-black px-6 py-2 font-bold uppercase tracking-widest text-xs hover:bg-gray-100 transition-all disabled:opacity-50"
+          >
+            Skip for now
+          </button>
+        </div>
+      </form>
+
+      <p className="text-center text-[10px] text-gray-500 mt-4">
+        You can always add more brand details in your Company settings.
+      </p>
+    </>
+  );
+
+  const renderAnalyzingState = () => (
+    <div className="text-center py-8">
+      <div className="mb-6">
+        <div className="relative w-20 h-20 mx-auto">
+          <div className="absolute inset-0 border-4 border-neo-pink border-t-transparent rounded-full animate-spin"></div>
+          <div className="absolute inset-2 border-4 border-neo-lime border-b-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
+          <div className="absolute inset-4 border-4 border-neo-cyan border-t-transparent rounded-full animate-spin" style={{ animationDuration: '1.5s' }}></div>
+        </div>
+      </div>
+      
+      <h2 className="font-display font-black text-xl md:text-2xl mb-2">
+        Analyzing Your Brand
+      </h2>
+      
+      <div className="h-6 flex items-center justify-center">
+        <p className="text-sm text-gray-600 animate-pulse">
+          {PROGRESS_MESSAGES[progressIndex]}
+        </p>
+      </div>
+      
+      <div className="mt-6 flex justify-center gap-1">
+        {PROGRESS_MESSAGES.slice(0, 4).map((_, idx) => (
+          <div 
+            key={idx} 
+            className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              idx <= progressIndex ? 'bg-neo-pink' : 'bg-gray-200'
+            }`}
+          />
+        ))}
+      </div>
+      
+      <p className="text-[10px] text-gray-400 mt-6">
+        This usually takes 10-20 seconds
+      </p>
+    </div>
+  );
+
+  const renderConfirmationState = () => {
+    if (!extractedData) return null;
+    
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-4">
+          <div className="inline-block bg-neo-lime border-2 border-black px-3 py-1 mb-3">
+            <span className="text-[10px] font-black uppercase tracking-widest">✓ Brand Detected</span>
+          </div>
+          <h2 className="font-display font-black text-xl md:text-2xl">
+            Confirm Your Brand
+          </h2>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-gray-600">
+              Company Name
+            </label>
+            <input
+              type="text"
+              value={editedCompanyName}
+              onChange={(e) => setEditedCompanyName(e.target.value)}
+              className="w-full bg-white border-2 border-black px-3 py-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-neo-pink"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-gray-600">
+              Description
+            </label>
+            <textarea
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              rows={2}
+              className="w-full bg-white border-2 border-black px-3 py-2 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-neo-pink resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 border-2 border-black p-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Industry</p>
+              <p className="text-sm font-bold truncate">{extractedData.industry}</p>
+            </div>
+            <div className="bg-gray-50 border-2 border-black p-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Audience</p>
+              <p className="text-sm font-bold truncate">{extractedData.targetAudience}</p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 border-2 border-black p-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Key Offerings</p>
+            <div className="flex flex-wrap gap-1">
+              {extractedData.keyOfferings.slice(0, 5).map((offering, idx) => (
+                <span 
+                  key={idx} 
+                  className="inline-block bg-neo-cyan border border-black px-2 py-0.5 text-[10px] font-bold"
+                >
+                  {offering}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-xs text-red-600 font-bold text-center">{error}</p>
+        )}
+
+        <div className="flex flex-col gap-2 pt-2">
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={isConfirming}
+            className="w-full bg-neo-pink border-3 border-black px-6 py-3 font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isConfirming ? 'Saving...' : 'Confirm & Start Creating'}
+          </button>
+          <button
+            type="button"
+            onClick={handleUseDifferentUrl}
+            disabled={isConfirming}
+            className="w-full bg-white border-2 border-black px-6 py-2 font-bold uppercase tracking-widest text-xs hover:bg-gray-100 transition-all disabled:opacity-50"
+          >
+            Use Different URL
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={handleSkip}
+        onClick={modalState === 'analyzing' ? undefined : handleSkip}
       />
       
       <div className="relative bg-white border-4 border-black shadow-neo p-6 md:p-8 w-full max-w-md animate-fade-in-up">
-        <div className="text-center mb-6">
-          <div className="inline-block bg-neo-pink border-2 border-black px-3 py-1 mb-4">
-            <span className="text-[10px] font-black uppercase tracking-widest">Quick Setup</span>
-          </div>
-          <h2 className="font-display font-black text-2xl md:text-3xl mb-2">
-            Link to Campaign
-          </h2>
-          <p className="text-sm text-gray-600">
-            Share your website and we'll instantly understand your brand.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label 
-              htmlFor="website-url" 
-              className="block text-xs font-black uppercase tracking-widest mb-2"
-            >
-              Your Website
-            </label>
-            <input
-              id="website-url"
-              type="text"
-              value={url}
-              onChange={(e) => {
-                setUrl(e.target.value);
-                if (error) setError('');
-              }}
-              placeholder="https://yourcompany.com"
-              className="w-full bg-white border-3 border-black px-4 py-3 font-bold text-base focus:outline-none focus:ring-2 focus:ring-neo-pink placeholder:text-gray-400"
-              disabled={isLoading}
-              autoFocus
-            />
-            <p className="text-[10px] text-gray-500 mt-1">
-              Include the full URL with https://
-            </p>
-            {error && (
-              <p className="text-xs text-red-600 font-bold mt-1">{error}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-neo-pink border-3 border-black px-6 py-3 font-black uppercase tracking-widest text-sm hover:bg-black hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Analyzing...' : 'Start Creating'}
-            </button>
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={isLoading}
-              className="w-full bg-white border-2 border-black px-6 py-2 font-bold uppercase tracking-widest text-xs hover:bg-gray-100 transition-all disabled:opacity-50"
-            >
-              Skip for now
-            </button>
-          </div>
-        </form>
-
-        <p className="text-center text-[10px] text-gray-500 mt-4">
-          You can always add more brand details in your Company settings.
-        </p>
+        {modalState === 'input' && renderInputState()}
+        {modalState === 'analyzing' && renderAnalyzingState()}
+        {modalState === 'confirmation' && renderConfirmationState()}
       </div>
     </div>
   );

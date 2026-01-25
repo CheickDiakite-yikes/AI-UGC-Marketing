@@ -16,7 +16,7 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole, ExtractedBrandData } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { getRemainingVideos, IMAGE_CREDIT_COST, VIDEO_CREDIT_COST } from './services/usageLimits';
@@ -46,6 +46,7 @@ import {
   dismissOnboardingAction,
   completeOnboardingAction,
   submitWebsiteOnboardingAction,
+  analyzeWebsiteAction,
   createStoryboardAction,
   updateStoryboardStatusAction,
   updateStoryboardPayloadAction,
@@ -1330,6 +1331,29 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       setIsWebsiteSubmitting(false);
     }
   }, [refreshOnboardingState, showSuccess, showError]);
+
+  const handleWebsiteAnalyze = useCallback(async (url: string) => {
+    return await analyzeWebsiteAction(url);
+  }, []);
+
+  const handleWebsiteConfirm = useCallback(async (url: string, data: ExtractedBrandData) => {
+    setIsWebsiteSubmitting(true);
+    try {
+      const result = await submitWebsiteOnboardingAction(url, data.description);
+      if (result.success) {
+        showSuccess(`${data.companyName} is ready! Let's create some magic.`);
+        await refreshOnboardingState();
+        setShowWebsiteLinkModal(false);
+      } else {
+        throw new Error(result.error || 'Failed to save');
+      }
+    } catch (error) {
+      console.error('[ONBOARDING] Failed to confirm website:', error);
+      throw error;
+    } finally {
+      setIsWebsiteSubmitting(false);
+    }
+  }, [refreshOnboardingState, showSuccess]);
 
   const handleWebsiteLinkClose = useCallback(() => {
     dismissOnboardingAction()
@@ -2854,6 +2878,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         isOpen={showWebsiteLinkModal}
         onClose={handleWebsiteLinkClose}
         onSubmit={handleWebsiteLinkSubmit}
+        onAnalyze={handleWebsiteAnalyze}
+        onConfirm={handleWebsiteConfirm}
         isLoading={isWebsiteSubmitting}
       />
       {showOnboardingGuide && activeOnboardingStep && onboardingState && !onboardingState.dismissed && (

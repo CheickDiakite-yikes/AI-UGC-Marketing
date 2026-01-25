@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { boards, assets, messages, storyboards, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs, favorites, profileAssets, profileProducts, profileProductAssets } from '@/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection, LongVideoStoryboardPayload, StoryboardStatus, AspectRatio, ImageSize, PlanTier } from '@/types';
+import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection, LongVideoStoryboardPayload, StoryboardStatus, AspectRatio, ImageSize, PlanTier, ExtractedBrandData } from '@/types';
 import { getSession } from './authActions';
 import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset, downloadAsset } from '@/services/objectStorageService';
 import { consumeUsage } from '@/services/usageConsumption';
@@ -969,7 +969,76 @@ export async function resetOnboardingAction(): Promise<void> {
     revalidatePath('/profile');
 }
 
-export async function submitWebsiteOnboardingAction(websiteUrl: string): Promise<{ success: boolean; error?: string }> {
+export async function analyzeWebsiteAction(url: string): Promise<{ success: boolean; data?: ExtractedBrandData; error?: string }> {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+        new URL(url);
+    } catch {
+        return { success: false, error: 'Invalid URL format' };
+    }
+
+    const TIMEOUT_MS = 30000;
+    const prompt = `Analyze this website URL and extract brand information. Return a JSON object with these fields:
+- companyName: The company or brand name (string)
+- description: A short overview of what the company does, 1-2 sentences (string)
+- industry: The primary industry or sector (string)
+- keyOfferings: 3-5 main products or services offered (array of strings)
+- targetAudience: Who the company primarily serves (string)
+
+URL to analyze: ${url}
+
+Return ONLY valid JSON, no markdown, no explanations.`;
+
+    try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Analysis timed out')), TIMEOUT_MS);
+        });
+
+        const analysisPromise = generateContentServer('gemini-2.5-flash', [prompt], {
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    companyName: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    industry: { type: Type.STRING },
+                    keyOfferings: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    targetAudience: { type: Type.STRING }
+                },
+                required: ['companyName', 'description', 'industry', 'keyOfferings', 'targetAudience']
+            }
+        });
+
+        const response = await Promise.race([analysisPromise, timeoutPromise]);
+        
+        if (!response.text) {
+            return { success: false, error: 'No response from AI' };
+        }
+
+        const data = JSON.parse(response.text) as ExtractedBrandData;
+        
+        if (!data.companyName || !data.description) {
+            return { success: false, error: 'Could not extract brand information' };
+        }
+
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('[ANALYZE_WEBSITE] Failed:', error);
+        if (error.message === 'Analysis timed out') {
+            return { success: false, error: 'Analysis took too long. Please try again.' };
+        }
+        return { success: false, error: error.message || 'Failed to analyze website' };
+    }
+}
+
+export async function submitWebsiteOnboardingAction(
+    websiteUrl: string,
+    overview?: string
+): Promise<{ success: boolean; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
         return { success: false, error: 'Not authenticated' };
@@ -1016,13 +1085,19 @@ export async function submitWebsiteOnboardingAction(websiteUrl: string): Promise
         });
     }
 
+    const updateData: Record<string, any> = {
+        websiteUrl,
+        onboardingCompleted: true,
+        onboardingCompletedAt: new Date(),
+        onboardingDismissedAt: null
+    };
+
+    if (overview) {
+        updateData.overview = overview;
+    }
+
     await db.update(users)
-        .set({
-            websiteUrl,
-            onboardingCompleted: true,
-            onboardingCompletedAt: new Date(),
-            onboardingDismissedAt: null
-        })
+        .set(updateData)
         .where(eq(users.id, session.userId as string));
 
     revalidatePath('/');
