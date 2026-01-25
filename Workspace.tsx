@@ -7,10 +7,9 @@ import BrandIdentityModal from './components/BrandIdentityModal';
 import AvatarAnalysisModal from './components/AvatarAnalysisModal';
 import BrandAnalysisSkeleton from './components/BrandAnalysisSkeleton';
 import ProductModal from './components/ProductModal';
-import OnboardingPanel from './components/OnboardingPanel';
 import OnboardingCoach, { CoachStep } from './components/OnboardingCoach';
+import WebsiteLinkModal from './components/WebsiteLinkModal';
 import WorkspaceSkeleton from './components/WorkspaceSkeleton';
-import OnboardingPanelSkeleton from './components/OnboardingPanelSkeleton';
 import PaywallModal from './components/PaywallModal';
 import NewBoardModal from './components/NewBoardModal';
 import BoardListModal from './components/BoardListModal';
@@ -46,6 +45,7 @@ import {
   getOnboardingStateAction,
   dismissOnboardingAction,
   completeOnboardingAction,
+  submitWebsiteOnboardingAction,
   createStoryboardAction,
   updateStoryboardStatusAction,
   updateStoryboardPayloadAction,
@@ -116,6 +116,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(null);
   const [isOnboardingLoading, setIsOnboardingLoading] = useState(false);
   const [showOnboardingGuide, setShowOnboardingGuide] = useState(false);
+  const [showWebsiteLinkModal, setShowWebsiteLinkModal] = useState(false);
+  const [isWebsiteSubmitting, setIsWebsiteSubmitting] = useState(false);
   const [skippedOnboardingSteps, setSkippedOnboardingSteps] = useState<string[]>([]);
   const [activeOnboardingStepId, setActiveOnboardingStepId] = useState<string | null>(null);
 
@@ -1310,7 +1312,33 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       .finally(() => setShowOnboardingGuide(false));
   }, [refreshOnboardingState]);
 
-  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null;
+  const handleWebsiteLinkSubmit = useCallback(async (url: string) => {
+    setIsWebsiteSubmitting(true);
+    try {
+      const result = await submitWebsiteOnboardingAction(url);
+      if (result.success) {
+        showSuccess('Website linked! Starting your campaign...');
+        await refreshOnboardingState();
+        setShowWebsiteLinkModal(false);
+      } else {
+        showError(result.error || 'Failed to save website');
+      }
+    } catch (error) {
+      console.error('[ONBOARDING] Failed to submit website:', error);
+      showError('Something went wrong. Please try again.');
+    } finally {
+      setIsWebsiteSubmitting(false);
+    }
+  }, [refreshOnboardingState, showSuccess, showError]);
+
+  const handleWebsiteLinkClose = useCallback(() => {
+    dismissOnboardingAction()
+      .then(() => refreshOnboardingState())
+      .catch((error) => console.error('[ONBOARDING] Failed to dismiss:', error));
+    setShowWebsiteLinkModal(false);
+  }, [refreshOnboardingState]);
+
+  const anyModalOpen = showBrandModal || showAvatarModal || showProductModal || showNewBoardModal || showBoardListModal || selectedItem !== null || showWebsiteLinkModal;
 
   useEffect(() => {
     if (!onboardingState) return;
@@ -1318,10 +1346,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       setShowOnboardingGuide(false);
       return;
     }
-    if (!showOnboardingGuide && !onboardingState.completed && !onboardingState.dismissed) {
-      setShowOnboardingGuide(true);
+    if (!onboardingState.completed && !onboardingState.dismissed) {
+      if (!onboardingState.required.websiteLink && !showWebsiteLinkModal) {
+        setShowWebsiteLinkModal(true);
+      }
+      if (!showOnboardingGuide) {
+        setShowOnboardingGuide(true);
+      }
     }
-  }, [onboardingState, showOnboardingGuide]);
+  }, [onboardingState, showOnboardingGuide, showWebsiteLinkModal]);
 
   useEffect(() => {
     if (!showOnboardingGuide) return;
@@ -2628,19 +2661,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
       {/* Main Content */}
       <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 pb-32 md:pt-0">
-        {isOnboardingLoading && <OnboardingPanelSkeleton />}
-        {!isOnboardingLoading && onboardingState && !onboardingState.completed && !onboardingState.dismissed && activeOnboardingStep?.id !== 'campaign' && (
-          <OnboardingPanel
-            state={onboardingState}
-            onOpenLinkModal={handleOpenLinkModal}
-            onOpenChat={handleOpenChat}
-            onOpenBoards={() => setShowBoardListModal(true)}
-            onOpenProduct={() => handleOpenProductModal()}
-            onSnooze={handleDismissOnboarding}
-            onSkipTutorial={handleSkipOnboarding}
-          />
-        )}
-        {/* Desktop Header - Hidden on mobile */}
+                {/* Desktop Header - Hidden on mobile */}
         <header className="hidden md:flex justify-between items-center mb-12">
           <div className="flex items-center gap-4">
             <div className="relative" ref={desktopProfileDropdownRef}>
@@ -2821,6 +2842,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       {showNewBoardModal && <NewBoardModal onCreate={handleCreateBoard} onCancel={() => setShowNewBoardModal(false)} />}
       {showBoardListModal && <BoardListModal boards={boards} activeBoardId={activeBoardId} onSwitch={setActiveBoardId} onClose={() => setShowBoardListModal(false)} onCreateNew={() => setShowNewBoardModal(true)} onRename={handleRenameBoard} onDelete={handleDeleteBoard} />}
       {selectedItem && <LightboxModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
+      <WebsiteLinkModal
+        isOpen={showWebsiteLinkModal}
+        onClose={handleWebsiteLinkClose}
+        onSubmit={handleWebsiteLinkSubmit}
+        isLoading={isWebsiteSubmitting}
+      />
       {showOnboardingGuide && activeOnboardingStep && onboardingState && !onboardingState.dismissed && (
         <OnboardingCoach
           step={activeOnboardingStep}

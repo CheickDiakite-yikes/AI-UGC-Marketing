@@ -17,6 +17,7 @@ I prefer clear, concise instructions and explanations. I value iterative develop
 ### UI/UX Decisions
 The application features a clean, simplified interface focused on content generation:
 - **Main Workspace**: Minimalist layout with just the chat interface and content canvas. No sidebar - all brand context is managed separately.
+- **First-Time Setup**: Simplified "Link to Campaign" onboarding - new users see a single popup requesting their website URL. The system uses the website to build brand context automatically. All other brand details (logos, avatars, products, sources) are optional and managed in the Company page.
 - **Profile Section**: Three-tab navigation at `/profile`, `/profile/dashboard`, and `/profile/company`:
   - **Profile Tab**: Account details, password management, billing controls, favorites
   - **Dashboard Tab**: Marketing calendar with scheduled content
