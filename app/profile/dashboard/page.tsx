@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getUserProfile } from '@/app/actions/userActions';
 import { getCalendarDashboardData } from '@/app/actions/calendarActions';
+import { getFavoritesByBoardAction } from '@/app/actions/favoriteActions';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
 const getInitials = (name?: string | null, email?: string | null) => {
@@ -24,7 +25,14 @@ export default async function ProfileDashboardPage() {
   }
 
   const calendarData = await getCalendarDashboardData();
+  const favoritesByBoard = await getFavoritesByBoardAction();
   const initials = getInitials(profile.name, profile.email);
+  
+  const favoriteItems = favoritesByBoard.flatMap(board => board.items.map(item => ({
+    ...item,
+    boardId: board.boardId,
+    boardName: board.boardName,
+  })));
 
   return (
     <div className="min-h-screen bg-neo-yellow text-black">
@@ -101,6 +109,50 @@ export default async function ProfileDashboardPage() {
           boards={calendarData.boards}
           calendarItems={calendarData.calendarItems}
         />
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display font-black text-xl">Favorites</h2>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
+              {favoriteItems.length} Items
+            </span>
+          </div>
+          {favoriteItems.length === 0 ? (
+            <div className="mt-4 border-2 border-dashed border-black/30 p-4 text-xs font-bold uppercase tracking-widest text-gray-400">
+              No favorites yet
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              {favoriteItems.map(item => (
+                <div key={`${item.boardId}-${item.id}`} className="border-2 border-black bg-white overflow-hidden">
+                  {item.previewUrl ? (
+                    item.type === 'video' ? (
+                      <video
+                        src={item.previewUrl}
+                        className="w-full h-24 object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img src={item.previewUrl} alt={item.title} className="w-full h-24 object-cover" />
+                    )
+                  ) : (
+                    <div className="h-24 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                      No preview
+                    </div>
+                  )}
+                  <div className="border-t-2 border-black px-2 py-1">
+                    <div className="text-[10px] font-bold uppercase tracking-widest truncate">{item.title}</div>
+                    <div className="text-[9px] uppercase tracking-widest text-gray-500 truncate">
+                      {item.boardName}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
     </div>
   );

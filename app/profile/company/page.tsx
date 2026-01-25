@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getUserProfile } from '@/app/actions/userActions';
-import { getProfileLibrary, uploadProfileAssetAction, createProfileProductAction } from '@/app/actions/profileLibraryActions';
+import { getUserProfile, updateProfileBasics } from '@/app/actions/userActions';
+import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 
 const getInitials = (name?: string | null, email?: string | null) => {
   const safeName = name?.trim();
@@ -16,19 +16,99 @@ const getInitials = (name?: string | null, email?: string | null) => {
   return '?';
 };
 
-export default async function CompanyPage() {
+const PRODUCT_TYPES = [
+  { value: 'physical_product', label: 'Physical Product' },
+  { value: 'software', label: 'Software' },
+  { value: 'service', label: 'Service' },
+  { value: 'digital_product', label: 'Digital Product' },
+  { value: 'hardware', label: 'Hardware' },
+];
+
+const PRODUCT_ASSET_ROLES = [
+  { value: 'hero', label: 'Hero' },
+  { value: 'product_shot', label: 'Product Shot' },
+  { value: 'packaging', label: 'Packaging' },
+  { value: 'mockup', label: 'Mockup' },
+  { value: 'screenshot', label: 'Screenshot' },
+  { value: 'in_use', label: 'In Use' },
+  { value: 'lifestyle', label: 'Lifestyle' },
+  { value: 'logo', label: 'Logo' },
+  { value: 'ui', label: 'UI' },
+  { value: 'other', label: 'Other' },
+];
+
+type CompanyPageProps = {
+  searchParams?: Promise<{
+    updated?: string;
+    error?: string;
+  }>;
+};
+
+type Banner = {
+  tone: 'success' | 'error';
+  message: string;
+} | null;
+
+const getBanner = (searchParamsData?: { updated?: string; error?: string }): Banner => {
+  const error = searchParamsData?.error;
+  const updated = searchParamsData?.updated;
+
+  const errorMessages: Record<string, string> = {
+    invalid_website: 'Website URL must include http:// or https://.',
+    missing_file: 'Please choose a file to upload.',
+    invalid_pdf: 'Please upload a valid PDF file.',
+    invalid_image: 'Please upload a supported image file.',
+    upload_failed: 'Upload failed. Please try again.',
+    missing_asset: 'Asset could not be found.',
+    asset_not_found: 'Asset could not be found.',
+    missing_product_name: 'Please add a product name.',
+    missing_product: 'Select a product before continuing.',
+    product_not_found: 'Product could not be found.',
+    invalid_product_asset: 'Product assets must be image files.',
+  };
+
+  if (error) {
+    return {
+      tone: 'error',
+      message: errorMessages[error] || 'Something went wrong. Please try again.',
+    };
+  }
+
+  const updatedMessages: Record<string, string> = {
+    basics: 'Brand basics saved.',
+    library: 'Library updated.',
+    product: 'Product catalog updated.',
+    product_assets: 'Product assets updated.',
+  };
+
+  if (updated) {
+    return {
+      tone: 'success',
+      message: updatedMessages[updated] || 'Changes saved.',
+    };
+  }
+
+  return null;
+};
+
+export default async function CompanyPage({ searchParams }: CompanyPageProps) {
   const profile = await getUserProfile();
   if (!profile) {
     redirect('/login');
   }
 
   const library = await getProfileLibrary();
+  const searchParamsData = searchParams ? await searchParams : undefined;
+  const banner = getBanner(searchParamsData);
   const initials = getInitials(profile.name, profile.email);
   const assets = library?.assets ?? [];
   const products = library?.products ?? [];
 
-  const logoAssets = assets.filter(asset => asset.type === 'logo');
-  const avatarAssets = assets.filter(asset => asset.type === 'avatar');
+  const nonProductAssets = assets.filter(asset => asset.category !== 'product');
+  const logoAssets = nonProductAssets.filter(asset => asset.type === 'logo');
+  const deckAssets = nonProductAssets.filter(asset => asset.type === 'pdf');
+  const avatarAssets = nonProductAssets.filter(asset => asset.type === 'avatar');
+  const imageAssets = nonProductAssets.filter(asset => asset.type === 'image');
   const docAssets = assets.filter(asset => asset.type === 'pdf' || asset.type === 'text' || asset.type === 'link');
 
   return (
@@ -54,6 +134,16 @@ export default async function CompanyPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-10 space-y-6">
+        {banner && (
+          <div
+            className={`border-2 border-black px-4 py-3 font-bold text-sm ${
+              banner.tone === 'success' ? 'bg-neo-lime text-black' : 'bg-neo-pink text-black'
+            }`}
+          >
+            {banner.message}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2">
           <Link
             href="/profile"
@@ -103,136 +193,349 @@ export default async function CompanyPage() {
         </section>
 
         <section className="bg-white border-4 border-black shadow-neo p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-black text-xl">Brand Identity</h2>
-            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
-              {logoAssets.length} Logo{logoAssets.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="space-y-4">
-            {logoAssets.length === 0 ? (
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No logos uploaded yet</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {logoAssets.map(asset => (
-                  <div key={asset.id} className="border-4 border-black bg-white p-2">
-                    {asset.previewUrl ? (
-                      <img src={asset.previewUrl} alt={asset.name} className="w-full h-24 object-contain" />
-                    ) : (
-                      <div className="w-full h-24 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
-                        LOGO
-                      </div>
-                    )}
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mt-2 truncate">{asset.name}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            <form action={uploadProfileAssetAction} encType="multipart/form-data" className="flex flex-wrap items-center gap-3">
-              <input type="hidden" name="assetType" value="logo" />
-              <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
-              <button type="submit" className="bg-neo-lime border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all">
-                Upload Logo
-              </button>
-            </form>
-          </div>
-        </section>
-
-        <section className="bg-white border-4 border-black shadow-neo p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-black text-xl">Avatar / Spokesperson</h2>
-            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
-              {avatarAssets.length} Avatar{avatarAssets.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="space-y-4">
-            {avatarAssets.length === 0 ? (
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No avatars uploaded yet</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {avatarAssets.map(asset => (
-                  <div key={asset.id} className="border-4 border-black bg-white p-2">
-                    {asset.previewUrl ? (
-                      <img src={asset.previewUrl} alt={asset.name} className="w-full h-24 object-cover rounded-full" />
-                    ) : (
-                      <div className="w-full h-24 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold rounded-full">
-                        AVTR
-                      </div>
-                    )}
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 mt-2 truncate text-center">{asset.name}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            <form action={uploadProfileAssetAction} encType="multipart/form-data" className="flex flex-wrap items-center gap-3">
-              <input type="hidden" name="assetType" value="avatar" />
-              <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
-              <button type="submit" className="bg-neo-cyan border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all">
-                Upload Avatar
-              </button>
-            </form>
-          </div>
-        </section>
-
-        <section className="bg-white border-4 border-black shadow-neo p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-black text-xl">Products</h2>
-            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
-              {products.length} Product{products.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          {products.length === 0 ? (
-            <div className="border-2 border-dashed border-black/30 p-6 text-center">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">No products added yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3 mb-4">
-              {products.map(product => (
-                <div key={product.id} className="border-2 border-black p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-sm">{product.name}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                      {product.productType?.replace('_', ' ')} • {product.assets?.length || 0} asset{(product.assets?.length || 0) !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <div className="bg-neo-lime border-2 border-black px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
-                    {product.productType?.replace('_', ' ')}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <form action={createProfileProductAction} className="flex flex-wrap gap-3 items-end border-t-2 border-black/20 pt-4 mt-4">
-            <div className="flex-1 min-w-[150px]">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-600 block mb-1">Product Name</label>
+          <h2 className="font-display font-black text-xl mb-4">Brand Basics</h2>
+          <form action={updateProfileBasics} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest">Website</label>
               <input
-                type="text"
-                name="name"
-                placeholder="New Product"
-                required
-                className="w-full border-2 border-black p-2 text-sm font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
+                type="url"
+                name="websiteUrl"
+                defaultValue={profile.websiteUrl || ''}
+                placeholder="https://yourcompany.com"
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
               />
             </div>
-            <div className="min-w-[120px]">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-600 block mb-1">Type</label>
-              <select
-                name="productType"
-                className="w-full border-2 border-black p-2 text-sm font-bold bg-gray-50 focus:outline-none"
-              >
-                <option value="physical_product">Physical Product</option>
-                <option value="software">Software</option>
-                <option value="service">Service</option>
-                <option value="digital_product">Digital Product</option>
-                <option value="hardware">Hardware</option>
-              </select>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest">Overview Paragraph</label>
+              <textarea
+                name="overview"
+                rows={4}
+                defaultValue={profile.overview || ''}
+                placeholder="Describe your company in a few sentences."
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+              />
             </div>
             <button
               type="submit"
-              className="bg-neo-pink border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+              className="bg-black text-white border-2 border-black px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all"
             >
-              Add Product
+              Save Brand Basics
             </button>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              These fields can be imported into new boards.
+            </p>
           </form>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-black text-xl">Brand Identity</h2>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
+              {logoAssets.length + avatarAssets.length} Assets
+            </span>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest">Logos</p>
+                <p className="text-[11px] text-gray-600">Primary and alternate logos.</p>
+              </div>
+              <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
+                <input type="hidden" name="assetType" value="logo" />
+                <input type="hidden" name="category" value="logo" />
+                <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all">
+                  Upload Logo
+                </button>
+              </form>
+              <div className="space-y-2">
+                {logoAssets.length === 0 ? (
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No logos yet</p>
+                ) : (
+                  logoAssets.map(asset => (
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
+                      {asset.previewUrl ? (
+                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border-2 border-black object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
+                          LOGO
+                        </div>
+                      )}
+                      <span className="text-xs font-bold truncate">{asset.name}</span>
+                      <form action={deleteProfileAssetAction} className="ml-auto">
+                        <input type="hidden" name="assetId" value={asset.id} />
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest">Avatar Library</p>
+                <p className="text-[11px] text-gray-600">Spokespeople and persona shots.</p>
+              </div>
+              <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
+                <input type="hidden" name="assetType" value="avatar" />
+                <input type="hidden" name="category" value="avatar" />
+                <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all">
+                  Upload Avatar
+                </button>
+              </form>
+              <div className="space-y-2">
+                {avatarAssets.length === 0 ? (
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No avatars yet</p>
+                ) : (
+                  avatarAssets.map(asset => (
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
+                      {asset.previewUrl ? (
+                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border-2 border-black object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
+                          AVTR
+                        </div>
+                      )}
+                      <span className="text-xs font-bold truncate">{asset.name}</span>
+                      <form action={deleteProfileAssetAction} className="ml-auto">
+                        <input type="hidden" name="assetId" value={asset.id} />
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-black text-xl">Asset Library</h2>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
+              Source of Truth
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 mb-6">
+            Upload assets once and pull them into new boards during creation.
+          </p>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest">Company Decks</p>
+                <p className="text-[11px] text-gray-600">PDF decks and one-pagers.</p>
+              </div>
+              <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
+                <input type="hidden" name="assetType" value="pdf" />
+                <input type="hidden" name="category" value="company_deck" />
+                <input type="file" name="file" accept="application/pdf,.pdf" className="text-xs font-bold" required />
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all">
+                  Upload Deck
+                </button>
+              </form>
+              <div className="space-y-2">
+                {deckAssets.length === 0 ? (
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No decks yet</p>
+                ) : (
+                  deckAssets.map(asset => (
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
+                      <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
+                        PDF
+                      </div>
+                      <span className="text-xs font-bold truncate">{asset.name}</span>
+                      <form action={deleteProfileAssetAction} className="ml-auto">
+                        <input type="hidden" name="assetId" value={asset.id} />
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest">Brand Images</p>
+                <p className="text-[11px] text-gray-600">Approved imagery for campaigns.</p>
+              </div>
+              <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
+                <input type="hidden" name="assetType" value="image" />
+                <input type="hidden" name="category" value="brand_image" />
+                <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
+                <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all">
+                  Upload Image
+                </button>
+              </form>
+              <div className="space-y-2">
+                {imageAssets.length === 0 ? (
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">No brand images yet</p>
+                ) : (
+                  imageAssets.map(asset => (
+                    <div key={asset.id} className="flex items-center gap-2 border-2 border-black bg-white p-2">
+                      {asset.previewUrl ? (
+                        <img src={asset.previewUrl} alt={asset.name} className="w-10 h-10 border-2 border-black object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 border-2 border-black bg-gray-200 flex items-center justify-center text-[9px] font-bold">
+                          IMG
+                        </div>
+                      )}
+                      <span className="text-xs font-bold truncate">{asset.name}</span>
+                      <form action={deleteProfileAssetAction} className="ml-auto">
+                        <input type="hidden" name="assetId" value={asset.id} />
+                        <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-black text-xl">Product Catalog</h2>
+            <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase tracking-widest">
+              Profile Products
+            </span>
+          </div>
+          <form action={createProfileProductAction} className="grid gap-3 md:grid-cols-3">
+            <div className="md:col-span-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest">Product Name</label>
+              <input
+                name="name"
+                required
+                placeholder="New product name"
+                className="mt-2 w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
+              />
+            </div>
+            <div className="md:col-span-1">
+              <label className="text-[10px] font-bold uppercase tracking-widest">Type</label>
+              <select
+                name="productType"
+                className="mt-2 w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
+                defaultValue="physical_product"
+              >
+                {PRODUCT_TYPES.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="md:col-span-3">
+              <label className="text-[10px] font-bold uppercase tracking-widest">Description</label>
+              <textarea
+                name="description"
+                rows={3}
+                placeholder="Short product summary"
+                className="mt-2 w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/10"
+              />
+            </div>
+            <div className="md:col-span-3">
+              <button
+                type="submit"
+                className="bg-black text-white border-2 border-black px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all"
+              >
+                Add Product
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-6 space-y-4">
+            {products.length === 0 ? (
+              <div className="border-2 border-dashed border-black/30 p-4 text-xs font-bold uppercase tracking-widest text-gray-400">
+                No products yet
+              </div>
+            ) : (
+              products.map(product => (
+                <div key={product.id} className="border-2 border-black bg-gray-50 p-4">
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold">{product.name}</h3>
+                      <p className="text-[10px] uppercase font-bold text-gray-500">{product.productType.replace('_', ' ')}</p>
+                      {product.description && (
+                        <p className="text-xs text-gray-600 mt-2">{product.description}</p>
+                      )}
+                    </div>
+                    <form action={deleteProfileProductAction}>
+                      <input type="hidden" name="productId" value={product.id} />
+                      <button className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
+                        Delete Product
+                      </button>
+                    </form>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {(product.assets || []).length === 0 ? (
+                      <div className="col-span-full text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        No product assets yet
+                      </div>
+                    ) : (
+                      (product.assets || []).map(asset => (
+                        <div key={asset.id} className="border-2 border-black bg-white overflow-hidden">
+                          {asset.previewUrl ? (
+                            <img src={asset.previewUrl} alt={product.name} className="w-full h-20 object-cover" />
+                          ) : (
+                            <div className="h-20 flex items-center justify-center text-[9px] font-bold">IMG</div>
+                          )}
+                          <div className="border-t-2 border-black px-2 py-1 text-[9px] font-bold uppercase tracking-widest flex items-center justify-between">
+                            <span className="truncate">{asset.role.replace('_', ' ')}</span>
+                            <form action={deleteProfileAssetAction}>
+                              <input type="hidden" name="assetId" value={asset.assetId} />
+                              <button className="text-[9px] font-bold uppercase tracking-widest text-red-500 hover:text-black">
+                                Remove
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <form action={addProfileProductAssetAction} encType="multipart/form-data" className="mt-4 space-y-2">
+                    <input type="hidden" name="profileProductId" value={product.id} />
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <div className="md:col-span-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest">Role</label>
+                        <select
+                          name="role"
+                          className="mt-1 w-full border-2 border-black p-2 text-xs font-bold bg-white"
+                          defaultValue="hero"
+                        >
+                          {PRODUCT_ASSET_ROLES.map(role => (
+                            <option key={role.value} value={role.value}>
+                              {role.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest">Product Image</label>
+                        <input type="file" name="file" accept="image/*" className="mt-1 w-full text-xs font-bold" required />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className="bg-black text-white border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all"
+                    >
+                      Add Product Image
+                    </button>
+                  </form>
+                </div>
+              ))
+            )}
+          </div>
         </section>
 
         <section className="bg-white border-4 border-black shadow-neo p-6">
