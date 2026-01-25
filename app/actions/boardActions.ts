@@ -969,6 +969,68 @@ export async function resetOnboardingAction(): Promise<void> {
     revalidatePath('/profile');
 }
 
+export async function submitWebsiteOnboardingAction(websiteUrl: string): Promise<{ success: boolean; error?: string }> {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Not authenticated' };
+    }
+
+    try {
+        new URL(websiteUrl);
+    } catch {
+        return { success: false, error: 'Invalid URL format' };
+    }
+
+    const userBoards = await db.query.boards.findMany({
+        where: eq(boards.userId, session.userId as string),
+        orderBy: [desc(boards.createdAt)],
+        limit: 1
+    });
+
+    let boardId: string;
+    if (userBoards.length > 0) {
+        boardId = userBoards[0].id;
+    } else {
+        const [newBoard] = await db.insert(boards)
+            .values({
+                name: 'My First Campaign',
+                userId: session.userId as string,
+            })
+            .returning();
+        boardId = newBoard.id;
+    }
+
+    const existingLink = await db.query.assets.findFirst({
+        where: and(
+            eq(assets.boardId, boardId),
+            eq(assets.type, 'link')
+        )
+    });
+
+    if (!existingLink) {
+        await db.insert(assets).values({
+            boardId,
+            type: 'link',
+            name: websiteUrl,
+            content: websiteUrl,
+        });
+    }
+
+    await db.update(users)
+        .set({
+            websiteUrl,
+            onboardingCompleted: true,
+            onboardingCompletedAt: new Date(),
+            onboardingDismissedAt: null
+        })
+        .where(eq(users.id, session.userId as string));
+
+    revalidatePath('/');
+    revalidatePath('/profile');
+
+    return { success: true };
+}
+
 export async function renameBoard(boardId: string, newName: string) {
     await assertBoardOwnership(boardId);
     
