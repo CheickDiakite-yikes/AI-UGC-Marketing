@@ -230,7 +230,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   useEffect(() => {
     getUserProfile().then((profile) => {
       if (profile) {
-        setUserProfile({ name: profile.name, email: profile.email });
+        setUserProfile({ name: profile.name, email: profile.email, avatarUrl: profile.avatarUrl });
       }
     }).catch(() => {});
   }, []);
@@ -345,7 +345,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [showBoardListModal, setShowBoardListModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ name: string | null; email: string | null } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ name: string | null; email: string | null; avatarUrl: string | null } | null>(null);
   const mobileProfileDropdownRef = useRef<HTMLDivElement>(null);
   const desktopProfileDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -2612,9 +2612,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         <div className="relative" ref={mobileProfileDropdownRef}>
           <button
             onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-            className="w-10 h-10 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none flex-shrink-0 flex items-center justify-center font-bold text-sm"
+            className="w-10 h-10 bg-white border-2 border-black shadow-neo-sm active:translate-y-[1px] active:shadow-none flex-shrink-0 flex items-center justify-center font-bold text-sm overflow-hidden"
           >
-            {userProfile ? getProfileInitials(userProfile.name, userProfile.email) : (
+            {userProfile?.avatarUrl ? (
+              <img src={userProfile.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : userProfile ? (
+              getProfileInitials(userProfile.name, userProfile.email)
+            ) : (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
@@ -2667,9 +2671,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             <div className="relative" ref={desktopProfileDropdownRef}>
               <button
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="w-12 h-12 bg-white border-2 border-black shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center font-bold text-base"
+                className="w-12 h-12 bg-white border-2 border-black shadow-neo-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center justify-center font-bold text-base overflow-hidden"
               >
-                {userProfile ? getProfileInitials(userProfile.name, userProfile.email) : (
+                {userProfile?.avatarUrl ? (
+                  <img src={userProfile.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : userProfile ? (
+                  getProfileInitials(userProfile.name, userProfile.email)
+                ) : (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
