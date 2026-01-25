@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { boards, assets, messages, storyboards, generatedItems, brandIdentities, avatarIdentities, users, products, productAssets, jobs, favorites, profileAssets, profileProducts, profileProductAssets } from '@/db/schema';
 import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { Board, ProjectAsset, BrandIdentity, AvatarIdentity, Product, ProductAsset, ProductAssetRole, ProfileImportSelection, LongVideoStoryboardPayload, StoryboardStatus, AspectRatio, ImageSize, PlanTier, ExtractedBrandData } from '@/types';
 import { getSession } from './authActions';
 import { uploadAsset, uploadGeneratedItem, uploadCarouselSlide, deleteAsset as deleteFromStorage, getAsset, downloadAsset } from '@/services/objectStorageService';
@@ -967,6 +968,7 @@ export async function resetOnboardingAction(): Promise<void> {
 
     revalidatePath('/');
     revalidatePath('/profile');
+    redirect('/');
 }
 
 export async function analyzeWebsiteAction(url: string): Promise<{ success: boolean; data?: ExtractedBrandData; error?: string }> {
