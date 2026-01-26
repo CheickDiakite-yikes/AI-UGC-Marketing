@@ -971,7 +971,7 @@ export async function resetOnboardingAction(): Promise<void> {
     redirect('/');
 }
 
-export async function analyzeLogoAction(formData: FormData): Promise<{ success: boolean; logoUrl?: string; colors?: string[]; fonts?: string[]; error?: string }> {
+export async function analyzeLogoAction(formData: FormData): Promise<{ success: boolean; logoUrl?: string; colors?: string[]; fonts?: string[]; brandFeel?: string[]; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
         return { success: false, error: 'Not authenticated' };
@@ -1002,7 +1002,8 @@ export async function analyzeLogoAction(formData: FormData): Promise<{ success: 
 Return a JSON object with exactly this structure:
 {
   "colors": ["#HEXCODE1", "#HEXCODE2", ...],
-  "fonts": ["Font Name 1", "Font Name 2", ...]
+  "fonts": ["Font Name 1", "Font Name 2", ...],
+  "brandFeel": ["descriptor1", "descriptor2", ...]
 }
 
 Rules for colors:
@@ -1021,6 +1022,11 @@ Rules for fonts:
 - Return 1-3 fonts maximum
 - If no text in logo, return empty array
 
+Rules for brandFeel:
+- Describe the overall vibe/personality conveyed by the logo
+- Use 3-5 descriptive words like: modern, minimalist, playful, professional, luxury, bold, elegant, friendly, tech-forward, organic, vintage, sophisticated, energetic, trustworthy, creative, clean, premium, approachable, innovative, corporate
+- Order from most prominent to least
+
 Return valid JSON only`;
 
         const { generateContentServer } = await import('@/app/actions');
@@ -1032,6 +1038,7 @@ Return valid JSON only`;
 
         let colors: string[] = [];
         let fonts: string[] = [];
+        let brandFeel: string[] = [];
         if (colorResponse.text) {
             let jsonText = colorResponse.text.trim();
             if (jsonText.startsWith('```json')) jsonText = jsonText.slice(7);
@@ -1046,12 +1053,15 @@ Return valid JSON only`;
                 if (Array.isArray(parsed.fonts)) {
                     fonts = parsed.fonts.filter((f: string) => typeof f === 'string' && f.length > 0).slice(0, 3);
                 }
+                if (Array.isArray(parsed.brandFeel)) {
+                    brandFeel = parsed.brandFeel.filter((f: string) => typeof f === 'string' && f.length > 0).slice(0, 5);
+                }
             } catch {
                 console.error('[ANALYZE_LOGO] Failed to parse analysis:', jsonText);
             }
         }
 
-        return { success: true, logoUrl, colors, fonts };
+        return { success: true, logoUrl, colors, fonts, brandFeel };
     } catch (error: any) {
         console.error('[ANALYZE_LOGO] Failed:', error);
         return { success: false, error: error.message || 'Failed to analyze logo' };
@@ -1067,12 +1077,12 @@ export async function analyzeWebsiteAction(
         return { success: false, error: 'Not authenticated' };
     }
 
-    let logoResult: { logoUrl?: string; colors?: string[]; fonts?: string[] } = {};
+    let logoResult: { logoUrl?: string; colors?: string[]; fonts?: string[]; brandFeel?: string[] } = {};
     
     if (logoFormData) {
         const result = await analyzeLogoAction(logoFormData);
         if (result.success) {
-            logoResult = { logoUrl: result.logoUrl, colors: result.colors, fonts: result.fonts };
+            logoResult = { logoUrl: result.logoUrl, colors: result.colors, fonts: result.fonts, brandFeel: result.brandFeel };
         }
     }
 
@@ -1086,6 +1096,7 @@ export async function analyzeWebsiteAction(
                 targetAudience: 'Your target customers',
                 brandColors: logoResult.colors || [],
                 fonts: logoResult.fonts || [],
+                brandFeel: logoResult.brandFeel || [],
             };
             return { success: true, data: fallbackData, logoUrl: logoResult.logoUrl };
         }
@@ -1260,6 +1271,7 @@ export async function submitWebsiteOnboardingAction(
             tagline: data.tagline || null,
             brandColors: data.brandColors || [],
             fonts: data.fonts || [],
+            brandFeel: data.brandFeel || [],
             socialLinks: data.socialLinks || [],
             contactEmail: data.contactEmail || null,
             missionStatement: data.missionStatement || null,

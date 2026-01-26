@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addBrandFont, removeBrandFont, addSocialLink, removeSocialLink, updateBrandLogo } from '@/app/actions/userActions';
+import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addBrandFont, removeBrandFont, addBrandFeel, removeBrandFeel, addSocialLink, removeSocialLink, updateBrandLogo } from '@/app/actions/userActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 
 const getInitials = (name?: string | null, email?: string | null) => {
@@ -487,6 +487,42 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
             <button
               type="submit"
               className="bg-black text-white border-2 border-black px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all"
+            >
+              Add
+            </button>
+          </form>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <h2 className="font-display font-black text-xl mb-4">Brand Feel</h2>
+          <div className="flex flex-wrap gap-3 mb-4">
+            {(profile.brandContext?.brandFeel || []).length === 0 ? (
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No brand feel set</p>
+            ) : (
+              (profile.brandContext?.brandFeel || []).map((feel, idx) => (
+                <div key={idx} className="flex items-center gap-2 border-2 border-black bg-neo-lime px-3 py-2">
+                  <span className="text-xs font-bold">{feel}</span>
+                  <form action={removeBrandFeel}>
+                    <input type="hidden" name="feel" value={feel} />
+                    <button type="submit" className="text-red-500 hover:text-black text-xs font-bold">×</button>
+                  </form>
+                </div>
+              ))
+            )}
+          </div>
+          <form action={addBrandFeel} className="flex gap-2 items-end">
+            <div className="flex-1 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest">Add Descriptor</label>
+              <input
+                type="text"
+                name="feel"
+                placeholder="e.g., modern, professional, elegant"
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+              />
+            </div>
+            <button
+              type="submit"
+              className="bg-neo-lime border-2 border-black px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
             >
               Add
             </button>

@@ -356,6 +356,7 @@ export interface ExtractedBrandData {
   tagline?: string;
   brandColors?: string[];
   fonts?: string[];
+  brandFeel?: string[];
   socialLinks?: { platform: string; url: string }[];
   contactEmail?: string;
   missionStatement?: string;
@@ -372,11 +373,13 @@ export interface BrandContext {
   tagline?: string;
   brandColors?: string[];
   fonts?: string[];
+  brandFeel?: string[];
   socialLinks?: { platform: string; url: string }[];
   contactEmail?: string;
   missionStatement?: string;
   foundedYear?: string;
   teamSize?: string;
+  logoUrl?: string;
   autoDetected?: boolean;
   detectedAt?: string;
 }

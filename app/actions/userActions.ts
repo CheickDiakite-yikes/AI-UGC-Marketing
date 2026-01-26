@@ -17,6 +17,7 @@ export type BrandContext = {
   tagline?: string;
   brandColors?: string[];
   fonts?: string[];
+  brandFeel?: string[];
   socialLinks?: { platform: string; url: string }[];
   contactEmail?: string;
   missionStatement?: string;
@@ -529,4 +530,68 @@ Rules:
     console.error('[UPDATE_BRAND_LOGO] Error:', error);
     redirect('/profile/company?error=upload_failed');
   }
+}
+
+export async function addBrandFeel(formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    redirect('/login');
+  }
+
+  const feel = (formData.get('feel') as string | null)?.trim();
+  if (!feel) {
+    redirect('/profile/company?error=invalid_brand_feel');
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.userId as string),
+    columns: { brandContext: true },
+  });
+
+  const existingContext = (user?.brandContext as BrandContext) || {};
+  const brandFeel = existingContext.brandFeel || [];
+
+  if (!brandFeel.includes(feel)) {
+    brandFeel.push(feel);
+  }
+
+  await db
+    .update(users)
+    .set({
+      brandContext: { ...existingContext, brandFeel },
+    })
+    .where(eq(users.id, session.userId as string));
+
+  revalidatePath('/profile/company');
+  redirect('/profile/company?updated=brand_context');
+}
+
+export async function removeBrandFeel(formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    redirect('/login');
+  }
+
+  const feel = formData.get('feel') as string | null;
+  if (!feel) {
+    redirect('/profile/company?error=invalid_brand_feel');
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.userId as string),
+    columns: { brandContext: true },
+  });
+
+  const existingContext = (user?.brandContext as BrandContext) || {};
+  const brandFeel = (existingContext.brandFeel || []).filter(f => f !== feel);
+
+  await db
+    .update(users)
+    .set({
+      brandContext: { ...existingContext, brandFeel },
+    })
+    .where(eq(users.id, session.userId as string));
+
+  revalidatePath('/profile/company');
+  redirect('/profile/company?updated=brand_context');
 }

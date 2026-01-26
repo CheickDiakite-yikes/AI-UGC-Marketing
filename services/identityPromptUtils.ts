@@ -53,6 +53,9 @@ const buildBrandContextBlock = (context?: BrandContext | null): string | null =>
   if (context.fonts && context.fonts.length > 0) {
     lines.push(`Brand Fonts: ${context.fonts.join(', ')}`);
   }
+  if (context.brandFeel && context.brandFeel.length > 0) {
+    lines.push(`Brand Feel/Personality: ${context.brandFeel.join(', ')}`);
+  }
   if (context.keyOfferings && context.keyOfferings.length > 0) {
     lines.push(`Key Offerings: ${context.keyOfferings.slice(0, 5).join(', ')}`);
   }
