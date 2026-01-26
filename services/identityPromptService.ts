@@ -1,6 +1,6 @@
-import { BrandIdentity, AvatarIdentity, Product } from '@/types';
+import { BrandIdentity, AvatarIdentity, Product, BrandContext } from '@/types';
 import { db } from '@/db';
-import { boards } from '@/db/schema';
+import { boards, users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { buildIdentityConstraints } from './identityPromptUtils';
 
@@ -25,17 +25,28 @@ export async function compileVisualPromptWithIdentity(params: {
     return { prompt: basePrompt, notes: ['Board not found for identity compilation'] };
   }
 
+  let brandContext: BrandContext | null = null;
+  if (board.userId) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, board.userId),
+      columns: { brandContext: true }
+    });
+    brandContext = (user?.brandContext as BrandContext) || null;
+  }
+
   const compiled = buildIdentityConstraints({
     basePrompt,
     brandIdentity: board.brandIdentity as unknown as BrandIdentity | null,
     avatarIdentity: board.avatarIdentity as unknown as AvatarIdentity | null,
     products: board.products as unknown as Product[] | undefined,
-    productId
+    productId,
+    brandContext
   });
 
   if (traceId) {
     console.log(`[PROMPT COMPILER ${traceId}] Applied identity constraints`, {
-      productIdUsed: compiled.productIdUsed || null
+      productIdUsed: compiled.productIdUsed || null,
+      hasBrandContext: !!brandContext
     });
   }
 

@@ -1059,7 +1059,7 @@ Return valid JSON only.`;
 
 export async function submitWebsiteOnboardingAction(
     websiteUrl: string,
-    data?: { companyName?: string; overview?: string }
+    data?: ExtractedBrandData
 ): Promise<{ success: boolean; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
@@ -1114,12 +1114,25 @@ export async function submitWebsiteOnboardingAction(
         onboardingDismissedAt: null
     };
 
-    if (data?.companyName) {
+    if (data) {
         updateData.company = data.companyName;
-    }
-    
-    if (data?.overview) {
-        updateData.overview = data.overview;
+        updateData.overview = data.description;
+        updateData.brandContext = {
+            companyName: data.companyName,
+            description: data.description,
+            industry: data.industry,
+            keyOfferings: data.keyOfferings,
+            targetAudience: data.targetAudience,
+            tagline: data.tagline || null,
+            brandColors: data.brandColors || [],
+            socialLinks: data.socialLinks || [],
+            contactEmail: data.contactEmail || null,
+            missionStatement: data.missionStatement || null,
+            foundedYear: data.foundedYear || null,
+            teamSize: data.teamSize || null,
+            autoDetected: true,
+            detectedAt: new Date().toISOString(),
+        };
     }
 
     await db.update(users)
@@ -1128,6 +1141,7 @@ export async function submitWebsiteOnboardingAction(
 
     revalidatePath('/');
     revalidatePath('/profile');
+    revalidatePath('/profile/company');
 
     return { success: true };
 }

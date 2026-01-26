@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getUserProfile, updateProfileBasics } from '@/app/actions/userActions';
+import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addSocialLink, removeSocialLink } from '@/app/actions/userActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 
 const getInitials = (name?: string | null, email?: string | null) => {
@@ -65,6 +65,8 @@ const getBanner = (searchParamsData?: { updated?: string; error?: string }): Ban
     missing_product: 'Select a product before continuing.',
     product_not_found: 'Product could not be found.',
     invalid_product_asset: 'Product assets must be image files.',
+    invalid_color: 'Please enter a valid color.',
+    invalid_social_link: 'Please enter both platform and URL.',
   };
 
   if (error) {
@@ -79,6 +81,7 @@ const getBanner = (searchParamsData?: { updated?: string; error?: string }): Ban
     library: 'Library updated.',
     product: 'Product catalog updated.',
     product_assets: 'Product assets updated.',
+    brand_context: 'Brand context saved.',
   };
 
   if (updated) {
@@ -193,37 +196,280 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
         </section>
 
         <section className="bg-white border-4 border-black shadow-neo p-6">
-          <h2 className="font-display font-black text-xl mb-4">Brand Basics</h2>
-          <form action={updateProfileBasics} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest">Website</label>
-              <input
-                type="url"
-                name="websiteUrl"
-                defaultValue={profile.websiteUrl || ''}
-                placeholder="https://yourcompany.com"
-                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
-              />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-black text-xl">Brand Basics</h2>
+            {profile.brandContext?.autoDetected && (
+              <span className="bg-neo-lime border-2 border-black px-2 py-1 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                <span className="w-2 h-2 bg-black rounded-full" />
+                Auto-detected
+              </span>
+            )}
+          </div>
+
+          <form action={updateBrandContext} className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Company Name
+                  {profile.brandContext?.autoDetected && profile.brandContext?.companyName && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="company"
+                  defaultValue={profile.company || profile.brandContext?.companyName || ''}
+                  placeholder="Your company name"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Tagline
+                  {profile.brandContext?.autoDetected && profile.brandContext?.tagline && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="tagline"
+                  defaultValue={profile.brandContext?.tagline || ''}
+                  placeholder="Your catchy tagline"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
             </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Industry
+                  {profile.brandContext?.autoDetected && profile.brandContext?.industry && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="industry"
+                  defaultValue={profile.brandContext?.industry || ''}
+                  placeholder="e.g., SaaS, E-commerce, Healthcare"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Target Audience
+                  {profile.brandContext?.autoDetected && profile.brandContext?.targetAudience && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="targetAudience"
+                  defaultValue={profile.brandContext?.targetAudience || ''}
+                  placeholder="Who are your ideal customers?"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Contact Email
+                  {profile.brandContext?.autoDetected && profile.brandContext?.contactEmail && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="email"
+                  name="contactEmail"
+                  defaultValue={profile.brandContext?.contactEmail || ''}
+                  placeholder="hello@company.com"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Founded Year
+                  {profile.brandContext?.autoDetected && profile.brandContext?.foundedYear && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="foundedYear"
+                  defaultValue={profile.brandContext?.foundedYear || ''}
+                  placeholder="e.g., 2020"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  Team Size
+                  {profile.brandContext?.autoDetected && profile.brandContext?.teamSize && (
+                    <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  name="teamSize"
+                  defaultValue={profile.brandContext?.teamSize || ''}
+                  placeholder="e.g., 1-10, 50+"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest">Overview Paragraph</label>
+              <label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                Mission Statement
+                {profile.brandContext?.autoDetected && profile.brandContext?.missionStatement && (
+                  <span className="text-[9px] bg-neo-lime/50 px-1">auto</span>
+                )}
+              </label>
               <textarea
-                name="overview"
-                rows={4}
-                defaultValue={profile.overview || ''}
-                placeholder="Describe your company in a few sentences."
+                name="missionStatement"
+                rows={3}
+                defaultValue={profile.brandContext?.missionStatement || ''}
+                placeholder="What drives your company? What's your purpose?"
                 className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
               />
             </div>
+
             <button
               type="submit"
               className="bg-black text-white border-2 border-black px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all"
             >
-              Save Brand Basics
+              Save Brand Context
             </button>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              These fields can be imported into new boards.
-            </p>
+          </form>
+
+          <div className="border-t-2 border-black mt-6 pt-6">
+            <form action={updateProfileBasics} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest">Website URL</label>
+                <input
+                  type="url"
+                  name="websiteUrl"
+                  defaultValue={profile.websiteUrl || ''}
+                  placeholder="https://yourcompany.com"
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest">Overview Paragraph</label>
+                <textarea
+                  name="overview"
+                  rows={4}
+                  defaultValue={profile.overview || profile.brandContext?.description || ''}
+                  placeholder="Describe your company in a few sentences."
+                  className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-lime/20"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-white text-black border-2 border-black px-5 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime transition-all"
+              >
+                Save Website & Overview
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <h2 className="font-display font-black text-xl mb-4">Brand Colors</h2>
+          <div className="flex flex-wrap gap-3 mb-4">
+            {(profile.brandContext?.brandColors || []).length === 0 ? (
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No brand colors set</p>
+            ) : (
+              (profile.brandContext?.brandColors || []).map((color, idx) => (
+                <div key={idx} className="flex items-center gap-2 border-2 border-black bg-gray-50 px-3 py-2">
+                  <div
+                    className="w-6 h-6 border-2 border-black"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="text-xs font-bold uppercase">{color}</span>
+                  <form action={removeBrandColor}>
+                    <input type="hidden" name="color" value={color} />
+                    <button type="submit" className="text-red-500 hover:text-black text-xs font-bold">×</button>
+                  </form>
+                </div>
+              ))
+            )}
+          </div>
+          <form action={addBrandColor} className="flex gap-2 items-end">
+            <div className="flex-1 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest">Add Color (hex)</label>
+              <input
+                type="text"
+                name="color"
+                placeholder="#FF5500"
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/20"
+              />
+            </div>
+            <button
+              type="submit"
+              className="bg-black text-white border-2 border-black px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all"
+            >
+              Add
+            </button>
+          </form>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <h2 className="font-display font-black text-xl mb-4">Social Links</h2>
+          <div className="space-y-2 mb-4">
+            {(profile.brandContext?.socialLinks || []).length === 0 ? (
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No social links set</p>
+            ) : (
+              (profile.brandContext?.socialLinks || []).map((link, idx) => (
+                <div key={idx} className="flex items-center gap-3 border-2 border-black bg-gray-50 px-3 py-2">
+                  <span className="bg-black text-white px-2 py-1 text-[10px] font-bold uppercase">{link.platform}</span>
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-600 hover:underline truncate flex-1">
+                    {link.url}
+                  </a>
+                  <form action={removeSocialLink}>
+                    <input type="hidden" name="index" value={idx} />
+                    <button type="submit" className="text-red-500 hover:text-black text-xs font-bold">Remove</button>
+                  </form>
+                </div>
+              ))
+            )}
+          </div>
+          <form action={addSocialLink} className="grid gap-2 md:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest">Platform</label>
+              <select
+                name="platform"
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-cyan/20"
+              >
+                <option value="Twitter">Twitter</option>
+                <option value="LinkedIn">LinkedIn</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Facebook">Facebook</option>
+                <option value="TikTok">TikTok</option>
+                <option value="YouTube">YouTube</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-2 md:col-span-1">
+              <label className="text-xs font-bold uppercase tracking-widest">URL</label>
+              <input
+                type="url"
+                name="url"
+                placeholder="https://twitter.com/yourcompany"
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-cyan/20"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                className="w-full bg-black text-white border-2 border-black px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all"
+              >
+                Add Link
+              </button>
+            </div>
           </form>
         </section>
 

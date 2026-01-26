@@ -49,6 +49,7 @@ export const users = pgTable('users', {
   creditBalance: integer('credit_balance').default(0).notNull(),
   ahaPackUsed: boolean('aha_pack_used').default(false).notNull(),
   ahaPackUsedAt: timestamp('aha_pack_used_at'),
+  brandContext: jsonb('brand_context'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

@@ -361,3 +361,20 @@ export interface ExtractedBrandData {
   foundedYear?: string;
   teamSize?: string;
 }
+
+export interface BrandContext {
+  companyName?: string;
+  description?: string;
+  industry?: string;
+  keyOfferings?: string[];
+  targetAudience?: string;
+  tagline?: string;
+  brandColors?: string[];
+  socialLinks?: { platform: string; url: string }[];
+  contactEmail?: string;
+  missionStatement?: string;
+  foundedYear?: string;
+  teamSize?: string;
+  autoDetected?: boolean;
+  detectedAt?: string;
+}
