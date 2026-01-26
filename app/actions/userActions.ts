@@ -16,6 +16,7 @@ export type BrandContext = {
   targetAudience?: string;
   tagline?: string;
   brandColors?: string[];
+  fonts?: string[];
   socialLinks?: { platform: string; url: string }[];
   contactEmail?: string;
   missionStatement?: string;
@@ -301,6 +302,70 @@ export async function removeBrandColor(formData: FormData) {
   redirect('/profile/company?updated=brand_context');
 }
 
+export async function addBrandFont(formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    redirect('/login');
+  }
+
+  const font = (formData.get('font') as string | null)?.trim();
+  if (!font) {
+    redirect('/profile/company?error=invalid_font');
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.userId as string),
+    columns: { brandContext: true },
+  });
+
+  const existingContext = (user?.brandContext as BrandContext) || {};
+  const fonts = existingContext.fonts || [];
+
+  if (!fonts.includes(font)) {
+    fonts.push(font);
+  }
+
+  await db
+    .update(users)
+    .set({
+      brandContext: { ...existingContext, fonts },
+    })
+    .where(eq(users.id, session.userId as string));
+
+  revalidatePath('/profile/company');
+  redirect('/profile/company?updated=brand_context');
+}
+
+export async function removeBrandFont(formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    redirect('/login');
+  }
+
+  const font = formData.get('font') as string | null;
+  if (!font) {
+    redirect('/profile/company?error=invalid_font');
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, session.userId as string),
+    columns: { brandContext: true },
+  });
+
+  const existingContext = (user?.brandContext as BrandContext) || {};
+  const fonts = (existingContext.fonts || []).filter(f => f !== font);
+
+  await db
+    .update(users)
+    .set({
+      brandContext: { ...existingContext, fonts },
+    })
+    .where(eq(users.id, session.userId as string));
+
+  revalidatePath('/profile/company');
+  redirect('/profile/company?updated=brand_context');
+}
+
 export async function addSocialLink(formData: FormData) {
   const session = await getSession();
   if (!session || !session.userId) {
@@ -411,10 +476,11 @@ Rules:
 
     let newColors: string[] = [];
     try {
-      const colorResponse = await generateContentServer([
-        { text: colorPrompt },
-        { inlineData: { mimeType, data: base64Data } }
-      ]);
+      const colorResponse = await generateContentServer(
+        'gemini-2.5-flash',
+        [{ text: colorPrompt }, { inlineData: { mimeType, data: base64Data } }],
+        {}
+      );
 
       if (colorResponse.text) {
         let jsonText = colorResponse.text.trim();

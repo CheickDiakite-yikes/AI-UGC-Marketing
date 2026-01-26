@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addSocialLink, removeSocialLink, updateBrandLogo } from '@/app/actions/userActions';
+import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addBrandFont, removeBrandFont, addSocialLink, removeSocialLink, updateBrandLogo } from '@/app/actions/userActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 
 const getInitials = (name?: string | null, email?: string | null) => {
@@ -66,6 +66,7 @@ const getBanner = (searchParamsData?: { updated?: string; error?: string }): Ban
     product_not_found: 'Product could not be found.',
     invalid_product_asset: 'Product assets must be image files.',
     invalid_color: 'Please enter a valid color.',
+    invalid_font: 'Please enter a valid font name.',
     invalid_social_link: 'Please enter both platform and URL.',
   };
 
@@ -444,6 +445,42 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
                 type="text"
                 name="color"
                 placeholder="#FF5500"
+                className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/20"
+              />
+            </div>
+            <button
+              type="submit"
+              className="bg-black text-white border-2 border-black px-4 py-3 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all"
+            >
+              Add
+            </button>
+          </form>
+        </section>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6">
+          <h2 className="font-display font-black text-xl mb-4">Brand Fonts</h2>
+          <div className="flex flex-wrap gap-3 mb-4">
+            {(profile.brandContext?.fonts || []).length === 0 ? (
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400">No brand fonts set</p>
+            ) : (
+              (profile.brandContext?.fonts || []).map((font, idx) => (
+                <div key={idx} className="flex items-center gap-2 border-2 border-black bg-gray-50 px-3 py-2">
+                  <span className="text-xs font-bold">{font}</span>
+                  <form action={removeBrandFont}>
+                    <input type="hidden" name="font" value={font} />
+                    <button type="submit" className="text-red-500 hover:text-black text-xs font-bold">×</button>
+                  </form>
+                </div>
+              ))
+            )}
+          </div>
+          <form action={addBrandFont} className="flex gap-2 items-end">
+            <div className="flex-1 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest">Add Font</label>
+              <input
+                type="text"
+                name="font"
+                placeholder="Montserrat"
                 className="w-full border-2 border-black p-3 font-bold bg-gray-50 focus:outline-none focus:bg-neo-pink/20"
               />
             </div>

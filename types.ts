@@ -355,6 +355,7 @@ export interface ExtractedBrandData {
   targetAudience: string;
   tagline?: string;
   brandColors?: string[];
+  fonts?: string[];
   socialLinks?: { platform: string; url: string }[];
   contactEmail?: string;
   missionStatement?: string;
@@ -370,6 +371,7 @@ export interface BrandContext {
   targetAudience?: string;
   tagline?: string;
   brandColors?: string[];
+  fonts?: string[];
   socialLinks?: { platform: string; url: string }[];
   contactEmail?: string;
   missionStatement?: string;

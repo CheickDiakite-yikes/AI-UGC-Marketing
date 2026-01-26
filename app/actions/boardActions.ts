@@ -971,7 +971,7 @@ export async function resetOnboardingAction(): Promise<void> {
     redirect('/');
 }
 
-export async function analyzeLogoAction(formData: FormData): Promise<{ success: boolean; logoUrl?: string; colors?: string[]; error?: string }> {
+export async function analyzeLogoAction(formData: FormData): Promise<{ success: boolean; logoUrl?: string; colors?: string[]; fonts?: string[]; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
         return { success: false, error: 'Not authenticated' };
@@ -997,27 +997,41 @@ export async function analyzeLogoAction(formData: FormData): Promise<{ success: 
 
         const logoUrl = await getPublicUrl(uploadResult.storageKey);
         
-        const colorPrompt = `Analyze this logo image and extract the dominant brand colors.
+        const analysisPrompt = `Analyze this logo image and extract brand styling information.
 
 Return a JSON object with exactly this structure:
 {
-  "colors": ["#HEXCODE1", "#HEXCODE2", ...]
+  "colors": ["#HEXCODE1", "#HEXCODE2", ...],
+  "fonts": ["Font Name 1", "Font Name 2", ...]
 }
 
-Rules:
-- Extract 3-6 dominant colors as hex codes
+Rules for colors:
+- Extract 4-8 prominent colors as hex codes
 - Order from most dominant to least dominant
 - Include the primary brand color first
-- Exclude pure black (#000000) and pure white (#FFFFFF) unless they are clearly part of the brand
-- Return valid JSON only`;
+- Include accent colors, secondary colors, and background colors
+- Include black (#000000) or near-black only if it's a key brand element
+- Include white (#FFFFFF) or near-white only if it's a key brand element
+- Be comprehensive - extract all visually significant colors
+
+Rules for fonts:
+- Identify font families used in the logo text
+- Use common font names if you recognize them (e.g., "Helvetica", "Montserrat", "Playfair Display")
+- If exact font is unclear, describe the style (e.g., "Sans-serif Bold", "Serif Script", "Modern Geometric Sans")
+- Return 1-3 fonts maximum
+- If no text in logo, return empty array
+
+Return valid JSON only`;
 
         const { generateContentServer } = await import('@/app/actions');
-        const colorResponse = await generateContentServer([
-            { text: colorPrompt },
-            { inlineData: { mimeType, data: base64Data } }
-        ]);
+        const colorResponse = await generateContentServer(
+            'gemini-2.5-flash',
+            [{ text: analysisPrompt }, { inlineData: { mimeType, data: base64Data } }],
+            {}
+        );
 
         let colors: string[] = [];
+        let fonts: string[] = [];
         if (colorResponse.text) {
             let jsonText = colorResponse.text.trim();
             if (jsonText.startsWith('```json')) jsonText = jsonText.slice(7);
@@ -1027,14 +1041,17 @@ Rules:
             try {
                 const parsed = JSON.parse(jsonText);
                 if (Array.isArray(parsed.colors)) {
-                    colors = parsed.colors.filter((c: string) => /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 6);
+                    colors = parsed.colors.filter((c: string) => /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 8);
+                }
+                if (Array.isArray(parsed.fonts)) {
+                    fonts = parsed.fonts.filter((f: string) => typeof f === 'string' && f.length > 0).slice(0, 3);
                 }
             } catch {
-                console.error('[ANALYZE_LOGO] Failed to parse colors:', jsonText);
+                console.error('[ANALYZE_LOGO] Failed to parse analysis:', jsonText);
             }
         }
 
-        return { success: true, logoUrl, colors };
+        return { success: true, logoUrl, colors, fonts };
     } catch (error: any) {
         console.error('[ANALYZE_LOGO] Failed:', error);
         return { success: false, error: error.message || 'Failed to analyze logo' };
@@ -1050,12 +1067,12 @@ export async function analyzeWebsiteAction(
         return { success: false, error: 'Not authenticated' };
     }
 
-    let logoResult: { logoUrl?: string; colors?: string[] } = {};
+    let logoResult: { logoUrl?: string; colors?: string[]; fonts?: string[] } = {};
     
     if (logoFormData) {
         const result = await analyzeLogoAction(logoFormData);
         if (result.success) {
-            logoResult = { logoUrl: result.logoUrl, colors: result.colors };
+            logoResult = { logoUrl: result.logoUrl, colors: result.colors, fonts: result.fonts };
         }
     }
 
@@ -1068,6 +1085,7 @@ export async function analyzeWebsiteAction(
                 keyOfferings: ['Your products or services'],
                 targetAudience: 'Your target customers',
                 brandColors: logoResult.colors || [],
+                fonts: logoResult.fonts || [],
             };
             return { success: true, data: fallbackData, logoUrl: logoResult.logoUrl };
         }
@@ -1241,6 +1259,7 @@ export async function submitWebsiteOnboardingAction(
             targetAudience: data.targetAudience,
             tagline: data.tagline || null,
             brandColors: data.brandColors || [],
+            fonts: data.fonts || [],
             socialLinks: data.socialLinks || [],
             contactEmail: data.contactEmail || null,
             missionStatement: data.missionStatement || null,
