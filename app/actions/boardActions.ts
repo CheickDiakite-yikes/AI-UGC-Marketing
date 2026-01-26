@@ -1184,6 +1184,14 @@ Return valid JSON only.`;
             data.brandColors = mergedColors;
         }
 
+        if (logoResult.fonts && logoResult.fonts.length > 0) {
+            data.fonts = logoResult.fonts;
+        }
+
+        if (logoResult.brandFeel && logoResult.brandFeel.length > 0) {
+            data.brandFeel = logoResult.brandFeel;
+        }
+
         return { success: true, data, logoUrl: logoResult.logoUrl };
     } catch (error: any) {
         console.error('[ANALYZE_WEBSITE] Failed:', error);
