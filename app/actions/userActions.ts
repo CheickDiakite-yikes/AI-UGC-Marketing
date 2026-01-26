@@ -21,6 +21,7 @@ export type BrandContext = {
   missionStatement?: string;
   foundedYear?: string;
   teamSize?: string;
+  logoUrl?: string;
   autoDetected?: boolean;
   detectedAt?: string;
 };
@@ -361,4 +362,105 @@ export async function removeSocialLink(formData: FormData) {
 
   revalidatePath('/profile/company');
   redirect('/profile/company?updated=brand_context');
+}
+
+export async function updateBrandLogo(formData: FormData) {
+  const session = await getSession();
+  if (!session || !session.userId) {
+    redirect('/login');
+  }
+
+  const logoFile = formData.get('logo') as File | null;
+  if (!logoFile || logoFile.size === 0) {
+    redirect('/profile/company?error=missing_file');
+  }
+
+  if (!logoFile.type.startsWith('image/')) {
+    redirect('/profile/company?error=invalid_image');
+  }
+
+  try {
+    const { uploadUserLogo, getPublicUrl } = await import('@/services/objectStorageService');
+    const { generateContentServer } = await import('@/app/actions');
+
+    const arrayBuffer = await logoFile.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuffer).toString('base64');
+    const logoId = crypto.randomUUID();
+    const mimeType = logoFile.type || 'image/png';
+
+    const uploadResult = await uploadUserLogo(session.userId as string, logoId, base64Data, mimeType);
+    if (!uploadResult.success || !uploadResult.storageKey) {
+      redirect('/profile/company?error=upload_failed');
+    }
+
+    const logoUrl = await getPublicUrl(uploadResult.storageKey!);
+
+    const colorPrompt = `Analyze this logo image and extract the dominant brand colors.
+
+Return a JSON object with exactly this structure:
+{
+  "colors": ["#HEXCODE1", "#HEXCODE2", ...]
+}
+
+Rules:
+- Extract 3-6 dominant colors as hex codes
+- Order from most dominant to least dominant
+- Include the primary brand color first
+- Exclude pure black (#000000) and pure white (#FFFFFF) unless they are clearly part of the brand
+- Return valid JSON only`;
+
+    let newColors: string[] = [];
+    try {
+      const colorResponse = await generateContentServer([
+        { text: colorPrompt },
+        { inlineData: { mimeType, data: base64Data } }
+      ]);
+
+      if (colorResponse.text) {
+        let jsonText = colorResponse.text.trim();
+        if (jsonText.startsWith('```json')) jsonText = jsonText.slice(7);
+        if (jsonText.startsWith('```')) jsonText = jsonText.slice(3);
+        if (jsonText.endsWith('```')) jsonText = jsonText.slice(0, -3);
+        jsonText = jsonText.trim();
+        const parsed = JSON.parse(jsonText);
+        if (Array.isArray(parsed.colors)) {
+          newColors = parsed.colors.filter((c: string) => /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 6);
+        }
+      }
+    } catch {
+      console.error('[UPDATE_BRAND_LOGO] Failed to analyze colors');
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, session.userId as string),
+      columns: { brandContext: true },
+    });
+
+    const existingContext = (user?.brandContext as BrandContext) || {};
+    const existingColors = existingContext.brandColors || [];
+    
+    const mergedColors = [...newColors];
+    for (const color of existingColors) {
+      if (!mergedColors.includes(color) && mergedColors.length < 8) {
+        mergedColors.push(color);
+      }
+    }
+
+    await db
+      .update(users)
+      .set({
+        brandContext: {
+          ...existingContext,
+          logoUrl,
+          brandColors: mergedColors.length > 0 ? mergedColors : existingColors,
+        },
+      })
+      .where(eq(users.id, session.userId as string));
+
+    revalidatePath('/profile/company');
+    redirect('/profile/company?updated=brand_context');
+  } catch (error) {
+    console.error('[UPDATE_BRAND_LOGO] Error:', error);
+    redirect('/profile/company?error=upload_failed');
+  }
 }

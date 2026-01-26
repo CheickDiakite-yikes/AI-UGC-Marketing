@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addSocialLink, removeSocialLink } from '@/app/actions/userActions';
+import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addSocialLink, removeSocialLink, updateBrandLogo } from '@/app/actions/userActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
 
 const getInitials = (name?: string | null, email?: string | null) => {
@@ -204,6 +204,45 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
                 Auto-detected
               </span>
             )}
+          </div>
+
+          <div className="mb-6 pb-6 border-b-2 border-dashed border-gray-300">
+            <label className="text-xs font-bold uppercase tracking-widest block mb-3">
+              Brand Logo
+            </label>
+            <div className="flex items-start gap-4">
+              <div className="w-[100px] h-[100px] border-3 border-black bg-gray-50 flex items-center justify-center overflow-hidden">
+                {profile.brandContext?.logoUrl ? (
+                  <img 
+                    src={profile.brandContext.logoUrl} 
+                    alt="Brand Logo" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <div className="text-center">
+                    <span className="text-2xl">📷</span>
+                    <p className="text-[8px] text-gray-500 mt-1">No logo</p>
+                  </div>
+                )}
+              </div>
+              <form action={updateBrandLogo} className="flex flex-col gap-2">
+                <input
+                  type="file"
+                  name="logo"
+                  accept="image/*"
+                  className="text-xs file:mr-2 file:py-2 file:px-3 file:border-2 file:border-black file:bg-neo-pink file:text-black file:font-bold file:uppercase file:tracking-widest file:text-xs file:cursor-pointer hover:file:bg-black hover:file:text-white"
+                />
+                <button
+                  type="submit"
+                  className="bg-neo-pink border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all w-fit"
+                >
+                  Upload Logo
+                </button>
+                <p className="text-[10px] text-gray-500">
+                  Logo colors will be extracted automatically
+                </p>
+              </form>
+            </div>
           </div>
 
           <form action={updateBrandContext} className="space-y-6">

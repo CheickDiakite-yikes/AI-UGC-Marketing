@@ -971,10 +971,107 @@ export async function resetOnboardingAction(): Promise<void> {
     redirect('/');
 }
 
-export async function analyzeWebsiteAction(url: string): Promise<{ success: boolean; data?: ExtractedBrandData; error?: string }> {
+export async function analyzeLogoAction(formData: FormData): Promise<{ success: boolean; logoUrl?: string; colors?: string[]; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
         return { success: false, error: 'Not authenticated' };
+    }
+
+    const logoFile = formData.get('logo') as File | null;
+    if (!logoFile || logoFile.size === 0) {
+        return { success: false, error: 'No logo file provided' };
+    }
+
+    try {
+        const { uploadUserLogo, getPublicUrl } = await import('@/services/objectStorageService');
+        
+        const arrayBuffer = await logoFile.arrayBuffer();
+        const base64Data = Buffer.from(arrayBuffer).toString('base64');
+        const logoId = crypto.randomUUID();
+        const mimeType = logoFile.type || 'image/png';
+        
+        const uploadResult = await uploadUserLogo(session.userId as string, logoId, base64Data, mimeType);
+        if (!uploadResult.success || !uploadResult.storageKey) {
+            return { success: false, error: uploadResult.error || 'Failed to upload logo' };
+        }
+
+        const logoUrl = await getPublicUrl(uploadResult.storageKey);
+        
+        const colorPrompt = `Analyze this logo image and extract the dominant brand colors.
+
+Return a JSON object with exactly this structure:
+{
+  "colors": ["#HEXCODE1", "#HEXCODE2", ...]
+}
+
+Rules:
+- Extract 3-6 dominant colors as hex codes
+- Order from most dominant to least dominant
+- Include the primary brand color first
+- Exclude pure black (#000000) and pure white (#FFFFFF) unless they are clearly part of the brand
+- Return valid JSON only`;
+
+        const { generateContentServer } = await import('@/app/actions');
+        const colorResponse = await generateContentServer([
+            { text: colorPrompt },
+            { inlineData: { mimeType, data: base64Data } }
+        ]);
+
+        let colors: string[] = [];
+        if (colorResponse.text) {
+            let jsonText = colorResponse.text.trim();
+            if (jsonText.startsWith('```json')) jsonText = jsonText.slice(7);
+            if (jsonText.startsWith('```')) jsonText = jsonText.slice(3);
+            if (jsonText.endsWith('```')) jsonText = jsonText.slice(0, -3);
+            jsonText = jsonText.trim();
+            try {
+                const parsed = JSON.parse(jsonText);
+                if (Array.isArray(parsed.colors)) {
+                    colors = parsed.colors.filter((c: string) => /^#[0-9A-Fa-f]{6}$/.test(c)).slice(0, 6);
+                }
+            } catch {
+                console.error('[ANALYZE_LOGO] Failed to parse colors:', jsonText);
+            }
+        }
+
+        return { success: true, logoUrl, colors };
+    } catch (error: any) {
+        console.error('[ANALYZE_LOGO] Failed:', error);
+        return { success: false, error: error.message || 'Failed to analyze logo' };
+    }
+}
+
+export async function analyzeWebsiteAction(
+    url: string,
+    logoFormData?: FormData
+): Promise<{ success: boolean; data?: ExtractedBrandData; error?: string; logoUrl?: string }> {
+    const session = await getSession();
+    if (!session || !session.userId) {
+        return { success: false, error: 'Not authenticated' };
+    }
+
+    let logoResult: { logoUrl?: string; colors?: string[] } = {};
+    
+    if (logoFormData) {
+        const result = await analyzeLogoAction(logoFormData);
+        if (result.success) {
+            logoResult = { logoUrl: result.logoUrl, colors: result.colors };
+        }
+    }
+
+    if (!url) {
+        if (logoResult.logoUrl) {
+            const fallbackData: ExtractedBrandData = {
+                companyName: 'Your Company',
+                description: 'Add your company description in Company settings',
+                industry: 'Your Industry',
+                keyOfferings: ['Your products or services'],
+                targetAudience: 'Your target customers',
+                brandColors: logoResult.colors || [],
+            };
+            return { success: true, data: fallbackData, logoUrl: logoResult.logoUrl };
+        }
+        return { success: false, error: 'Please provide a website URL or upload a logo' };
     }
 
     try {
@@ -1047,29 +1144,43 @@ Return valid JSON only.`;
             return { success: false, error: 'Could not extract brand information' };
         }
 
-        return { success: true, data };
+        if (logoResult.colors && logoResult.colors.length > 0) {
+            const websiteColors = data.brandColors || [];
+            const mergedColors = [...logoResult.colors];
+            for (const color of websiteColors) {
+                if (!mergedColors.includes(color) && mergedColors.length < 8) {
+                    mergedColors.push(color);
+                }
+            }
+            data.brandColors = mergedColors;
+        }
+
+        return { success: true, data, logoUrl: logoResult.logoUrl };
     } catch (error: any) {
         console.error('[ANALYZE_WEBSITE] Failed:', error);
         if (error.message === 'Analysis timed out') {
-            return { success: false, error: 'Analysis took too long. Please try again.' };
+            return { success: false, error: 'Analysis took too long. Please try again.', logoUrl: logoResult.logoUrl };
         }
-        return { success: false, error: error.message || 'Failed to analyze website' };
+        return { success: false, error: error.message || 'Failed to analyze website', logoUrl: logoResult.logoUrl };
     }
 }
 
 export async function submitWebsiteOnboardingAction(
     websiteUrl: string,
-    data?: ExtractedBrandData
+    data?: ExtractedBrandData,
+    logoUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
     const session = await getSession();
     if (!session || !session.userId) {
         return { success: false, error: 'Not authenticated' };
     }
 
-    try {
-        new URL(websiteUrl);
-    } catch {
-        return { success: false, error: 'Invalid URL format' };
+    if (websiteUrl) {
+        try {
+            new URL(websiteUrl);
+        } catch {
+            return { success: false, error: 'Invalid URL format' };
+        }
     }
 
     const userBoards = await db.query.boards.findMany({
@@ -1091,28 +1202,33 @@ export async function submitWebsiteOnboardingAction(
         boardId = newBoard.id;
     }
 
-    const existingLink = await db.query.assets.findFirst({
-        where: and(
-            eq(assets.boardId, boardId),
-            eq(assets.type, 'link')
-        )
-    });
-
-    if (!existingLink) {
-        await db.insert(assets).values({
-            boardId,
-            type: 'link',
-            name: websiteUrl,
-            content: websiteUrl,
+    if (websiteUrl) {
+        const existingLink = await db.query.assets.findFirst({
+            where: and(
+                eq(assets.boardId, boardId),
+                eq(assets.type, 'link')
+            )
         });
+
+        if (!existingLink) {
+            await db.insert(assets).values({
+                boardId,
+                type: 'link',
+                name: websiteUrl,
+                content: websiteUrl,
+            });
+        }
     }
 
     const updateData: Record<string, any> = {
-        websiteUrl,
         onboardingCompleted: true,
         onboardingCompletedAt: new Date(),
         onboardingDismissedAt: null
     };
+
+    if (websiteUrl) {
+        updateData.websiteUrl = websiteUrl;
+    }
 
     if (data) {
         updateData.company = data.companyName;
@@ -1130,8 +1246,14 @@ export async function submitWebsiteOnboardingAction(
             missionStatement: data.missionStatement || null,
             foundedYear: data.foundedYear || null,
             teamSize: data.teamSize || null,
+            logoUrl: logoUrl || null,
             autoDetected: true,
             detectedAt: new Date().toISOString(),
+        };
+    } else if (logoUrl) {
+        updateData.brandContext = {
+            logoUrl,
+            autoDetected: false,
         };
     }
 

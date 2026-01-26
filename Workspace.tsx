@@ -1332,14 +1332,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   }, [refreshOnboardingState, showSuccess, showError]);
 
-  const handleWebsiteAnalyze = useCallback(async (url: string) => {
-    return await analyzeWebsiteAction(url);
+  const handleWebsiteAnalyze = useCallback(async (url: string, logoFile?: File) => {
+    let logoFormData: FormData | undefined;
+    if (logoFile) {
+      logoFormData = new FormData();
+      logoFormData.append('logo', logoFile);
+    }
+    return await analyzeWebsiteAction(url, logoFormData);
   }, []);
 
-  const handleWebsiteConfirm = useCallback(async (url: string, data: ExtractedBrandData) => {
+  const handleWebsiteConfirm = useCallback(async (url: string, data: ExtractedBrandData, logoUrl?: string) => {
     setIsWebsiteSubmitting(true);
     try {
-      const result = await submitWebsiteOnboardingAction(url, data);
+      const result = await submitWebsiteOnboardingAction(url, data, logoUrl);
       if (result.success) {
         showSuccess(`${data.companyName} is ready! Let's create some magic.`);
         await refreshOnboardingState();

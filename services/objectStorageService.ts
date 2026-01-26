@@ -225,6 +225,37 @@ export async function uploadCarouselSlide(
   }
 }
 
+export async function uploadUserLogo(
+  userId: string,
+  logoId: string,
+  data: string,
+  mimeType: string
+): Promise<UploadResult> {
+  try {
+    const extension = mimeType.split('/')[1] || 'png';
+    const storageKey = `users/${userId}/logos/${logoId}.${extension}`;
+    
+    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const binaryData = Buffer.from(base64Data, 'base64');
+    
+    const validation = validateImageBuffer(binaryData, 'image');
+    if (!validation.valid) {
+      console.error(`[UPLOAD BLOCKED] Logo validation failed: ${validation.error}`);
+      return { success: false, error: validation.error };
+    }
+    
+    const { ok, error } = await client.uploadFromBytes(storageKey, binaryData);
+    
+    if (!ok) {
+      return { success: false, error: error?.message || 'Upload failed' };
+    }
+    
+    return { success: true, storageKey };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
 export async function downloadAsset(storageKey: string): Promise<{ success: boolean; data?: Buffer; error?: string }> {
   try {
     const { ok, value, error } = await client.downloadAsBytes(storageKey);

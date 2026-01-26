@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExtractedBrandData } from '@/types';
 
 type ModalState = 'input' | 'analyzing' | 'confirmation';
@@ -9,8 +9,8 @@ interface WebsiteLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (url: string) => Promise<void>;
-  onAnalyze: (url: string) => Promise<{ success: boolean; data?: ExtractedBrandData; error?: string }>;
-  onConfirm: (url: string, data: ExtractedBrandData) => Promise<void>;
+  onAnalyze: (url: string, logoFile?: File) => Promise<{ success: boolean; data?: ExtractedBrandData; error?: string; logoUrl?: string }>;
+  onConfirm: (url: string, data: ExtractedBrandData, logoUrl?: string) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -38,6 +38,11 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
   const [editedCompanyName, setEditedCompanyName] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
   const [isConfirming, setIsConfirming] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (modalState !== 'analyzing') return;
@@ -55,8 +60,44 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
       setProgressIndex(0);
       setExtractedData(null);
       setError('');
+      setLogoFile(null);
+      setLogoPreview(null);
+      setLogoUrl(null);
     }
   }, [isOpen]);
+
+  const handleLogoSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo must be under 5MB');
+      return;
+    }
+    setLogoFile(file);
+    setError('');
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleLogoSelect(file);
+  };
+
+  const handleLogoRemove = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -81,11 +122,22 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateUrl(url)) return;
     
-    let finalUrl = url.trim();
-    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
-      finalUrl = 'https://' + finalUrl;
+    const hasUrl = url.trim().length > 0;
+    const hasLogo = logoFile !== null;
+    
+    if (!hasUrl && !hasLogo) {
+      setError('Please enter a website URL or upload your logo');
+      return;
+    }
+    
+    let finalUrl = '';
+    if (hasUrl) {
+      if (!validateUrl(url)) return;
+      finalUrl = url.trim();
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = 'https://' + finalUrl;
+      }
     }
     
     setModalState('analyzing');
@@ -93,15 +145,18 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
     setError('');
     
     try {
-      const result = await onAnalyze(finalUrl);
+      const result = await onAnalyze(finalUrl, logoFile || undefined);
       
       if (result.success && result.data) {
         setExtractedData(result.data);
         setEditedCompanyName(result.data.companyName);
         setEditedDescription(result.data.description);
+        if (result.logoUrl) {
+          setLogoUrl(result.logoUrl);
+        }
         setModalState('confirmation');
       } else {
-        setError(result.error || 'Failed to analyze website. You can try again or skip.');
+        setError(result.error || 'Failed to analyze. You can try again or skip.');
         setModalState('input');
       }
     } catch (err) {
@@ -122,11 +177,11 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
       };
       
       let finalUrl = url.trim();
-      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      if (finalUrl && !finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
         finalUrl = 'https://' + finalUrl;
       }
       
-      await onConfirm(finalUrl, finalData);
+      await onConfirm(finalUrl, finalData, logoUrl || undefined);
     } catch (err) {
       setError('Failed to save. Please try again.');
     } finally {
@@ -154,17 +209,66 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
           Link to Campaign
         </h2>
         <p className="text-sm text-gray-600">
-          Share your website and we'll instantly understand your brand.
+          Share your website or logo and we'll instantly understand your brand.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
+          <label className="block text-xs font-black uppercase tracking-widest mb-2">
+            Upload Your Logo <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleLogoSelect(file);
+            }}
+            className="hidden"
+          />
+          {logoPreview ? (
+            <div className="flex items-center gap-4">
+              <div className="w-[100px] h-[100px] border-3 border-black bg-white flex items-center justify-center overflow-hidden">
+                <img src={logoPreview} alt="Logo preview" className="max-w-full max-h-full object-contain" />
+              </div>
+              <button
+                type="button"
+                onClick={handleLogoRemove}
+                className="bg-white border-2 border-black px-3 py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink transition-all"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div
+              className={`w-full h-[100px] border-3 border-dashed ${isDragging ? 'border-neo-pink bg-neo-pink/10' : 'border-black'} flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-all`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleLogoDrop}
+            >
+              <div className="w-10 h-10 border-2 border-black bg-gray-100 flex items-center justify-center mb-2">
+                <span className="text-lg">📷</span>
+              </div>
+              <p className="text-xs font-bold text-gray-600">Drop logo or click to upload</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-px bg-gray-300" />
+          <span className="text-xs font-bold text-gray-400 uppercase">and/or</span>
+          <div className="flex-1 h-px bg-gray-300" />
+        </div>
+
+        <div>
           <label 
             htmlFor="website-url" 
             className="block text-xs font-black uppercase tracking-widest mb-2"
           >
-            Your Website
+            Your Website <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <input
             id="website-url"
@@ -177,15 +281,15 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
             placeholder="https://yourcompany.com"
             className="w-full bg-white border-3 border-black px-4 py-3 font-bold text-base focus:outline-none focus:ring-2 focus:ring-neo-pink placeholder:text-gray-400"
             disabled={isLoading}
-            autoFocus
           />
           <p className="text-[10px] text-gray-500 mt-1">
             Include the full URL with https://
           </p>
-          {error && (
-            <p className="text-xs text-red-600 font-bold mt-1">{error}</p>
-          )}
         </div>
+
+        {error && (
+          <p className="text-xs text-red-600 font-bold">{error}</p>
+        )}
 
         <div className="flex flex-col gap-2">
           <button
