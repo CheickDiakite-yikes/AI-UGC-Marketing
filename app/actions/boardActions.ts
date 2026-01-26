@@ -983,74 +983,65 @@ export async function analyzeWebsiteAction(url: string): Promise<{ success: bool
         return { success: false, error: 'Invalid URL format' };
     }
 
-    const TIMEOUT_MS = 30000;
-    const prompt = `Analyze this website URL and extract brand information. Return a JSON object with these fields:
+    const TIMEOUT_MS = 45000;
+    const prompt = `You are analyzing a company website. Extract all available brand information from the page content.
 
-Required fields:
-- companyName: The company or brand name (string)
-- description: A short overview of what the company does, 1-2 sentences (string)
-- industry: The primary industry or sector (string)
-- keyOfferings: 3-5 main products or services offered (array of strings)
-- targetAudience: Who the company primarily serves (string)
+Return a JSON object with these fields:
 
-Optional fields (include only if found on the website):
-- tagline: Brand tagline or slogan if visible (string)
-- brandColors: Primary brand colors as hex codes, max 5 (array of strings like "#FF5500")
-- socialLinks: Social media links found (array of objects with platform and url)
-- contactEmail: Contact email if visible (string)
-- missionStatement: Company mission or vision statement if found (string)
-- foundedYear: Year the company was founded if mentioned (string like "2020")
-- teamSize: Company size indicator if found (string like "50-100" or "Enterprise")
+REQUIRED (always include):
+- companyName: The company or brand name
+- description: A 2-3 sentence overview of what the company does
+- industry: The primary industry or sector
+- keyOfferings: Array of 3-5 main products or services
+- targetAudience: Who the company primarily serves
 
-URL to analyze: ${url}
+OPTIONAL (include if you can find them on the website):
+- tagline: The brand's tagline, slogan, or motto (look in headers, hero sections)
+- brandColors: Primary brand colors as hex codes, extract from the website's design (array like ["#FF5500", "#1A1A1A"])
+- socialLinks: Social media links found in footer or header (array of {platform: "twitter", url: "..."})
+- contactEmail: Contact email address if visible
+- missionStatement: Company mission, vision, or "about us" statement
+- foundedYear: Year founded if mentioned (as string like "2020")
+- teamSize: Company size if mentioned (like "50-100 employees" or "Enterprise")
 
-Return ONLY valid JSON, no markdown, no explanations.`;
+Look carefully at:
+- The page header and hero section for tagline
+- Footer for social links and contact info
+- About page content for mission and founding info
+- CSS/design for brand colors
+
+Return valid JSON only.`;
 
     try {
+        const { generateContentWithUrlContext } = await import('@/app/actions');
+        
         const timeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(() => reject(new Error('Analysis timed out')), TIMEOUT_MS);
         });
 
-        const analysisPromise = generateContentServer('gemini-2.5-flash', [prompt], {
-            responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    companyName: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    industry: { type: Type.STRING },
-                    keyOfferings: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    targetAudience: { type: Type.STRING },
-                    tagline: { type: Type.STRING, nullable: true },
-                    brandColors: { type: Type.ARRAY, items: { type: Type.STRING }, nullable: true },
-                    socialLinks: { 
-                        type: Type.ARRAY, 
-                        items: { 
-                            type: Type.OBJECT,
-                            properties: {
-                                platform: { type: Type.STRING },
-                                url: { type: Type.STRING }
-                            },
-                            required: ['platform', 'url']
-                        }, 
-                        nullable: true 
-                    },
-                    contactEmail: { type: Type.STRING, nullable: true },
-                    missionStatement: { type: Type.STRING, nullable: true },
-                    foundedYear: { type: Type.STRING, nullable: true },
-                    teamSize: { type: Type.STRING, nullable: true }
-                },
-                required: ['companyName', 'description', 'industry', 'keyOfferings', 'targetAudience']
+        const analysisPromise = (async () => {
+            const urlResponse = await generateContentWithUrlContext(url, prompt);
+            
+            if (!urlResponse.text) {
+                throw new Error('No response from AI');
             }
-        });
+            
+            let jsonText = urlResponse.text.trim();
+            if (jsonText.startsWith('```json')) {
+                jsonText = jsonText.slice(7);
+            }
+            if (jsonText.startsWith('```')) {
+                jsonText = jsonText.slice(3);
+            }
+            if (jsonText.endsWith('```')) {
+                jsonText = jsonText.slice(0, -3);
+            }
+            jsonText = jsonText.trim();
+            
+            return JSON.parse(jsonText) as ExtractedBrandData;
+        })();
 
-        const response = await Promise.race([analysisPromise, timeoutPromise]);
-        
-        if (!response.text) {
-            return { success: false, error: 'No response from AI' };
-        }
-
-        const data = JSON.parse(response.text) as ExtractedBrandData;
+        const data = await Promise.race([analysisPromise, timeoutPromise]);
         
         if (!data.companyName || !data.description) {
             return { success: false, error: 'Could not extract brand information' };
