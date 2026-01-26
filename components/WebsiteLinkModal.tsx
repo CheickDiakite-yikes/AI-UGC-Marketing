@@ -370,6 +370,8 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
     
     const hasExtras = extractedData.tagline || 
       (extractedData.brandColors && extractedData.brandColors.length > 0) ||
+      (extractedData.fonts && extractedData.fonts.length > 0) ||
+      (extractedData.brandFeel && extractedData.brandFeel.length > 0) ||
       (extractedData.socialLinks && extractedData.socialLinks.length > 0) ||
       extractedData.foundedYear || extractedData.teamSize;
     
@@ -452,6 +454,38 @@ const WebsiteLinkModal: React.FC<WebsiteLinkModalProps> = ({
                         style={{ backgroundColor: color }}
                         title={color}
                       />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {extractedData.fonts && extractedData.fonts.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-gray-500">Fonts:</span>
+                  <div className="flex gap-1 flex-wrap">
+                    {extractedData.fonts.map((font, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 bg-gray-100 border border-black text-[10px] font-bold"
+                      >
+                        {font}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {extractedData.brandFeel && extractedData.brandFeel.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold text-gray-500">Brand Feel:</span>
+                  <div className="flex gap-1 flex-wrap">
+                    {extractedData.brandFeel.map((feel, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 bg-neo-lime border border-black text-[10px] font-bold"
+                      >
+                        {feel}
+                      </span>
                     ))}
                   </div>
                 </div>
