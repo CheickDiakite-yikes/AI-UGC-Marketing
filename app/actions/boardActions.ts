@@ -1023,6 +1023,16 @@ export async function analyzeLogoAction(formData: FormData): Promise<{ success: 
 
         const logoUrl = await getPublicUrl(uploadResult.storageKey);
         
+        await db.insert(profileAssets).values({
+            id: logoId,
+            userId: session.userId as string,
+            type: 'logo',
+            name: logoFile.name || 'Brand Logo',
+            storageKey: uploadResult.storageKey,
+            mimeType,
+            metadata: { source: 'onboarding' }
+        });
+        
         const analysisPrompt = `Analyze this logo image and extract brand styling information.
 
 Return a JSON object with exactly this structure:
