@@ -110,9 +110,11 @@ export async function generateImagesServer(
                 const imageContextParts: string[] = [];
                 const hasLogo = validImages.some(img => img.role === 'logo');
                 const hasBrandImages = validImages.some(img => img.role === 'brand_image');
+                const hasAvatar = validImages.some(img => img.role === 'avatar');
                 
                 if (hasLogo) imageContextParts.push('Incorporate the brand logo prominently and accurately in the generated image.');
                 if (hasBrandImages) imageContextParts.push('Use the brand imagery as visual style reference for colors, aesthetics, and mood.');
+                if (hasAvatar) imageContextParts.push('CRITICAL: Use the provided avatar/spokesperson photo as the EXACT visual reference for any person in this image. The generated person must closely match the face, features, skin tone, and overall appearance of the reference photo.');
                 
                 parts.push({ text: `${prompt}\n\nIMPORTANT: Reference images are provided below. ${imageContextParts.join(' ')}` });
                 

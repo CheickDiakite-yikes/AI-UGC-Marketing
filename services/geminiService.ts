@@ -395,6 +395,8 @@ export const chatWithMarketingAgent = async (
 
   let brandInstruction = brandIdentity ? `
     BRAND VISUAL DNA (for styling only): Colors: ${brandIdentity.colors.join(", ")}, Fonts: ${brandIdentity.fonts.display}, Vibe: ${brandIdentity.vibe}
+    
+    📸 UPLOADED BRAND ASSETS: When you call generate_image, the user's ACTUAL uploaded logo and brand images from their Company page will be automatically passed to the image generation model as visual references. The AI will incorporate the real logo and visual style from these uploads - you don't need to describe the logo in detail, just reference it naturally (e.g., "featuring the brand logo").
   ` : "";
 
   let companyContextInstruction = "";
@@ -440,6 +442,9 @@ export const chatWithMarketingAgent = async (
     Camera Angles: ${listToText(avatarIdentity.consistencySpec?.cameraAngles)}
     Lighting Notes: ${avatarIdentity.consistencySpec?.lightingNotes || "Unspecified"}
     Voice Guidelines: ${listToText(avatarIdentity.consistencySpec?.voiceGuidelines)}
+    
+    👤 UPLOADED AVATAR IMAGE: When you call generate_image with prompts that mention people (person, woman, man, spokesperson, creator, founder, influencer, etc.), the user's ACTUAL uploaded avatar/spokesperson image will be automatically passed to the image generation model. The AI will use this real reference photo to maintain visual consistency of the person across all generated images. Just reference the avatar naturally in your prompts - the real image will be included automatically.
+    
     Note: Only use avatar for content that specifically needs a human face/spokesperson.
   ` : "";
 

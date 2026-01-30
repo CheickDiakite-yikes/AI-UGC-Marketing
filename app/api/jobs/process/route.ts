@@ -3,6 +3,7 @@ import { getPendingJobs, claimJob, updateJobStatus } from '../../../../services/
 import { generateMarketingImage, generateVeoVideo } from '../../../../services/geminiService';
 import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
 import { getBrandAssetDataForGeneration } from '../../../../services/brandAssetService';
+import { shouldUseAvatar } from '../../../../services/identityPromptUtils';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../../../../services/videoPromptUtils';
 import { generateAutoReferenceImages } from '../../../../services/videoReferenceService';
@@ -91,13 +92,14 @@ async function processImageJob(job: Job): Promise<JobResult> {
     traceId
   });
 
+  const useAvatar = shouldUseAvatar(prompt);
   const brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
     includeLogo: true,
     maxBrandImages: 2,
-    includeAvatars: false
+    includeAvatars: useAvatar
   });
 
-  console.log(`[API JOB PROCESSOR ${traceId}] Generating image with ${brandAssets.length} brand assets...`);
+  console.log(`[API JOB PROCESSOR ${traceId}] Generating image with ${brandAssets.length} brand assets (avatar: ${useAvatar})...`);
   
   const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue, undefined, brandAssets);
   
