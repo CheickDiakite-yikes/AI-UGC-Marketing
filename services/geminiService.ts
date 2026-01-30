@@ -318,7 +318,22 @@ export const chatWithMarketingAgent = async (
   assets: ProjectAsset[],
   brandIdentity?: BrandIdentity | null,
   avatarIdentity?: AvatarIdentity | null,
-  products?: Product[] | null
+  products?: Product[] | null,
+  brandContext?: {
+    companyName?: string;
+    tagline?: string;
+    description?: string;
+    industry?: string;
+    targetAudience?: string;
+    missionStatement?: string;
+    brandColors?: string[];
+    fonts?: string[];
+    brandFeel?: string[];
+    keyOfferings?: string[];
+    contactEmail?: string;
+    foundedYear?: string;
+    teamSize?: string;
+  } | null
 ) => {
 
   // Build source knowledge from uploaded documents (PDFs, text files, etc.)
@@ -381,6 +396,29 @@ export const chatWithMarketingAgent = async (
   let brandInstruction = brandIdentity ? `
     BRAND VISUAL DNA (for styling only): Colors: ${brandIdentity.colors.join(", ")}, Fonts: ${brandIdentity.fonts.display}, Vibe: ${brandIdentity.vibe}
   ` : "";
+
+  let companyContextInstruction = "";
+  if (brandContext) {
+    const contextLines: string[] = ['╔══════════════════════════════════════════════════════════════════════════════╗',
+    '║                    🏢 YOUR COMPANY/BRAND INFORMATION 🏢                      ║',
+    '╚══════════════════════════════════════════════════════════════════════════════╝'];
+    if (brandContext.companyName) contextLines.push(`Company Name: ${brandContext.companyName}`);
+    if (brandContext.tagline) contextLines.push(`Tagline: "${brandContext.tagline}"`);
+    if (brandContext.description) contextLines.push(`Description: ${brandContext.description}`);
+    if (brandContext.industry) contextLines.push(`Industry: ${brandContext.industry}`);
+    if (brandContext.targetAudience) contextLines.push(`Target Audience: ${brandContext.targetAudience}`);
+    if (brandContext.missionStatement) contextLines.push(`Mission: ${brandContext.missionStatement}`);
+    if (brandContext.keyOfferings && brandContext.keyOfferings.length > 0) contextLines.push(`Key Offerings: ${brandContext.keyOfferings.join(", ")}`);
+    if (brandContext.brandColors && brandContext.brandColors.length > 0) contextLines.push(`Brand Colors: ${brandContext.brandColors.join(", ")}`);
+    if (brandContext.fonts && brandContext.fonts.length > 0) contextLines.push(`Fonts: ${brandContext.fonts.join(", ")}`);
+    if (brandContext.brandFeel && brandContext.brandFeel.length > 0) contextLines.push(`Brand Feel/Personality: ${brandContext.brandFeel.join(", ")}`);
+    if (brandContext.foundedYear) contextLines.push(`Founded: ${brandContext.foundedYear}`);
+    if (brandContext.teamSize) contextLines.push(`Team Size: ${brandContext.teamSize}`);
+    contextLines.push('');
+    contextLines.push('🚨 CRITICAL: Use this company information for ALL content generation. DO NOT search the web for info about this company - you already have it above.');
+    contextLines.push('══════════════════════════════════════════════════════════════════════════════');
+    companyContextInstruction = contextLines.join('\n    ');
+  }
 
   let avatarInstruction = avatarIdentity ? `
     AVATAR IDENTITY PACK (use ONLY when visuals require a person):
@@ -472,6 +510,8 @@ export const chatWithMarketingAgent = async (
   }
 
   const systemInstruction = `
+    ${companyContextInstruction}
+    
     ${sourceKnowledge}
     
     ═══════════════════════════════════════════════════════════════════════════════
@@ -479,15 +519,16 @@ export const chatWithMarketingAgent = async (
     
     🚨 CRITICAL INSTRUCTION - READ THIS FIRST 🚨
     
-    1. BEFORE generating ANY content, you MUST read the SOURCE DOCUMENTS above completely.
-    2. The SOURCE DOCUMENTS define the EXACT product, service, or company you are marketing.
-    3. You MUST base ALL campaign content, messaging, visuals, and strategy on what is described in the source documents.
-    4. NEVER generate content for a different industry or product than what's in the source documents.
-    5. If the source documents describe a mental health app, you create mental health app marketing.
-    6. If the source documents describe a real estate company, you create real estate marketing.
-    7. ALWAYS extract and use: company name, product features, target audience, value propositions, and key messaging from the source documents.
+    1. BEFORE generating ANY content, you MUST read the COMPANY INFORMATION and SOURCE DOCUMENTS above completely.
+    2. The COMPANY INFORMATION and SOURCE DOCUMENTS define the EXACT product, service, or company you are marketing.
+    3. You MUST base ALL campaign content, messaging, visuals, and strategy on what is described in the company info and source documents.
+    4. NEVER generate content for a different industry or product than what's in the company info or source documents.
+    5. If the company is a marketing automation platform, you create marketing automation content.
+    6. If the company is a real estate company, you create real estate marketing.
+    7. ALWAYS use: company name, product features, target audience, value propositions, and key messaging from the COMPANY INFORMATION section.
+    8. DO NOT search the web for information about the user's own company - you already have that information above.
     
-    ${hasValidSourceDocs ? '✅ Valid source documents are available above - USE THEM.' : '⚠️ No valid source documents found. Ask the user to upload documents about their product/service.'}
+    ${hasValidSourceDocs ? '✅ Valid source documents are available above - USE THEM.' : (companyContextInstruction ? '✅ Company information is available above - USE IT.' : '⚠️ No company info found. Ask the user to set up their brand in the Company page.')}
     
     ${brandInstruction}
     ${avatarInstruction}

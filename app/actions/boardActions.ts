@@ -374,7 +374,15 @@ export async function getBoardDetails(boardId: string) {
         });
     }
     
-    return board;
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, session.userId as string),
+        columns: { brandContext: true }
+    });
+    
+    return {
+        ...board,
+        brandContext: user?.brandContext || null
+    };
 }
 
 export async function saveAsset(boardId: string, asset: ProjectAsset) {

@@ -157,6 +157,7 @@ export interface Board {
   brandIdentity: BrandIdentity | null;
   avatarIdentity: AvatarIdentity | null;
   products?: Product[];
+  brandContext?: BrandContext | null;
   createdAt: number;
 }
 
