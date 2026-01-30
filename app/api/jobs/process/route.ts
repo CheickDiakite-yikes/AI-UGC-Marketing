@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPendingJobs, claimJob, updateJobStatus } from '../../../../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../../../../services/geminiService';
 import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
-import { getBrandAssetDataForGeneration } from '../../../../services/brandAssetService';
+import { getBrandAssetDataForGeneration, getBrandAssetsByIds } from '../../../../services/brandAssetService';
 import { shouldUseAvatar } from '../../../../services/identityPromptUtils';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../../../../services/videoPromptUtils';
@@ -74,8 +74,8 @@ const assertVideoQuota = async (userId: string, count: number = 1) => {
 };
 
 async function processImageJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string; freebie?: boolean };
-  const { prompt, aspectRatio, title, caption, hook, archetype, productId } = payload;
+  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string; freebie?: boolean; brandAssetIds?: string[] };
+  const { prompt, aspectRatio, title, caption, hook, archetype, productId, brandAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
   const isFreebie = payload.freebie === true;
 
@@ -92,14 +92,21 @@ async function processImageJob(job: Job): Promise<JobResult> {
     traceId
   });
 
-  const useAvatar = shouldUseAvatar(prompt);
-  const brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
-    includeLogo: true,
-    maxBrandImages: 2,
-    includeAvatars: useAvatar
-  });
+  let brandAssets;
+  if (brandAssetIds && brandAssetIds.length > 0) {
+    console.log(`[API JOB PROCESSOR ${traceId}] AI selected ${brandAssetIds.length} specific assets: ${brandAssetIds.join(', ')}`);
+    brandAssets = await getBrandAssetsByIds(job.boardId, brandAssetIds);
+  } else {
+    const useAvatar = shouldUseAvatar(prompt);
+    brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
+      includeLogo: true,
+      maxBrandImages: 2,
+      includeAvatars: useAvatar
+    });
+    console.log(`[API JOB PROCESSOR ${traceId}] Auto-selected ${brandAssets.length} brand assets`);
+  }
 
-  console.log(`[API JOB PROCESSOR ${traceId}] Generating image with ${brandAssets.length} brand assets (avatar: ${useAvatar})...`);
+  console.log(`[API JOB PROCESSOR ${traceId}] Generating image with ${brandAssets.length} brand assets...`);
   
   const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue, undefined, brandAssets);
   

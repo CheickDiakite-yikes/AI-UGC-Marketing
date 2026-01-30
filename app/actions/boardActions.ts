@@ -379,9 +379,27 @@ export async function getBoardDetails(boardId: string) {
         columns: { brandContext: true }
     });
     
+    const userAssets = await db.query.profileAssets.findMany({
+        where: eq(profileAssets.userId, session.userId as string),
+        columns: {
+            id: true,
+            type: true,
+            name: true,
+            metadata: true
+        }
+    });
+    
+    const assetCatalog = userAssets.map(a => ({
+        id: a.id,
+        type: a.type,
+        name: a.name,
+        description: (a.metadata as any)?.description || undefined
+    }));
+    
     return {
         ...board,
-        brandContext: user?.brandContext || null
+        brandContext: user?.brandContext || null,
+        assetCatalog
     };
 }
 

@@ -16,7 +16,7 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole, ExtractedBrandData, BrandContext } from './types';
+import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole, ExtractedBrandData, BrandContext, AssetCatalogEntry } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
 import { getRemainingVideos, IMAGE_CREDIT_COST, VIDEO_CREDIT_COST } from './services/usageLimits';
@@ -312,6 +312,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             assets: p.productAssets as ProductAsset[]
           })),
           brandContext: (b as any).brandContext as BrandContext | null,
+          assetCatalog: ((b as any).assetCatalog || []) as AssetCatalogEntry[],
           createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
         };
         setActiveBoard(mappedBoard);
@@ -525,6 +526,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           assets: p.productAssets as ProductAsset[]
         })),
         brandContext: (b as any).brandContext as BrandContext | null,
+        assetCatalog: ((b as any).assetCatalog || []) as AssetCatalogEntry[],
         createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
       };
       setActiveBoard(mappedBoard);
@@ -1736,7 +1738,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         activeBoard.brandIdentity,
         activeBoard.avatarIdentity,
         activeBoard.products || [],
-        activeBoard.brandContext as BrandContext | null
+        activeBoard.brandContext as BrandContext | null,
+        activeBoard.assetCatalog || []
       ) as any;
 
       const pendingImageCount = pendingItems.filter(item => item.type === 'image').length;

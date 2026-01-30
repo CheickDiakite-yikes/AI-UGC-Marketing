@@ -21,7 +21,7 @@ const listToLines = (items?: string[] | null, max: number = 8): string => {
 
 const generateImageTool: FunctionDeclaration = {
   name: "generate_image",
-  description: "Generate a single high-fidelity marketing image using Gemini 3 Pro Image.",
+  description: "Generate a single high-fidelity marketing image using Gemini 3 Pro Image. You can include up to 14 reference images from the user's asset library.",
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -29,6 +29,11 @@ const generateImageTool: FunctionDeclaration = {
       aspectRatio: { type: Type.STRING, description: "Aspect ratio (e.g., '1:1', '16:9', '9:16'). Default '1:1'." },
       imageSize: { type: Type.STRING, description: "Resolution (e.g., '1K', '2K'). Default '1K'." },
       productId: { type: Type.STRING, description: "Optional product ID to bind identity constraints for visuals." },
+      brandAssetIds: { 
+        type: Type.ARRAY, 
+        items: { type: Type.STRING }, 
+        description: "Array of asset IDs from the BRAND ASSET LIBRARY to include as reference images. Select the most relevant logos, brand images, or avatars for this specific visual. Max 14 assets. If not provided, the system will auto-select logo + recent brand images." 
+      },
       title: { type: Type.STRING, description: "Short title for the asset card." },
       hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
       caption: { type: Type.STRING, description: "Social caption for the asset." },
@@ -312,6 +317,13 @@ export const analyzeBrandLogo = async (base64Image: string): Promise<BrandIdenti
   throw new Error("Failed to analyze logo");
 };
 
+export interface AssetCatalogEntry {
+  id: string;
+  type: string;
+  name: string;
+  description?: string;
+}
+
 export const chatWithMarketingAgent = async (
   history: { role: string; parts: { text: string }[] }[],
   newMessage: string,
@@ -333,7 +345,8 @@ export const chatWithMarketingAgent = async (
     contactEmail?: string;
     foundedYear?: string;
     teamSize?: string;
-  } | null
+  } | null,
+  assetCatalog?: AssetCatalogEntry[] | null
 ) => {
 
   // Build source knowledge from uploaded documents (PDFs, text files, etc.)
@@ -538,6 +551,28 @@ export const chatWithMarketingAgent = async (
     ${brandInstruction}
     ${avatarInstruction}
     ${productInstruction}
+    
+    ${assetCatalog && assetCatalog.length > 0 ? `
+    ════════════════════════════════════════════════════════════════════════════
+    📁 BRAND ASSET LIBRARY (${assetCatalog.length} assets available)
+    ════════════════════════════════════════════════════════════════════════════
+    
+    When calling generate_image, you can select specific assets by their ID using the brandAssetIds parameter.
+    Choose the most relevant assets for each visual - don't include everything, just what's needed.
+    
+    Available Assets:
+${assetCatalog.slice(0, 50).map(a => `    - [${a.type.toUpperCase()}] ${a.id}: "${a.name}"${a.description ? ` - ${a.description}` : ''}`).join('\n')}
+${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more assets` : ''}
+    
+    ASSET SELECTION GUIDELINES:
+    - For brand consistency: Include at least one logo asset
+    - For images with people: Include relevant avatar assets  
+    - For product shots: Include product-specific brand images
+    - For style matching: Include brand images that match the desired aesthetic
+    - Max 14 reference images per generation
+    - If you don't specify brandAssetIds, the system will auto-select the primary logo and recent brand images
+    ════════════════════════════════════════════════════════════════════════════
+    ` : ''}
     
     CONSTRAINTS:
     - Base ALL campaign content on the SOURCE DOCUMENTS above - this is non-negotiable

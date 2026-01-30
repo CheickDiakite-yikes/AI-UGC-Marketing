@@ -147,6 +147,13 @@ export interface AvatarIdentity {
   consistencySpec?: AvatarConsistencySpec;
 }
 
+export interface AssetCatalogEntry {
+  id: string;
+  type: string;
+  name: string;
+  description?: string;
+}
+
 export interface Board {
   id: string;
   name: string;
@@ -158,6 +165,7 @@ export interface Board {
   avatarIdentity: AvatarIdentity | null;
   products?: Product[];
   brandContext?: BrandContext | null;
+  assetCatalog?: AssetCatalogEntry[];
   createdAt: number;
 }
 
