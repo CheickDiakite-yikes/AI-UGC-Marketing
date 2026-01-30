@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 .next
 .stripe-price-ids
+
+# Replit Object Storage
+*.pack.gz
+*.pack.gz.old
+.cache/
