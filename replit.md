@@ -32,9 +32,10 @@ The application features a clean, simplified interface focused on content genera
 - **Object Storage**: Replit Object Storage is used for all media files (images, videos, carousels) to improve performance, scalability, and reduce database load by storing only `storage_key` references.
 - **AI Features**: Utilizes Google Gemini models:
     - `gemini-3-pro-preview` for content planning and function calling.
-    - `gemini-3-pro-image-preview` for image generation.
+    - `gemini-3-pro-image-preview` for image generation with multimodal brand asset references.
     - `veo-3.1-fast-generate-preview` for cinematic video generation.
     - `gemini-2.5-flash` for URL context (website scraping) and Google Search grounding.
+- **Brand Asset Integration**: AI image generation automatically fetches and includes uploaded brand assets (logos, brand images) as multimodal input to Gemini. This ensures generated content visually incorporates actual brand elements rather than just text descriptions. Assets are loaded from `profileAssets` table via `brandAssetService.ts`.
 - **Background Job Processing**: AI generation tasks run as background jobs to ensure responsiveness. Jobs are managed in a `jobs` table with `pending`, `processing`, `completed`, and `failed` states. The system is designed to be Autoscale-compatible, processing jobs via API calls in production environments.
 - **Deployment**: Autoscale deployment is used for cost efficiency, with a build command `npm run build` and start command `npm run start -- -p 5000 -H 0.0.0.0`.
 

@@ -557,13 +557,25 @@ export const chatWithMarketingAgent = async (
   };
 };
 
+export interface BrandAssetReference {
+  mimeType: string;
+  base64: string;
+  role?: 'logo' | 'brand_image' | 'avatar';
+}
+
 export const generateMarketingImage = async (
   prompt: string,
   aspectRatio: AspectRatio = AspectRatio.SQUARE,
-  imageSize: ImageSize = ImageSize.ONE_K
+  imageSize: ImageSize = ImageSize.ONE_K,
+  brandAssets?: BrandAssetReference[]
 ): Promise<string> => {
   const model = "gemini-3-pro-image-preview";
-  const response: any = await generateImagesServer(model, prompt, { imageConfig: { aspectRatio, imageSize } });
+  const response: any = await generateImagesServer(
+    model, 
+    prompt, 
+    { imageConfig: { aspectRatio, imageSize } },
+    brandAssets
+  );
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;

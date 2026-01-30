@@ -323,3 +323,11 @@ export async function getAsset(storageKey: string): Promise<{ success: boolean; 
     return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
+
+export async function getAssetAsBase64(storageKey: string): Promise<string | null> {
+  const result = await getAsset(storageKey);
+  if (result.success && result.data) {
+    return result.data;
+  }
+  return null;
+}

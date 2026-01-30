@@ -87,13 +87,53 @@ export async function generateContentWithSearch(prompt: string, searchEnabled: b
     }
 }
 
-export async function generateImagesServer(model: string, prompt: string, config: any) {
+export async function generateImagesServer(
+    model: string, 
+    prompt: string, 
+    config: any,
+    referenceImages?: Array<{ mimeType: string; base64: string; role?: string }>
+) {
     if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is not configured on the server.");
     
     try {
+        const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
+        
+        if (referenceImages && referenceImages.length > 0) {
+            const validImages = referenceImages.filter(img => {
+                if (!img.mimeType?.startsWith('image/')) return false;
+                if (!img.base64 || img.base64.length < 100) return false;
+                if (img.base64.length > 10 * 1024 * 1024) return false;
+                return true;
+            });
+
+            if (validImages.length > 0) {
+                const imageContextParts: string[] = [];
+                const hasLogo = validImages.some(img => img.role === 'logo');
+                const hasBrandImages = validImages.some(img => img.role === 'brand_image');
+                
+                if (hasLogo) imageContextParts.push('Incorporate the brand logo prominently and accurately in the generated image.');
+                if (hasBrandImages) imageContextParts.push('Use the brand imagery as visual style reference for colors, aesthetics, and mood.');
+                
+                parts.push({ text: `${prompt}\n\nIMPORTANT: Reference images are provided below. ${imageContextParts.join(' ')}` });
+                
+                for (const img of validImages) {
+                    parts.push({
+                        inlineData: {
+                            mimeType: img.mimeType,
+                            data: img.base64
+                        }
+                    });
+                }
+            } else {
+                parts.push({ text: prompt });
+            }
+        } else {
+            parts.push({ text: prompt });
+        }
+        
         const response = await ai.models.generateContent({
             model,
-            contents: { parts: [{ text: prompt }] },
+            contents: { parts },
             config
         });
         

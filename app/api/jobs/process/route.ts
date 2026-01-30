@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPendingJobs, claimJob, updateJobStatus } from '../../../../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../../../../services/geminiService';
 import { compileVisualPromptWithIdentity } from '../../../../services/identityPromptService';
+import { getBrandAssetDataForGeneration } from '../../../../services/brandAssetService';
 import { resolveVideoIngredients } from '../../../../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../../../../services/videoPromptUtils';
 import { generateAutoReferenceImages } from '../../../../services/videoReferenceService';
@@ -90,9 +91,15 @@ async function processImageJob(job: Job): Promise<JobResult> {
     traceId
   });
 
-  console.log(`[API JOB PROCESSOR ${traceId}] Generating image...`);
+  const brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
+    includeLogo: true,
+    maxBrandImages: 2,
+    includeAvatars: false
+  });
+
+  console.log(`[API JOB PROCESSOR ${traceId}] Generating image with ${brandAssets.length} brand assets...`);
   
-  const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue);
+  const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue, undefined, brandAssets);
   
   const itemId = crypto.randomUUID();
   let storageKey: string | null = null;
