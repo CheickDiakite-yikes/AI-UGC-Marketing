@@ -133,9 +133,11 @@ export async function generateImagesServer(
             parts.push({ text: prompt });
         }
         
+        console.log(`[GENERATE_IMAGES_SERVER] Generating with ${parts.length} parts (${parts.filter(p => p.inlineData).length} images)`);
+        
         const response = await ai.models.generateContent({
             model,
-            contents: { parts },
+            contents: parts,
             config
         });
         
