@@ -135,10 +135,15 @@ export async function generateImagesServer(
         
         console.log(`[GENERATE_IMAGES_SERVER] Generating with ${parts.length} parts (${parts.filter(p => p.inlineData).length} images)`);
         
+        const finalConfig = {
+            responseModalities: ['TEXT', 'IMAGE'],
+            ...config
+        };
+        
         const response = await ai.models.generateContent({
             model,
             contents: parts,
-            config
+            config: finalConfig
         });
         
         // Extract image data properly for serialization
