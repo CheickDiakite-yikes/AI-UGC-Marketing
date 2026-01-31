@@ -176,8 +176,8 @@ export interface ReferenceAsset {
 }
 
 export interface InitialFrameImage {
-  imageBytes: string;
-  mimeType: string;
+  imageBytes?: string;
+  mimeType?: string;
 }
 
 export interface ResolveIngredientsResult {
