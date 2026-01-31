@@ -176,8 +176,8 @@ export interface ReferenceAsset {
 }
 
 export interface InitialFrameImage {
-  imageBytes?: string;
-  mimeType?: string;
+  imageBytes: string;
+  mimeType: string;
 }
 
 export interface ResolveIngredientsResult {
@@ -652,7 +652,10 @@ export async function resolveVideoIngredients(params: {
   if (!initialFrameAsset && wantsLogo && logoAsset) {
     initialFrameAsset = logoAsset;
   }
-  const initialFrame = initialFrameAsset?.referenceImage?.image || null;
+  const initialFrameCandidate = initialFrameAsset?.referenceImage?.image;
+  const initialFrame = initialFrameCandidate?.imageBytes && initialFrameCandidate?.mimeType
+    ? { imageBytes: initialFrameCandidate.imageBytes, mimeType: initialFrameCandidate.mimeType }
+    : null;
 
   if (initialFrameAsset) {
     logTrace(traceId, 'Selected initial frame', {
