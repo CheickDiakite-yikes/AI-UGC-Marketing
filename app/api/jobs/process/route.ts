@@ -206,7 +206,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let productIdUsed: string | undefined;
   let autoReferenceUsed = false;
   let avatarReferenceImages = [];
-  let initialFrame: { imageBytes: string; mimeType: string } | null = null;
+  let initialFrame: { imageBytes?: string; mimeType?: string } | null = null;
   let initialFrameAssetId: string | undefined;
   let initialFrameRole: string | undefined;
   let initialFrameOrigin: string | undefined;
@@ -281,7 +281,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let initialFrameAttempted = false;
 
   const buildOptions = (references: typeof referenceImages, useFrame: boolean) => {
-    const options: { referenceImages?: typeof referenceImages; initialFrame?: { imageBytes: string; mimeType: string }; traceId: string } = { traceId };
+    const options: { referenceImages?: typeof referenceImages; initialFrame?: { imageBytes?: string; mimeType?: string }; traceId: string } = { traceId };
     if (references.length > 0) options.referenceImages = references;
     if (useFrame && initialFrame) options.initialFrame = initialFrame;
     return options;

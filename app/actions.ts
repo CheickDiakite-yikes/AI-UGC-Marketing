@@ -185,7 +185,7 @@ export async function generateVideoServer(
         durationSeconds?: 4 | 6 | 8;
         qualityMode?: boolean;
         referenceImages?: VideoGenerationReferenceImage[];
-        image?: { imageBytes: string; mimeType: string };
+        image?: { imageBytes?: string; mimeType?: string };
         traceId?: string;
     }
 ): Promise<string> {

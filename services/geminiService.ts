@@ -692,7 +692,7 @@ export const generateReferenceImage = async (
 export const generateVeoVideo = async (
   prompt: string,
   config: VeoConfig,
-  options?: { referenceImages?: VideoGenerationReferenceImage[]; initialFrame?: { imageBytes: string; mimeType: string }; traceId?: string }
+  options?: { referenceImages?: VideoGenerationReferenceImage[]; initialFrame?: { imageBytes?: string; mimeType?: string }; traceId?: string }
 ): Promise<string> => {
   const videoUrl = await generateVideoServer(prompt, {
     aspectRatio: config.aspectRatio,
