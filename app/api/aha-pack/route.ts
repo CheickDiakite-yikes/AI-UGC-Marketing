@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
         hook: carouselItem.hook,
         archetype: carouselItem.archetype,
       },
+      productId: carouselItem.productId,
       freebie: true,
       traceId: crypto.randomUUID(),
     });

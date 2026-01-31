@@ -1146,33 +1146,29 @@ export async function analyzeWebsiteAction(
     }
 
     const TIMEOUT_MS = 45000;
-    const prompt = `You are analyzing a company website. Extract all available brand information from the page content.
+    const prompt = `IMPORTANT: You MUST respond with ONLY a valid JSON object. Do not include any text before or after the JSON. No explanations, no markdown, just raw JSON.
 
-Return a JSON object with these fields:
+Analyze this company website and extract brand information.
 
-REQUIRED (always include):
-- companyName: The company or brand name
-- description: A 2-3 sentence overview of what the company does
-- industry: The primary industry or sector
-- keyOfferings: Array of 3-5 main products or services
-- targetAudience: Who the company primarily serves
+JSON Schema (respond with exactly this structure):
+{
+  "companyName": "string (required)",
+  "description": "string - 2-3 sentence overview (required)",
+  "industry": "string (required)",
+  "keyOfferings": ["array", "of", "products/services"],
+  "targetAudience": "string (required)",
+  "tagline": "string or null",
+  "brandColors": ["#HEX1", "#HEX2"] or [],
+  "socialLinks": [{"platform": "name", "url": "link"}] or [],
+  "contactEmail": "string or null",
+  "missionStatement": "string or null",
+  "foundedYear": "string or null",
+  "teamSize": "string or null"
+}
 
-OPTIONAL (include if you can find them on the website):
-- tagline: The brand's tagline, slogan, or motto (look in headers, hero sections)
-- brandColors: Primary brand colors as hex codes, extract from the website's design (array like ["#FF5500", "#1A1A1A"])
-- socialLinks: Social media links found in footer or header (array of {platform: "twitter", url: "..."})
-- contactEmail: Contact email address if visible
-- missionStatement: Company mission, vision, or "about us" statement
-- foundedYear: Year founded if mentioned (as string like "2020")
-- teamSize: Company size if mentioned (like "50-100 employees" or "Enterprise")
+Look for: company name in header/logo, tagline in hero section, colors from CSS/design, social links in footer.
 
-Look carefully at:
-- The page header and hero section for tagline
-- Footer for social links and contact info
-- About page content for mission and founding info
-- CSS/design for brand colors
-
-Return valid JSON only.`;
+RESPOND WITH JSON ONLY:`;
 
     try {
         const { generateContentWithUrlContext } = await import('@/app/actions');
@@ -1200,7 +1196,22 @@ Return valid JSON only.`;
             }
             jsonText = jsonText.trim();
             
-            return JSON.parse(jsonText) as ExtractedBrandData;
+            const firstBrace = jsonText.indexOf('{');
+            const lastBrace = jsonText.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                jsonText = jsonText.substring(firstBrace, lastBrace + 1);
+            }
+            
+            try {
+                return JSON.parse(jsonText) as ExtractedBrandData;
+            } catch (parseError) {
+                console.error('[ANALYZE_WEBSITE] JSON parse failed, trying regex extraction');
+                const jsonMatch = urlResponse.text.match(/\{[\s\S]*"companyName"[\s\S]*\}/);
+                if (jsonMatch) {
+                    return JSON.parse(jsonMatch[0]) as ExtractedBrandData;
+                }
+                throw parseError;
+            }
         })();
 
         const data = await Promise.race([analysisPromise, timeoutPromise]);

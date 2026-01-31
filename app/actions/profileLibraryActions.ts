@@ -106,11 +106,13 @@ export async function uploadProfileAssetAction(formData: FormData) {
     redirect('/login');
   }
 
-  const file = formData.get('file') as File | null;
+  const files = formData
+    .getAll('file')
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
   const assetType = (formData.get('assetType') as string | null) || 'image';
   const category = (formData.get('category') as string | null) || null;
 
-  if (!file || file.size === 0) {
+  if (files.length === 0) {
     redirect('/profile?error=missing_file');
   }
 
@@ -118,39 +120,43 @@ export async function uploadProfileAssetAction(formData: FormData) {
     redirect('/profile?error=invalid_asset_type');
   }
 
-  if (assetType === 'pdf' && file.type !== 'application/pdf') {
-    redirect('/profile?error=invalid_pdf');
-  }
-
-  if (['logo', 'image', 'avatar'].includes(assetType) && !file.type.startsWith('image/')) {
-    redirect('/profile?error=invalid_image');
-  }
-
-  const base64 = await readFileAsBase64(file);
-  const isImage = file.type.startsWith('image/');
-  let storageKey: string | null = null;
-  let content: string | null = base64;
-  const assetId = crypto.randomUUID();
-
-  if (isImage && ['logo', 'image', 'avatar'].includes(assetType)) {
-    const uploadResult = await uploadProfileAsset(session.userId as string, assetId, base64, file.type);
-    if (!uploadResult.success || !uploadResult.storageKey) {
-      redirect('/profile?error=upload_failed');
+  for (const file of files) {
+    if (assetType === 'pdf' && file.type !== 'application/pdf') {
+      redirect('/profile?error=invalid_pdf');
     }
-    storageKey = uploadResult.storageKey;
-    content = null;
+
+    if (['logo', 'image', 'avatar'].includes(assetType) && !file.type.startsWith('image/')) {
+      redirect('/profile?error=invalid_image');
+    }
   }
 
-  await db.insert(profileAssets).values({
-    id: assetId,
-    userId: session.userId as string,
-    type: assetType as 'logo' | 'image' | 'avatar' | 'pdf' | 'text' | 'link',
-    name: file.name,
-    content,
-    storageKey,
-    mimeType: file.type,
-    metadata: category ? { category } : null,
-  });
+  for (const file of files) {
+    const base64 = await readFileAsBase64(file);
+    const isImage = file.type.startsWith('image/');
+    let storageKey: string | null = null;
+    let content: string | null = base64;
+    const assetId = crypto.randomUUID();
+
+    if (isImage && ['logo', 'image', 'avatar'].includes(assetType)) {
+      const uploadResult = await uploadProfileAsset(session.userId as string, assetId, base64, file.type);
+      if (!uploadResult.success || !uploadResult.storageKey) {
+        redirect('/profile?error=upload_failed');
+      }
+      storageKey = uploadResult.storageKey;
+      content = null;
+    }
+
+    await db.insert(profileAssets).values({
+      id: assetId,
+      userId: session.userId as string,
+      type: assetType as 'logo' | 'image' | 'avatar' | 'pdf' | 'text' | 'link',
+      name: file.name,
+      content,
+      storageKey,
+      mimeType: file.type,
+      metadata: category ? { category } : null,
+    });
+  }
 
   revalidatePath('/profile');
   redirect('/profile?updated=library');

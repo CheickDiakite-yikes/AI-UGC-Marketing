@@ -596,14 +596,14 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
             <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Logos</p>
-                <p className="text-[11px] text-gray-600">Primary and alternate logos.</p>
+                <p className="text-[11px] text-gray-600">Primary and alternate logos. You can select multiple files.</p>
               </div>
               <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
                 <input type="hidden" name="assetType" value="logo" />
                 <input type="hidden" name="category" value="logo" />
-                <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
+                <input type="file" name="file" accept="image/*" multiple className="text-xs font-bold" required />
                 <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all">
-                  Upload Logo
+                  Upload Logos
                 </button>
               </form>
               <div className="space-y-2">
@@ -635,14 +635,14 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
             <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Avatar Library</p>
-                <p className="text-[11px] text-gray-600">Spokespeople and persona shots.</p>
+                <p className="text-[11px] text-gray-600">Spokespeople and persona shots. You can select multiple files.</p>
               </div>
               <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
                 <input type="hidden" name="assetType" value="avatar" />
                 <input type="hidden" name="category" value="avatar" />
-                <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
+                <input type="file" name="file" accept="image/*" multiple className="text-xs font-bold" required />
                 <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-lime hover:text-black transition-all">
-                  Upload Avatar
+                  Upload Avatars
                 </button>
               </form>
               <div className="space-y-2">
@@ -687,14 +687,14 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
             <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Company Decks</p>
-                <p className="text-[11px] text-gray-600">PDF decks and one-pagers.</p>
+                <p className="text-[11px] text-gray-600">PDF decks and one-pagers. You can select multiple files.</p>
               </div>
               <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
                 <input type="hidden" name="assetType" value="pdf" />
                 <input type="hidden" name="category" value="company_deck" />
-                <input type="file" name="file" accept="application/pdf,.pdf" className="text-xs font-bold" required />
+                <input type="file" name="file" accept="application/pdf,.pdf" multiple className="text-xs font-bold" required />
                 <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-pink hover:text-black transition-all">
-                  Upload Deck
+                  Upload Decks
                 </button>
               </form>
               <div className="space-y-2">
@@ -722,14 +722,14 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
             <div className="border-2 border-black bg-gray-50 p-4 space-y-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest">Brand Images</p>
-                <p className="text-[11px] text-gray-600">Approved imagery for campaigns.</p>
+                <p className="text-[11px] text-gray-600">Approved imagery for campaigns. You can select multiple files.</p>
               </div>
               <form action={uploadProfileAssetAction} encType="multipart/form-data" className="space-y-2">
                 <input type="hidden" name="assetType" value="image" />
                 <input type="hidden" name="category" value="brand_image" />
-                <input type="file" name="file" accept="image/*" className="text-xs font-bold" required />
+                <input type="file" name="file" accept="image/*" multiple className="text-xs font-bold" required />
                 <button type="submit" className="w-full bg-black text-white border-2 border-black py-2 text-xs font-bold uppercase tracking-widest hover:bg-neo-cyan hover:text-black transition-all">
-                  Upload Image
+                  Upload Images
                 </button>
               </form>
               <div className="space-y-2">

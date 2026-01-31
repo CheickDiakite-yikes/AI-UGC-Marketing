@@ -40,6 +40,14 @@ interface JobResult {
   [key: string]: unknown;
 }
 
+const MAX_IMAGE_REFERENCES = 14;
+
+const normalizeAssetIds = (assetIds?: string[]) => {
+  if (!assetIds) return [];
+  const unique = Array.from(new Set(assetIds.filter(Boolean)));
+  return unique.slice(0, MAX_IMAGE_REFERENCES);
+};
+
 const assertImageQuota = async (userId: string, count: number = 1) => {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
@@ -93,15 +101,17 @@ async function processImageJob(job: Job): Promise<JobResult> {
   });
 
   let brandAssets;
-  if (brandAssetIds && brandAssetIds.length > 0) {
-    console.log(`[API JOB PROCESSOR ${traceId}] AI selected ${brandAssetIds.length} specific assets: ${brandAssetIds.join(', ')}`);
-    brandAssets = await getBrandAssetsByIds(job.boardId, brandAssetIds);
+  const selectedAssetIds = normalizeAssetIds(brandAssetIds);
+  if (selectedAssetIds.length > 0) {
+    console.log(`[API JOB PROCESSOR ${traceId}] AI selected ${selectedAssetIds.length} specific assets: ${selectedAssetIds.join(', ')}`);
+    brandAssets = await getBrandAssetsByIds(job.boardId, selectedAssetIds);
   } else {
     const useAvatar = shouldUseAvatar(prompt);
     brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
       includeLogo: true,
-      maxBrandImages: 2,
-      includeAvatars: useAvatar
+      includeAvatars: useAvatar,
+      maxTotal: MAX_IMAGE_REFERENCES,
+      maxAvatars: 5
     });
     console.log(`[API JOB PROCESSOR ${traceId}] Auto-selected ${brandAssets.length} brand assets`);
   }
@@ -419,28 +429,55 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
     title?: string;
     description?: string;
     metadata?: Record<string, unknown>;
+    productId?: string;
+    brandAssetIds?: string[];
+    traceId?: string;
     freebie?: boolean;
   };
-  const { slides, aspectRatio, title, description, metadata } = payload;
+  const { slides, aspectRatio, title, description, metadata, productId, brandAssetIds } = payload;
+  const traceId = payload.traceId || crypto.randomUUID();
   const isFreebie = payload.freebie === true;
 
   if (!isFreebie) {
     await assertImageQuota(job.userId, slides.length);
   }
   
-  console.log(`[API JOB PROCESSOR] Generating carousel with ${slides.length} slides...`);
+  console.log(`[API JOB PROCESSOR ${traceId}] Generating carousel with ${slides.length} slides...`);
   
   const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.PORTRAIT;
   const itemId = crypto.randomUUID();
   const slideUrls: string[] = [];
   let coverUrl: string | null = null;
+
+  const slidePrompts = slides.map(slide => slide.prompt).filter(Boolean);
+  const useAvatar = slidePrompts.some(prompt => shouldUseAvatar(prompt));
+  let brandAssets;
+  const selectedAssetIds = normalizeAssetIds(brandAssetIds);
+  if (selectedAssetIds.length > 0) {
+    console.log(`[API JOB PROCESSOR ${traceId}] Carousel selected ${selectedAssetIds.length} specific assets: ${selectedAssetIds.join(', ')}`);
+    brandAssets = await getBrandAssetsByIds(job.boardId, selectedAssetIds);
+  } else {
+    brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
+      includeLogo: true,
+      includeAvatars: useAvatar,
+      maxTotal: MAX_IMAGE_REFERENCES,
+      maxAvatars: 5
+    });
+    console.log(`[API JOB PROCESSOR ${traceId}] Carousel auto-selected ${brandAssets.length} brand assets`);
+  }
   
   for (let i = 0; i < slides.length; i++) {
     const slidePrompt = slides[i].prompt;
-    console.log(`[API JOB PROCESSOR] Generating slide ${i + 1}/${slides.length}...`);
+    console.log(`[API JOB PROCESSOR ${traceId}] Generating slide ${i + 1}/${slides.length}...`);
     
     try {
-      const slideImage = await generateMarketingImage(slidePrompt, aspectRatioValue);
+      const compiled = await compileVisualPromptWithIdentity({
+        boardId: job.boardId,
+        basePrompt: slidePrompt,
+        productId,
+        traceId
+      });
+      const slideImage = await generateMarketingImage(compiled.prompt, aspectRatioValue, undefined, brandAssets);
       const slideKey = `boards/${job.boardId}/generated/${itemId}_slide${i + 1}.png`;
       const uploadResult = await uploadGeneratedItem(job.boardId, `${itemId}_slide${i + 1}`, slideImage, 'image');
       
@@ -466,7 +503,7 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
     carouselUrls: slideUrls,
     title: title || 'Generated Carousel',
     description: description,
-    metadata: { ...metadata, aspectRatio, jobId: job.id, slideCount: slides.length },
+    metadata: { ...metadata, aspectRatio, jobId: job.id, slideCount: slides.length, productId: productId || null, traceId },
   }).returning();
   
   if (!isFreebie) {

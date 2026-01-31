@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { profileAssets, boards, users } from '@/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { getAssetAsBase64 } from './objectStorageService';
 
 export interface BrandAssetReference {
@@ -80,8 +80,13 @@ export async function getBrandAssetsByIds(
   });
 
   const result: BrandAssetData[] = [];
+  const assetById = new Map(assets.map(asset => [asset.id, asset]));
+  const orderedAssets = assetIds
+    .filter((id, idx, arr) => arr.indexOf(id) === idx)
+    .map(id => assetById.get(id))
+    .filter((asset): asset is typeof assets[number] => Boolean(asset));
   
-  for (const asset of assets) {
+  for (const asset of orderedAssets) {
     if (!asset.storageKey || !asset.mimeType?.startsWith('image/')) continue;
     
     try {
@@ -125,7 +130,8 @@ export async function getBrandAssetsForBoard(boardId: string): Promise<BrandAsse
       storageKey: true,
       name: true,
       mimeType: true
-    }
+    },
+    orderBy: [desc(profileAssets.createdAt)]
   });
 
   return assets
@@ -140,62 +146,64 @@ export async function getBrandAssetsForBoard(boardId: string): Promise<BrandAsse
 
 export async function getBrandAssetDataForGeneration(
   boardId: string,
-  options?: { includeLogo?: boolean; maxBrandImages?: number; includeAvatars?: boolean }
+  options?: { includeLogo?: boolean; maxBrandImages?: number; includeAvatars?: boolean; maxTotal?: number; maxLogos?: number; maxAvatars?: number }
 ): Promise<BrandAssetData[]> {
-  const { includeLogo = true, maxBrandImages = 2, includeAvatars = false } = options || {};
+  const {
+    includeLogo = true,
+    maxBrandImages,
+    includeAvatars = false,
+    maxTotal = 14,
+    maxLogos = 1,
+    maxAvatars = 1
+  } = options || {};
 
   const assets = await getBrandAssetsForBoard(boardId);
-  if (assets.length === 0) return [];
+  if (assets.length === 0 || maxTotal <= 0) return [];
 
   const result: BrandAssetData[] = [];
+  let remaining = maxTotal;
 
-  const logo = assets.find(a => a.type === 'logo');
-  if (includeLogo && logo) {
+  const pushAsset = async (asset: BrandAssetReference, role: BrandAssetData['role']) => {
+    if (remaining <= 0) return;
     try {
-      const logoData = await getAssetAsBase64(logo.storageKey);
-      if (logoData) {
+      const assetData = await getAssetAsBase64(asset.storageKey);
+      if (assetData) {
         result.push({
-          mimeType: logo.mimeType,
-          base64: logoData,
-          role: 'logo'
+          mimeType: asset.mimeType,
+          base64: assetData,
+          role
         });
+        remaining -= 1;
       }
     } catch (e) {
-      console.warn('[BRAND_ASSET_SERVICE] Failed to load logo:', e);
+      console.warn(`[BRAND_ASSET_SERVICE] Failed to load ${role}:`, e);
+    }
+  };
+
+  if (includeLogo && remaining > 0) {
+    const logos = assets.filter(a => a.type === 'logo').slice(0, Math.max(0, maxLogos));
+    for (const logo of logos) {
+      await pushAsset(logo, 'logo');
+      if (remaining <= 0) break;
     }
   }
 
-  const brandImages = assets.filter(a => a.type === 'image').slice(0, maxBrandImages);
-  for (const img of brandImages) {
-    try {
-      const imgData = await getAssetAsBase64(img.storageKey);
-      if (imgData) {
-        result.push({
-          mimeType: img.mimeType,
-          base64: imgData,
-          role: 'brand_image'
-        });
-      }
-    } catch (e) {
-      console.warn('[BRAND_ASSET_SERVICE] Failed to load brand image:', e);
-    }
-  }
-
-  if (includeAvatars) {
-    const avatars = assets.filter(a => a.type === 'avatar').slice(0, 1);
+  if (includeAvatars && remaining > 0) {
+    const avatars = assets.filter(a => a.type === 'avatar').slice(0, Math.max(0, maxAvatars));
     for (const avatar of avatars) {
-      try {
-        const avatarData = await getAssetAsBase64(avatar.storageKey);
-        if (avatarData) {
-          result.push({
-            mimeType: avatar.mimeType,
-            base64: avatarData,
-            role: 'avatar'
-          });
-        }
-      } catch (e) {
-        console.warn('[BRAND_ASSET_SERVICE] Failed to load avatar:', e);
-      }
+      await pushAsset(avatar, 'avatar');
+      if (remaining <= 0) break;
+    }
+  }
+
+  if (remaining > 0) {
+    const brandImages = assets.filter(a => a.type === 'image');
+    const maxImages = typeof maxBrandImages === 'number'
+      ? Math.min(maxBrandImages, remaining)
+      : remaining;
+    for (const img of brandImages.slice(0, Math.max(0, maxImages))) {
+      await pushAsset(img, 'brand_image');
+      if (remaining <= 0) break;
     }
   }
 

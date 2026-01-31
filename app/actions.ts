@@ -107,18 +107,19 @@ export async function generateImagesServer(
             });
 
             if (validImages.length > 0) {
+                const limitedImages = validImages.slice(0, 14);
                 const imageContextParts: string[] = [];
-                const hasLogo = validImages.some(img => img.role === 'logo');
-                const hasBrandImages = validImages.some(img => img.role === 'brand_image');
-                const hasAvatar = validImages.some(img => img.role === 'avatar');
+                const hasLogo = limitedImages.some(img => img.role === 'logo');
+                const hasBrandImages = limitedImages.some(img => img.role === 'brand_image');
+                const hasAvatar = limitedImages.some(img => img.role === 'avatar');
                 
-                if (hasLogo) imageContextParts.push('Incorporate the brand logo prominently and accurately in the generated image.');
-                if (hasBrandImages) imageContextParts.push('Use the brand imagery as visual style reference for colors, aesthetics, and mood.');
+                if (hasLogo) imageContextParts.push('Use the provided logo as the exact visual reference (do not redraw, stylize, or alter colors). Place it cleanly and keep the shape intact.');
+                if (hasBrandImages) imageContextParts.push('Use the provided brand/product imagery as the PRIMARY visual reference. Preserve real colors, materials, and distinctive details.');
                 if (hasAvatar) imageContextParts.push('CRITICAL: Use the provided avatar/spokesperson photo as the EXACT visual reference for any person in this image. The generated person must closely match the face, features, skin tone, and overall appearance of the reference photo.');
                 
                 parts.push({ text: `${prompt}\n\nIMPORTANT: Reference images are provided below. ${imageContextParts.join(' ')}` });
                 
-                for (const img of validImages) {
+                for (const img of limitedImages) {
                     parts.push({
                         inlineData: {
                             mimeType: img.mimeType,

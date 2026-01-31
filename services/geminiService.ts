@@ -32,7 +32,7 @@ const generateImageTool: FunctionDeclaration = {
       brandAssetIds: { 
         type: Type.ARRAY, 
         items: { type: Type.STRING }, 
-        description: "Array of asset IDs from the BRAND ASSET LIBRARY to include as reference images. Select the most relevant logos, brand images, or avatars for this specific visual. Max 14 assets. If not provided, the system will auto-select logo + recent brand images." 
+        description: "Array of asset IDs from the BRAND ASSET LIBRARY to include as reference images. Select the most relevant logos, brand images, or avatars for this specific visual. Max 14 assets. If not provided, the system will auto-select up to 14 assets (logo + brand imagery + avatar when relevant)." 
       },
       title: { type: Type.STRING, description: "Short title for the asset card." },
       hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
@@ -570,7 +570,7 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     - For product shots: Include product-specific brand images
     - For style matching: Include brand images that match the desired aesthetic
     - Max 14 reference images per generation
-    - If you don't specify brandAssetIds, the system will auto-select the primary logo and recent brand images
+    - If you don't specify brandAssetIds, the system will auto-select up to 14 assets (logo + brand imagery + avatar if relevant)
     ════════════════════════════════════════════════════════════════════════════
     ` : ''}
     

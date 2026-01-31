@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getOnboardingStateAction, dismissOnboardingAction, resumeOnboardingAction, completeOnboardingAction, resetOnboardingAction } from '@/app/actions/boardActions';
+import { logout } from '@/app/actions/authActions';
 import { getUserProfile, updateUserPassword, updateUserProfile } from '@/app/actions/userActions';
 import { getSubscriptionStateAction } from '@/app/actions/subscriptionActions';
 import BillingControls from '@/components/BillingControls';
@@ -333,6 +334,23 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             </div>
           </section>
         </div>
+
+        <section className="bg-white border-4 border-black shadow-neo p-6 mt-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h2 className="font-display font-black text-xl">Sign Out</h2>
+              <p className="text-sm text-gray-600">Log out and return to the login screen.</p>
+            </div>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="bg-neo-pink border-2 border-black px-5 py-3 text-xs font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+              >
+                Sign Out
+              </button>
+            </form>
+          </div>
+        </section>
       </main>
     </div>
   );

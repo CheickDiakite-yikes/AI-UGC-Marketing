@@ -1,6 +1,8 @@
 import { getPendingJobs, claimJob, updateJobStatus } from '../services/jobService';
 import { generateMarketingImage, generateVeoVideo } from '../services/geminiService';
 import { compileVisualPromptWithIdentity } from '../services/identityPromptService';
+import { getBrandAssetDataForGeneration, getBrandAssetsByIds } from '../services/brandAssetService';
+import { shouldUseAvatar } from '../services/identityPromptUtils';
 import { resolveVideoIngredients } from '../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../services/videoPromptUtils';
 import { generateAutoReferenceImages } from '../services/videoReferenceService';
@@ -15,6 +17,13 @@ import { getRemainingImages, getRemainingVideos } from '../services/usageLimits'
 import { consumeUsage } from '../services/usageConsumption';
 
 const POLL_INTERVAL = 5000;
+const MAX_IMAGE_REFERENCES = 14;
+
+const normalizeAssetIds = (assetIds?: string[]) => {
+  if (!assetIds) return [];
+  const unique = Array.from(new Set(assetIds.filter(Boolean)));
+  return unique.slice(0, MAX_IMAGE_REFERENCES);
+};
 
 interface Job {
   id: string;
@@ -73,8 +82,8 @@ const assertVideoQuota = async (userId: string, count: number = 1) => {
 };
 
 async function processImageJob(job: Job): Promise<JobResult> {
-  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string; freebie?: boolean };
-  const { prompt, aspectRatio, title, caption, hook, archetype, productId } = payload;
+  const payload = job.payload as { prompt: string; aspectRatio?: string; imageSize?: string; title?: string; caption?: string; hook?: string; archetype?: string; productId?: string; traceId?: string; freebie?: boolean; brandAssetIds?: string[] };
+  const { prompt, aspectRatio, title, caption, hook, archetype, productId, brandAssetIds } = payload;
   const traceId = payload.traceId || crypto.randomUUID();
   const isFreebie = payload.freebie === true;
 
@@ -91,9 +100,25 @@ async function processImageJob(job: Job): Promise<JobResult> {
     traceId
   });
 
-  console.log(`[JOB RUNNER ${traceId}] Generating image with prompt: "${compiled.prompt.substring(0, 50)}..."`);
+  let brandAssets;
+  const selectedAssetIds = normalizeAssetIds(brandAssetIds);
+  if (selectedAssetIds.length > 0) {
+    console.log(`[JOB RUNNER ${traceId}] AI selected ${selectedAssetIds.length} specific assets: ${selectedAssetIds.join(', ')}`);
+    brandAssets = await getBrandAssetsByIds(job.boardId, selectedAssetIds);
+  } else {
+    const useAvatar = shouldUseAvatar(prompt);
+    brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
+      includeLogo: true,
+      includeAvatars: useAvatar,
+      maxTotal: MAX_IMAGE_REFERENCES,
+      maxAvatars: 5
+    });
+    console.log(`[JOB RUNNER ${traceId}] Auto-selected ${brandAssets.length} brand assets`);
+  }
+
+  console.log(`[JOB RUNNER ${traceId}] Generating image with ${brandAssets.length} brand assets...`);
   
-  const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue);
+  const imageResult = await generateMarketingImage(compiled.prompt, aspectRatioValue, undefined, brandAssets);
   
   const itemId = crypto.randomUUID();
   let storageKey: string | null = null;
@@ -138,6 +163,102 @@ async function processImageJob(job: Job): Promise<JobResult> {
     content: storageKey ? `/api/storage/${encodeURIComponent(storageKey)}` : imageResult, 
     type: 'image',
     itemId: saved.id
+  };
+}
+
+async function processCarouselJob(job: Job): Promise<JobResult> {
+  const payload = job.payload as {
+    slides: Array<{ prompt: string }>;
+    aspectRatio?: string;
+    title?: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+    productId?: string;
+    brandAssetIds?: string[];
+    traceId?: string;
+    freebie?: boolean;
+  };
+  const { slides, aspectRatio, title, description, metadata, productId, brandAssetIds } = payload;
+  const traceId = payload.traceId || crypto.randomUUID();
+  const isFreebie = payload.freebie === true;
+
+  if (!isFreebie) {
+    await assertImageQuota(job.userId, slides.length);
+  }
+
+  console.log(`[JOB RUNNER ${traceId}] Generating carousel with ${slides.length} slides...`);
+
+  const aspectRatioValue = (aspectRatio as AspectRatio) || AspectRatio.PORTRAIT;
+  const itemId = crypto.randomUUID();
+  const slideUrls: string[] = [];
+  let coverUrl: string | null = null;
+
+  const slidePrompts = slides.map(slide => slide.prompt).filter(Boolean);
+  const useAvatar = slidePrompts.some(prompt => shouldUseAvatar(prompt));
+  let brandAssets;
+  const selectedAssetIds = normalizeAssetIds(brandAssetIds);
+  if (selectedAssetIds.length > 0) {
+    console.log(`[JOB RUNNER ${traceId}] Carousel selected ${selectedAssetIds.length} specific assets: ${selectedAssetIds.join(', ')}`);
+    brandAssets = await getBrandAssetsByIds(job.boardId, selectedAssetIds);
+  } else {
+    brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
+      includeLogo: true,
+      includeAvatars: useAvatar,
+      maxTotal: MAX_IMAGE_REFERENCES,
+      maxAvatars: 5
+    });
+    console.log(`[JOB RUNNER ${traceId}] Carousel auto-selected ${brandAssets.length} brand assets`);
+  }
+
+  for (let i = 0; i < slides.length; i++) {
+    const slidePrompt = slides[i].prompt;
+    console.log(`[JOB RUNNER ${traceId}] Generating slide ${i + 1}/${slides.length}...`);
+
+    const compiled = await compileVisualPromptWithIdentity({
+      boardId: job.boardId,
+      basePrompt: slidePrompt,
+      productId,
+      traceId
+    });
+
+    const slideImage = await generateMarketingImage(compiled.prompt, aspectRatioValue, undefined, brandAssets);
+    const uploadResult = await uploadGeneratedItem(job.boardId, `${itemId}_slide${i + 1}`, slideImage, 'image');
+    if (uploadResult.success && uploadResult.storageKey) {
+      const slideUrl = `/api/storage/${encodeURIComponent(uploadResult.storageKey)}`;
+      slideUrls.push(slideUrl);
+      if (i === 0) coverUrl = slideUrl;
+    } else {
+      slideUrls.push(slideImage);
+      if (i === 0) coverUrl = slideImage;
+    }
+  }
+
+  const [saved] = await db.insert(generatedItems).values({
+    id: itemId,
+    boardId: job.boardId,
+    type: 'carousel',
+    content: coverUrl,
+    carouselUrls: slideUrls,
+    title: title || 'Generated Carousel',
+    description: description,
+    metadata: { ...metadata, aspectRatio, jobId: job.id, slideCount: slides.length, productId: productId || null, traceId },
+  }).returning();
+
+  if (!isFreebie) {
+    try {
+      await consumeUsage(job.userId, 'image', slides.length);
+    } catch (error) {
+      console.warn('[JOB RUNNER] Failed to apply carousel usage charge', error);
+    }
+  }
+
+  console.log(`[JOB RUNNER] Saved carousel ${itemId} with ${slideUrls.length} slides`);
+
+  return {
+    content: coverUrl,
+    type: 'carousel',
+    itemId: saved.id,
+    carouselUrls: slideUrls
   };
 }
 
@@ -407,6 +528,9 @@ async function processJob(job: Job): Promise<void> {
         break;
       case 'generate_long_video':
         result = await processLongVideoJob(job);
+        break;
+      case 'generate_carousel':
+        result = await processCarouselJob(job);
         break;
       case 'generate_campaign':
         result = await processCampaignJob(job);

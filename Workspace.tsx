@@ -1772,6 +1772,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
             const caption = typeof fc.args['caption'] === 'string' ? fc.args['caption'] : undefined;
             const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
+            const brandAssetIds = Array.isArray(fc.args['brandAssetIds']) ? fc.args['brandAssetIds'] : undefined;
             const traceId = crypto.randomUUID();
             if (remainingImages <= 0) {
               const message = `Image quota reached (${usage.imagesGenerated}/${imageLimit}).`;
@@ -1793,6 +1794,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   hook,
                   caption,
                   archetype,
+                  brandAssetIds,
                   traceId
                 }
               })
@@ -2257,8 +2259,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               continue;
             }
             if (item.type === 'carousel') {
-              // TODO: Add carousel support to job runner
-              // For now, run synchronously with fallback
               try {
                 const prompts = Array.isArray(item.carousel_prompts) ? item.carousel_prompts : [];
                 const safePrompts = prompts.length > 0 ? prompts : [`Hero slide for ${item.title || 'product'} with bold headline.`];
@@ -2273,27 +2273,57 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
                   skippedReasons.push(`Carousel trimmed to ${slidesToGenerate} slide(s) due to image quota.`);
                 }
                 const promptsToUse = safePrompts.slice(0, slidesToGenerate);
-                const slides: string[] = [];
-                for (const p of promptsToUse) {
-                  const compiled = buildIdentityConstraints({
-                    basePrompt: p,
-                    brandIdentity: activeBoard.brandIdentity,
-                    avatarIdentity: activeBoard.avatarIdentity,
-                    products: activeBoard.products || [],
-                    productId: item.productId
-                  });
-                  const slide = await generateMarketingImage(compiled.prompt, item.aspectRatio || AspectRatio.SQUARE);
-                  slides.push(slide);
+
+                const res = await fetch('/api/jobs', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    boardId: activeBoardId,
+                    type: 'generate_carousel',
+                    payload: {
+                      slides: promptsToUse.map(prompt => ({ prompt })),
+                      aspectRatio: item.aspectRatio || '1:1',
+                      title: item.title,
+                      description: item.caption,
+                      metadata: { hook: item.hook, archetype: item.archetype },
+                      productId: item.productId,
+                      traceId
+                    }
+                  })
+                });
+                const job = await res.json().catch(() => null);
+                if (!res.ok || !job?.id) {
+                  const message = job?.error || 'Carousel generation failed.';
+                  if (job?.code === 'QUOTA_EXCEEDED') {
+                    openPaywall('image_limit');
+                    skippedCount++;
+                    skippedReasons.push(message);
+                  } else {
+                    showError(message);
+                  }
+                  continue;
                 }
-                const carouselItem: CanvasItem = { id: Math.random().toString(), type: 'carousel', content: slides[0], carouselUrls: slides, title: item.title, meta: { caption: item.caption, hook: item.hook, archetype: item.archetype } };
-                newItems.push(carouselItem);
-                await saveGeneratedItemAction(activeBoardId, carouselItem);
-                getUserUsageAction().then(setUsage);
-                immediateCount++;
+
+                backgroundCount++;
                 queuedCount++;
+                setActiveJobs(prev => [...prev, job.id]);
+                addPendingItem(job.id, 'carousel', {
+                  title: item.title,
+                  aspectRatio: item.aspectRatio || '1:1',
+                  caption: item.caption,
+                  hook: item.hook,
+                  archetype: item.archetype,
+                  slideCount: promptsToUse.length,
+                  queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
+                });
                 remainingImages = Math.max(0, remainingImages - slidesToGenerate);
+                pollJobStatus(job.id, async () => {
+                  await loadBoardDetails(activeBoardId, { skipOnboarding: true });
+                  getUserUsageAction().then(setUsage);
+                });
               } catch (error) {
                 console.error('[WORKSPACE] Carousel generation failed:', error);
+                showError('Carousel generation failed. Please try again.');
               }
             } else {
               // Use background jobs for images and videos in packs
@@ -2565,9 +2595,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       
       const job = await res.json();
       setActiveJobs(prev => [...prev, job.id]);
-      addPendingItem(job.id, failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video' ? 'video' : 'image', {
+      const pendingType = failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video'
+        ? 'video'
+        : failedJob.type === 'generate_carousel'
+          ? 'carousel'
+          : 'image';
+      addPendingItem(job.id, pendingType, {
         ...failedJob.payload,
         isLongVideo: failedJob.type === 'generate_long_video',
+        slideCount: failedJob.type === 'generate_carousel' && Array.isArray((failedJob.payload as any)?.slides)
+          ? (failedJob.payload as any).slides.length
+          : undefined,
         queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
       });
       pollJobStatus(job.id, async () => {
