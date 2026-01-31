@@ -52,10 +52,10 @@ const generateVideoTool: FunctionDeclaration = {
       prompt: { type: Type.STRING, description: "Describe the video content, movement, and camera angle. Must fit within 8 seconds." },
       aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
       productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
-      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." },
+      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs from the BRAND ASSET LIBRARY to use as reference images (ingredients). These can be product shots, avatars, logos, or generic setting/background images." },
       referenceSelections: {
         type: Type.ARRAY,
-        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting.",
+        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting (setting can be generic backgrounds/mood references).",
         items: {
           type: Type.OBJECT,
           properties: {
@@ -87,10 +87,10 @@ const generateLongVideoTool: FunctionDeclaration = {
       aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
       resolution: { type: Type.STRING, description: "Target resolution: '720p' or '1080p'." },
       productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
-      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs to use as reference images (ingredients)." },
+      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs from the BRAND ASSET LIBRARY to use as reference images (ingredients). These can be product shots, avatars, logos, or generic setting/background images." },
       referenceSelections: {
         type: Type.ARRAY,
-        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting.",
+        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting (setting can be generic backgrounds/mood references).",
         items: {
           type: Type.OBJECT,
           properties: {
@@ -557,7 +557,8 @@ export const chatWithMarketingAgent = async (
     📁 BRAND ASSET LIBRARY (${assetCatalog.length} assets available)
     ════════════════════════════════════════════════════════════════════════════
     
-    When calling generate_image, you can select specific assets by their ID using the brandAssetIds parameter.
+    When calling generate_image, select specific assets by ID using brandAssetIds.
+    When calling generate_video or generate_long_video, select up to 3 assets by ID using ingredientAssetIds and (when roles are clear) referenceSelections with roles avatar/item/setting.
     Choose the most relevant assets for each visual - don't include everything, just what's needed.
     
     Available Assets:
@@ -569,8 +570,11 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     - For images with people: Include relevant avatar assets  
     - For product shots: Include product-specific brand images
     - For style matching: Include brand images that match the desired aesthetic
+    - For lifestyle or non-product scenes: include a generic setting/background image (role: setting)
     - Max 14 reference images per generation
     - If you don't specify brandAssetIds, the system will auto-select up to 14 assets (logo + brand imagery + avatar if relevant)
+    - For video references: use ingredientAssetIds (max 3) to force real image-based video generation whenever assets exist (product, avatar, or setting)
+    - If the prompt mentions a logo/brand mark/watermark, include a logo asset in ingredientAssetIds (and role=item if using referenceSelections)
     ════════════════════════════════════════════════════════════════════════════
     ` : ''}
     
@@ -605,6 +609,9 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     - Default video aspect ratio is 16:9 for horizontal, use 9:16 for vertical/Reels/TikTok
     - Ingredient-based video generation is most reliable in 16:9 and 8s duration; for vertical, enable qualityMode and expect possible fallback
     - When possible, use referenceSelections with roles (avatar, item, setting) to lock identity and props; set referenceMode: hybrid to fill missing
+    - Prefer real visual references for videos whenever assets exist (ingredientAssetIds or referenceSelections). Only use text-only videos if no assets are available.
+    - If the request is generic or lifestyle (no specific product), use a setting reference (generic background/mood image) instead of forcing a product shot
+    - If a logo appears in the video, include a logo asset reference (ingredientAssetIds) to keep it accurate and avoid stylized redraws
     - Set qualityMode: true for UGC/influencer videos, close-up hands, product interactions, or when the user asks for the best realism
     - For generate_long_video, provide 2-5 scenes, each 4/6/8 seconds, total 30s or less
     - For generate_long_video, include continuitySpec covering character, wardrobe, props, lighting, and camera style
@@ -685,7 +692,7 @@ export const generateReferenceImage = async (
 export const generateVeoVideo = async (
   prompt: string,
   config: VeoConfig,
-  options?: { referenceImages?: VideoGenerationReferenceImage[]; traceId?: string }
+  options?: { referenceImages?: VideoGenerationReferenceImage[]; initialFrame?: { imageBytes: string; mimeType: string }; traceId?: string }
 ): Promise<string> => {
   const videoUrl = await generateVideoServer(prompt, {
     aspectRatio: config.aspectRatio,
@@ -693,6 +700,7 @@ export const generateVeoVideo = async (
     durationSeconds: config.durationSeconds,
     qualityMode: config.qualityMode,
     referenceImages: options?.referenceImages,
+    image: options?.initialFrame,
     traceId: options?.traceId
   });
   return videoUrl;

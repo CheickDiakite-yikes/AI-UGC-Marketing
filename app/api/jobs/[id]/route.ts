@@ -27,6 +27,7 @@ export async function GET(
       id: job.id,
       type: job.type,
       status: job.status,
+      payload: job.payload,
       result: job.result,
       error: job.error,
       createdAt: job.createdAt,

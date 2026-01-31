@@ -185,6 +185,7 @@ export async function generateVideoServer(
         durationSeconds?: 4 | 6 | 8;
         qualityMode?: boolean;
         referenceImages?: VideoGenerationReferenceImage[];
+        image?: { imageBytes: string; mimeType: string };
         traceId?: string;
     }
 ): Promise<string> {
@@ -193,16 +194,18 @@ export async function generateVideoServer(
     try {
         const traceId = config.traceId || 'no-trace';
         const useIngredients = !!(config.referenceImages && config.referenceImages.length > 0);
+        const useInitialFrame = !!config.image;
         const forceQuality = config.qualityMode === true;
         const model = (useIngredients || forceQuality) ? "veo-3.1-generate-preview" : "veo-3.1-fast-generate-preview";
         const durationSeconds = config.durationSeconds || ((useIngredients || forceQuality) ? 8 : undefined);
 
-        console.log(`[Veo 3.1 ${traceId}] Starting video generation (quality=${forceQuality}, references=${useIngredients}) with prompt:`, prompt.substring(0, 100) + "...");
+        console.log(`[Veo 3.1 ${traceId}] Starting video generation (quality=${forceQuality}, references=${useIngredients}, initialFrame=${useInitialFrame}) with prompt:`, prompt.substring(0, 100) + "...");
         
         // Use veo-3.1-fast-generate-preview for faster generation; use veo-3.1-generate-preview for higher quality or reference-based runs.
         let operation = await ai.models.generateVideos({
             model,
             prompt: prompt,
+            image: config.image,
             config: {
                 aspectRatio: config.aspectRatio || "16:9",
                 resolution: config.resolution || "720p",

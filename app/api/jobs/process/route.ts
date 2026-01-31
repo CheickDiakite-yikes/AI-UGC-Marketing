@@ -206,6 +206,11 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let productIdUsed: string | undefined;
   let autoReferenceUsed = false;
   let avatarReferenceImages = [];
+  let initialFrame: { imageBytes: string; mimeType: string } | null = null;
+  let initialFrameAssetId: string | undefined;
+  let initialFrameRole: string | undefined;
+  let initialFrameOrigin: string | undefined;
+  let initialFrameSource: string | undefined;
 
   try {
     const ingredientResult = await resolveVideoIngredients({
@@ -224,6 +229,11 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     avatarReferenceImages = (ingredientResult.referenceAssets || [])
       .filter(asset => asset.type === 'avatar')
       .map(asset => asset.referenceImage);
+    initialFrame = ingredientResult.initialFrame || null;
+    initialFrameAssetId = ingredientResult.initialFrameAssetId;
+    initialFrameRole = ingredientResult.initialFrameRole || undefined;
+    initialFrameOrigin = ingredientResult.initialFrameOrigin || undefined;
+    initialFrameSource = ingredientResult.initialFrameSource || undefined;
     if (ingredientResult.warnings.length > 0) {
       console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient warnings:`, ingredientResult.warnings);
     }
@@ -267,13 +277,33 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let videoResult: string;
   let ingredientFailure: string | null = null;
   let referenceImagesUsed: typeof referenceImages = [];
+  let initialFrameUsed = false;
+  let initialFrameAttempted = false;
+
+  const buildOptions = (references: typeof referenceImages, useFrame: boolean) => {
+    const options: { referenceImages?: typeof referenceImages; initialFrame?: { imageBytes: string; mimeType: string }; traceId: string } = { traceId };
+    if (references.length > 0) options.referenceImages = references;
+    if (useFrame && initialFrame) options.initialFrame = initialFrame;
+    return options;
+  };
+
+  const generateWithOptionalInitialFrame = async (references: typeof referenceImages) => {
+    if (initialFrame && !initialFrameAttempted) {
+      initialFrameAttempted = true;
+      try {
+        const result = await generateVeoVideo(compiled.prompt, config, buildOptions(references, true));
+        initialFrameUsed = true;
+        return result;
+      } catch (error: any) {
+        console.warn(`[API JOB PROCESSOR ${traceId}] Initial frame generation failed, retrying without initial frame`);
+      }
+    }
+    initialFrameUsed = false;
+    return generateVeoVideo(compiled.prompt, config, buildOptions(references, false));
+  };
   try {
     const referencesForAttempt = useIngredients ? referenceImages : [];
-    videoResult = await generateVeoVideo(
-      compiled.prompt,
-      config,
-      referencesForAttempt.length > 0 ? { referenceImages: referencesForAttempt, traceId } : { traceId }
-    );
+    videoResult = await generateWithOptionalInitialFrame(referencesForAttempt);
     referenceImagesUsed = referencesForAttempt;
   } catch (error: any) {
     if (!useIngredients) {
@@ -286,28 +316,16 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     if (fallbackReferences.length > 0) {
       console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient generation failed, retrying with avatar references: ${ingredientFailure}`);
       try {
-        videoResult = await generateVeoVideo(
-          compiled.prompt,
-          config,
-          { referenceImages: fallbackReferences, traceId }
-        );
+        videoResult = await generateWithOptionalInitialFrame(fallbackReferences);
         referenceImagesUsed = fallbackReferences;
       } catch (fallbackError) {
         console.warn(`[API JOB PROCESSOR ${traceId}] Avatar reference retry failed, retrying without references`);
-        videoResult = await generateVeoVideo(
-          compiled.prompt,
-          config,
-          { traceId }
-        );
+        videoResult = await generateWithOptionalInitialFrame([]);
         referenceImagesUsed = [];
       }
     } else {
       console.warn(`[API JOB PROCESSOR ${traceId}] Ingredient generation failed, retrying without references: ${ingredientFailure}`);
-      videoResult = await generateVeoVideo(
-        compiled.prompt,
-        config,
-        { traceId }
-      );
+      videoResult = await generateWithOptionalInitialFrame([]);
       referenceImagesUsed = [];
     }
   }
@@ -339,6 +357,11 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       qualityMode,
       autoReferenceUsed,
       referenceCount: referenceImagesUsed.length,
+      initialFrameUsed,
+      initialFrameAssetId: initialFrameUsed ? (initialFrameAssetId || null) : null,
+      initialFrameRole: initialFrameUsed ? (initialFrameRole || null) : null,
+      initialFrameOrigin: initialFrameUsed ? (initialFrameOrigin || null) : null,
+      initialFrameSource: initialFrameUsed ? (initialFrameSource || null) : null,
       caption: caption || null,
       hook: hook || null,
       archetype: archetype || null,

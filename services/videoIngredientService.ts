@@ -1,5 +1,5 @@
 import { db } from '@/db';
-import { assets, boards, products } from '@/db/schema';
+import { assets, boards, products, profileAssets } from '@/db/schema';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { getAsset } from './objectStorageService';
 import { VideoGenerationReferenceType } from '@google/genai';
@@ -172,6 +172,12 @@ export interface ReferenceAsset {
   referenceImage: VideoGenerationReferenceImage;
   source?: 'asset' | 'avatar_identity';
   role?: VideoReferenceRole;
+  origin?: 'board' | 'profile';
+}
+
+export interface InitialFrameImage {
+  imageBytes: string;
+  mimeType: string;
 }
 
 export interface ResolveIngredientsResult {
@@ -179,6 +185,11 @@ export interface ResolveIngredientsResult {
   referenceAssets: ReferenceAsset[];
   selectedAssetIds: string[];
   productIdUsed?: string;
+  initialFrame?: InitialFrameImage | null;
+  initialFrameAssetId?: string;
+  initialFrameRole?: VideoReferenceRole;
+  initialFrameOrigin?: 'board' | 'profile';
+  initialFrameSource?: 'asset' | 'avatar_identity';
   warnings: string[];
 }
 
@@ -199,6 +210,7 @@ export async function resolveVideoIngredients(params: {
   const preferAvatar = params.preferAvatar === true;
   const promptText = (prompt || '').toLowerCase();
   const blockAvatar = /no (people|person|faces|human|avatar|model)/.test(promptText) || /product\s*only/.test(promptText);
+  const wantsLogo = /(\blogo\b|logomark|wordmark|brand mark|brandmark|watermark|logo bug|logo reveal|logo animation)/.test(promptText);
   const allowAvatarInjection = preferAvatar && !blockAvatar && shouldUseAvatar(prompt || '');
   const referenceSelections = Array.isArray(params.referenceSelections) ? params.referenceSelections : [];
   const hasExplicitSelections = referenceSelections.length > 0 || (ingredientAssetIds && ingredientAssetIds.length > 0);
@@ -208,6 +220,12 @@ export async function resolveVideoIngredients(params: {
   const allowAutoFill = referenceMode !== 'manual';
   const allowAvatarAuto = allowAvatarInjection && allowAutoFill;
   const roleByAssetId = new Map<string, VideoReferenceRole>();
+  const boardRecord = await db.query.boards.findFirst({
+    where: eq(boards.id, boardId),
+    columns: { userId: true },
+    with: { avatarIdentity: true }
+  });
+  const boardUserId = boardRecord?.userId ?? null;
   const explicitSelectionIds: string[] = [];
 
   if (referenceSelections.length > 0 && referenceMode === 'auto') {
@@ -230,13 +248,15 @@ export async function resolveVideoIngredients(params: {
     logTrace(traceId, 'Reference mode set', { referenceMode });
   }
 
-  let candidateAssets: Array<{
+  type CandidateAsset = {
     id: string;
     content: string | null;
     storageKey: string | null;
     mimeType: string | null;
     type: ProjectAsset['type'];
-  }> = [];
+    origin: 'board' | 'profile';
+  };
+  let candidateAssets: CandidateAsset[] = [];
   let productIdUsed: string | undefined;
   let requestedAssetIds: string[] = [];
   let avatarAssetId: string | null = null;
@@ -260,6 +280,25 @@ export async function resolveVideoIngredients(params: {
     }
 
     const selectedAssetIds: string[] = [];
+    const seen = new Set<string>();
+    let logoAssetId: string | null = null;
+    const ensureLogoAsset = async () => {
+      if (logoAssetId !== null) return;
+      const logoAssets = await db
+        .select({ id: assets.id })
+        .from(assets)
+        .where(and(eq(assets.boardId, boardId), eq(assets.type, 'logo')))
+        .orderBy(desc(assets.createdAt))
+        .limit(1);
+      logoAssetId = logoAssets.length > 0 ? logoAssets[0].id : null;
+    };
+    const pushId = (id?: string | null) => {
+      if (!id) return;
+      if (seen.has(id)) return;
+      if (selectedAssetIds.length >= maxReferenceImages) return;
+      selectedAssetIds.push(id);
+      seen.add(id);
+    };
     let targetProductId = productId || null;
     if (!targetProductId) {
       const boardProducts = await db.query.products.findMany({
@@ -288,35 +327,99 @@ export async function resolveVideoIngredients(params: {
 
         const productAssetIds = Array.from(new Set(sortedAssignments.map(a => a.assetId)));
         if (productAssetIds.length > 0) {
-          selectedAssetIds.push(productAssetIds[0]);
+          pushId(productAssetIds[0]);
         }
 
-        if (resolvedAvatarId && selectedAssetIds.length < maxReferenceImages && !selectedAssetIds.includes(resolvedAvatarId)) {
-          selectedAssetIds.push(resolvedAvatarId);
+        if (resolvedAvatarId) {
+          pushId(resolvedAvatarId);
         }
 
-        const logoAssets = await db
-          .select({ id: assets.id })
-          .from(assets)
-          .where(and(eq(assets.boardId, boardId), eq(assets.type, 'logo')))
-          .orderBy(desc(assets.createdAt))
-          .limit(1);
-
-        if (logoAssets.length > 0 && selectedAssetIds.length < maxReferenceImages) {
-          selectedAssetIds.push(logoAssets[0].id);
+        await ensureLogoAsset();
+        if (logoAssetId) {
+          pushId(logoAssetId);
         }
 
         for (const id of productAssetIds.slice(1)) {
-          if (selectedAssetIds.length >= maxReferenceImages) break;
-          if (!selectedAssetIds.includes(id)) selectedAssetIds.push(id);
+          pushId(id);
+        }
+
+        if (selectedAssetIds.length < maxReferenceImages) {
+          const remainingSlots = maxReferenceImages - selectedAssetIds.length;
+          const brandImages = await db
+            .select({ id: assets.id })
+            .from(assets)
+            .where(and(eq(assets.boardId, boardId), eq(assets.type, 'image')))
+            .orderBy(desc(assets.createdAt))
+            .limit(Math.max(0, remainingSlots));
+          for (const image of brandImages) {
+            pushId(image.id);
+          }
         }
 
         if (selectedAssetIds.length === 0) {
           warnings.push('No product assets assigned');
         }
       }
-    } else if (resolvedAvatarId) {
-      selectedAssetIds.push(resolvedAvatarId);
+    } else {
+      if (resolvedAvatarId) {
+        pushId(resolvedAvatarId);
+      }
+
+      if (wantsLogo) {
+        await ensureLogoAsset();
+        if (logoAssetId) {
+          pushId(logoAssetId);
+        }
+      }
+
+      if (selectedAssetIds.length < maxReferenceImages) {
+        const remainingSlots = maxReferenceImages - selectedAssetIds.length;
+        const brandImages = await db
+          .select({ id: assets.id })
+          .from(assets)
+          .where(and(eq(assets.boardId, boardId), eq(assets.type, 'image')))
+          .orderBy(desc(assets.createdAt))
+          .limit(Math.max(0, remainingSlots));
+        for (const image of brandImages) {
+          pushId(image.id);
+        }
+      }
+
+      if (selectedAssetIds.length < maxReferenceImages) {
+        await ensureLogoAsset();
+        if (logoAssetId) {
+          pushId(logoAssetId);
+        }
+      }
+    }
+
+    if (selectedAssetIds.length < maxReferenceImages && boardUserId) {
+      const profileRows = await db
+        .select({ id: profileAssets.id, type: profileAssets.type })
+        .from(profileAssets)
+        .where(and(eq(profileAssets.userId, boardUserId), inArray(profileAssets.type, ['avatar', 'image', 'logo'])))
+        .orderBy(desc(profileAssets.createdAt));
+
+      const profileAvatars = profileRows.filter(row => row.type === 'avatar');
+      const profileImages = profileRows.filter(row => row.type === 'image');
+      const profileLogos = profileRows.filter(row => row.type === 'logo');
+
+      if (allowAvatarAuto && profileAvatars.length > 0) {
+        pushId(profileAvatars[0].id);
+      }
+
+      if (wantsLogo && profileLogos.length > 0) {
+        pushId(profileLogos[0].id);
+      }
+
+      for (const image of profileImages) {
+        pushId(image.id);
+        if (selectedAssetIds.length >= maxReferenceImages) break;
+      }
+
+      if (selectedAssetIds.length < maxReferenceImages && profileLogos.length > 0) {
+        pushId(profileLogos[0].id);
+      }
     }
 
     return { ids: selectedAssetIds, avatarAssetId: resolvedAvatarId };
@@ -375,11 +478,7 @@ export async function resolveVideoIngredients(params: {
   }
 
   if (allowAvatarAuto && !avatarAssetId) {
-    const board = await db.query.boards.findFirst({
-      where: eq(boards.id, boardId),
-      with: { avatarIdentity: true }
-    });
-    avatarIdentity = board?.avatarIdentity as AvatarIdentity | null;
+    avatarIdentity = boardRecord?.avatarIdentity as AvatarIdentity | null;
     if (!avatarIdentity || !Array.isArray(avatarIdentity.referenceImages) || avatarIdentity.referenceImages.length === 0) {
       logTrace(traceId, 'No avatar identity references available');
     }
@@ -403,7 +502,7 @@ export async function resolveVideoIngredients(params: {
       requestedAssetIds = trimmed;
     }
 
-    candidateAssets = await db
+    const boardAssets = await db
       .select({
         id: assets.id,
         content: assets.content,
@@ -414,16 +513,39 @@ export async function resolveVideoIngredients(params: {
       .from(assets)
       .where(and(eq(assets.boardId, boardId), inArray(assets.id, requestedAssetIds)));
 
+    candidateAssets = boardAssets.map(asset => ({ ...asset, origin: 'board' }));
+    const resolvedIds = new Set(candidateAssets.map(asset => asset.id));
+    const missingIds = requestedAssetIds.filter(id => !resolvedIds.has(id));
+
+    if (missingIds.length > 0 && boardUserId) {
+      const profileMatches = await db
+        .select({
+          id: profileAssets.id,
+          content: profileAssets.content,
+          storageKey: profileAssets.storageKey,
+          mimeType: profileAssets.mimeType,
+          type: profileAssets.type,
+        })
+        .from(profileAssets)
+        .where(and(eq(profileAssets.userId, boardUserId), inArray(profileAssets.id, missingIds)));
+
+      candidateAssets = [
+        ...candidateAssets,
+        ...profileMatches.map(asset => ({ ...asset, origin: 'profile' as const }))
+      ];
+    }
+
     const orderMap = new Map(requestedAssetIds.map((id, index) => [id, index]));
     candidateAssets.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
     if (candidateAssets.length < requestedAssetIds.length) {
-      warnings.push('One or more ingredient asset IDs were not found on this board');
+      warnings.push('One or more ingredient asset IDs were not found on this board or profile library');
     }
 
     logTrace(traceId, 'Resolved ingredient assets', candidateAssets.map(asset => ({
       id: asset.id,
       type: asset.type,
+      origin: asset.origin,
       role: roleByAssetId.get(asset.id) || null
     })));
   }
@@ -472,7 +594,8 @@ export async function resolveVideoIngredients(params: {
       type: asset.type,
       referenceImage,
       source: 'asset',
-      role: roleByAssetId.get(asset.id)
+      role: roleByAssetId.get(asset.id),
+      origin: asset.origin
     });
   }
 
@@ -507,12 +630,50 @@ export async function resolveVideoIngredients(params: {
   if (referenceImages.length === 0) {
     logTrace(traceId, 'No valid reference images resolved', warnings);
   }
+  if (wantsLogo && !referenceAssets.some(asset => asset.type === 'logo')) {
+    warnings.push('Prompt requested a logo, but no logo reference asset was available');
+  }
+
+  const hasExplicitAvatarSelection = referenceAssets.some(asset => asset.role === 'avatar');
+  const allowAvatarFrame = !blockAvatar && (shouldUseAvatar(prompt || '') || hasExplicitAvatarSelection);
+  const usableAssets = referenceAssets.filter(asset => asset.type !== 'logo' && asset.referenceImage?.image?.imageBytes);
+  const logoAsset = referenceAssets.find(asset => asset.type === 'logo' && asset.referenceImage?.image?.imageBytes);
+  const byRole = (role: VideoReferenceRole) =>
+    usableAssets.find(asset => asset.role === role && asset.source !== 'avatar_identity' && (allowAvatarFrame || asset.type !== 'avatar'));
+
+  let initialFrameAsset: ReferenceAsset | null = byRole('item') || byRole('setting') || null;
+  if (!initialFrameAsset) {
+    const nonAvatarAssets = usableAssets.filter(asset => asset.type !== 'avatar' && asset.source !== 'avatar_identity');
+    initialFrameAsset = nonAvatarAssets[0] || usableAssets.find(asset => asset.source !== 'avatar_identity') || null;
+  }
+  if (!initialFrameAsset && allowAvatarFrame) {
+    initialFrameAsset = usableAssets.find(asset => asset.type === 'avatar') || null;
+  }
+  if (!initialFrameAsset && wantsLogo && logoAsset) {
+    initialFrameAsset = logoAsset;
+  }
+  const initialFrame = initialFrameAsset?.referenceImage?.image || null;
+
+  if (initialFrameAsset) {
+    logTrace(traceId, 'Selected initial frame', {
+      assetId: initialFrameAsset.id,
+      type: initialFrameAsset.type,
+      role: initialFrameAsset.role || null,
+      origin: initialFrameAsset.origin || null,
+      source: initialFrameAsset.source || null
+    });
+  }
 
   return {
     referenceImages,
     referenceAssets,
     selectedAssetIds,
     productIdUsed,
+    initialFrame,
+    initialFrameAssetId: initialFrameAsset?.id,
+    initialFrameRole: initialFrameAsset?.role,
+    initialFrameOrigin: initialFrameAsset?.origin,
+    initialFrameSource: initialFrameAsset?.source,
     warnings,
   };
 }

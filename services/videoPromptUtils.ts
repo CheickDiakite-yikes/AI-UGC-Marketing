@@ -12,7 +12,10 @@ const VIDEO_QUALITY_BLOCK = [
   "- Accurate anatomy: correct limb count, natural hands, no extra fingers/limbs.",
   "- Hands interacting with objects must be fully visible and aligned with contact points.",
   "- Physics must look real: button presses, taps, and grabs show clear contact and response.",
-  "- Avoid on-screen text unless explicitly requested; if needed, keep it 1-3 words and exact.",
+  "- If a screen or UI appears, keep it crisp, flat, and readable with no warping or bending.",
+  "- For taps/clicks/swipes, align finger to the UI target and show a visible response.",
+  "- Avoid on-screen text unless explicitly requested; if needed, keep it 1-3 words and spell it EXACTLY as provided.",
+  "- If a logo appears, it must match the provided logo reference exactly (no redrawing or stylization).",
   "- Minimize motion blur and avoid rapid camera shakes that distort the subject."
 ].join("\n");
 
