@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prepare": "node scripts/setup-git-hooks.cjs",
     "dev": "next dev",
     "predev": "npm run db:migrate",
     "build": "next build",

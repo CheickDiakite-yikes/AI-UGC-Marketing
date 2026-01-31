@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+max_bytes=$((10 * 1024 * 1024))
+blocked=0
+
+# Iterate staged paths only (null-delimited)
+while IFS= read -r -d '' path; do
+  # Block Next.js build/cache output
+  if [[ "$path" == ".next" || "$path" == .next/* ]]; then
+    echo "ERROR: .next build artifacts must not be committed: $path" >&2
+    blocked=1
+    continue
+  fi
+
+  # Check size of staged blob (if any)
+  if git cat-file -e ":$path" 2>/dev/null; then
+    size=$(git cat-file -s ":$path")
+    if [[ $size -gt $max_bytes ]]; then
+      echo "ERROR: File too large (>10MB) in commit: $path (${size} bytes)" >&2
+      blocked=1
+    fi
+  fi
+done < <(git diff --cached --name-only -z)
+
+if [[ $blocked -ne 0 ]]; then
+  echo "Commit blocked by pre-commit hook." >&2
+  exit 1
+fi

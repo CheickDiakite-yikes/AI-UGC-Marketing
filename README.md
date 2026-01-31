@@ -73,6 +73,7 @@ Set one of:
 npm install
 npm run dev
 ```
+Note: `npm install` configures shared git hooks from `.githooks/` (blocks `.next` and files >10MB). If hooks aren't enabled, run `git config core.hooksPath .githooks`.
 
 ---
 
