@@ -70,6 +70,7 @@ export async function getProfileLibrary(): Promise<ProfileLibrary | null> {
     mimeType: asset.mimeType,
     previewUrl: buildPreviewUrl(asset.storageKey),
     category: (asset.metadata as { category?: string } | null)?.category ?? null,
+    imageType: (asset.metadata as { imageType?: string } | null)?.imageType ?? null,
     createdAt: asset.createdAt ? new Date(asset.createdAt).getTime() : undefined,
   }));
 
@@ -111,6 +112,7 @@ export async function uploadProfileAssetAction(formData: FormData) {
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
   const assetType = (formData.get('assetType') as string | null) || 'image';
   const category = (formData.get('category') as string | null) || null;
+  const imageTypeInput = (formData.get('imageType') as string | null) || null;
 
   if (files.length === 0) {
     redirect('/profile?error=missing_file');
@@ -130,12 +132,34 @@ export async function uploadProfileAssetAction(formData: FormData) {
     }
   }
 
+  const inferImageType = (fileName: string): string | null => {
+    const name = fileName.toLowerCase();
+    if (/screenshot|screen|dashboard|ui|app|saas|software|website|landing|product[-\s]?tour|walkthrough|demo/.test(name)) {
+      return 'ui';
+    }
+    if (/packaging|box|label|bottle|jar|container|tube|bag|unbox/.test(name)) {
+      return 'packaging';
+    }
+    if (/lifestyle|in[-\s]?use|usage|holding|wearing|outdoor|gym|kitchen|model/.test(name)) {
+      return 'lifestyle';
+    }
+    if (/product|hero|packshot|flatlay|macro/.test(name)) {
+      return 'product';
+    }
+    if (/background|setting|scene|environment|interior|exterior|studio/.test(name)) {
+      return 'setting';
+    }
+    return null;
+  };
+
   for (const file of files) {
     const base64 = await readFileAsBase64(file);
     const isImage = file.type.startsWith('image/');
     let storageKey: string | null = null;
     let content: string | null = base64;
     const assetId = crypto.randomUUID();
+    const inferredImageType = assetType === 'image' ? inferImageType(file.name) : null;
+    const imageType = imageTypeInput || inferredImageType;
 
     if (isImage && ['logo', 'image', 'avatar'].includes(assetType)) {
       const uploadResult = await uploadProfileAsset(session.userId as string, assetId, base64, file.type);
@@ -154,7 +178,10 @@ export async function uploadProfileAssetAction(formData: FormData) {
       content,
       storageKey,
       mimeType: file.type,
-      metadata: category ? { category } : null,
+      metadata: {
+        ...(category ? { category } : {}),
+        ...(imageType ? { imageType } : {})
+      },
     });
   }
 

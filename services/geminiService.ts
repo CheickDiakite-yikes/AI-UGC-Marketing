@@ -571,6 +571,7 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     - For product shots: Include product-specific brand images
     - For style matching: Include brand images that match the desired aesthetic
     - For lifestyle or non-product scenes: include a generic setting/background image (role: setting)
+    - Brand images can include UI screenshots or product screens; use those when the request mentions software, app, UI, or website visuals
     - Max 14 reference images per generation
     - If you don't specify brandAssetIds, the system will auto-select up to 14 assets (logo + brand imagery + avatar if relevant)
     - For video references: use ingredientAssetIds (max 3) to force real image-based video generation whenever assets exist (product, avatar, or setting)
@@ -692,7 +693,7 @@ export const generateReferenceImage = async (
 export const generateVeoVideo = async (
   prompt: string,
   config: VeoConfig,
-  options?: { referenceImages?: VideoGenerationReferenceImage[]; initialFrame?: { imageBytes?: string; mimeType?: string }; traceId?: string }
+  options?: { referenceImages?: VideoGenerationReferenceImage[]; initialFrame?: { imageBytes: string; mimeType: string }; traceId?: string }
 ): Promise<string> => {
   const videoUrl = await generateVideoServer(prompt, {
     aspectRatio: config.aspectRatio,

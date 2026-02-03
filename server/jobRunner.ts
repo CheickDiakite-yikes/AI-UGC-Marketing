@@ -101,17 +101,34 @@ async function processImageJob(job: Job): Promise<JobResult> {
   });
 
   let brandAssets;
+  const promptText = (prompt || '').toLowerCase();
+  const blockLogo = /(no logo|without logo|logo[-\s]?free|no branding|without branding|no brand mark|no watermark)/.test(promptText);
+  const wantsLogo = !blockLogo && /(\blogo\b|logomark|wordmark|brand mark|brandmark|watermark|logo bug|logo reveal|logo animation|brand logo)/.test(promptText);
   const selectedAssetIds = normalizeAssetIds(brandAssetIds);
   if (selectedAssetIds.length > 0) {
     console.log(`[JOB RUNNER ${traceId}] AI selected ${selectedAssetIds.length} specific assets: ${selectedAssetIds.join(', ')}`);
     brandAssets = await getBrandAssetsByIds(job.boardId, selectedAssetIds);
+    if (wantsLogo && !brandAssets.some(asset => asset.role === 'logo')) {
+      const logoOnly = await getBrandAssetDataForGeneration(job.boardId, {
+        includeLogo: true,
+        includeAvatars: false,
+        maxBrandImages: 0,
+        maxTotal: 1,
+        prompt: compiled.prompt
+      });
+      brandAssets = [...logoOnly, ...brandAssets].slice(0, MAX_IMAGE_REFERENCES);
+    }
+    if (blockLogo) {
+      brandAssets = brandAssets.filter(asset => asset.role !== 'logo');
+    }
   } else {
     const useAvatar = shouldUseAvatar(prompt);
     brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
       includeLogo: true,
       includeAvatars: useAvatar,
       maxTotal: MAX_IMAGE_REFERENCES,
-      maxAvatars: 5
+      maxAvatars: 5,
+      prompt: compiled.prompt
     });
     console.log(`[JOB RUNNER ${traceId}] Auto-selected ${brandAssets.length} brand assets`);
   }
@@ -195,17 +212,35 @@ async function processCarouselJob(job: Job): Promise<JobResult> {
 
   const slidePrompts = slides.map(slide => slide.prompt).filter(Boolean);
   const useAvatar = slidePrompts.some(prompt => shouldUseAvatar(prompt));
+  const combinedPrompt = slidePrompts.join(' ');
+  const combinedPromptText = combinedPrompt.toLowerCase();
+  const carouselBlockLogo = /(no logo|without logo|logo[-\s]?free|no branding|without branding|no brand mark|no watermark)/.test(combinedPromptText);
+  const carouselWantsLogo = !carouselBlockLogo && /(\blogo\b|logomark|wordmark|brand mark|brandmark|watermark|logo bug|logo reveal|logo animation|brand logo)/.test(combinedPromptText);
   let brandAssets;
   const selectedAssetIds = normalizeAssetIds(brandAssetIds);
   if (selectedAssetIds.length > 0) {
     console.log(`[JOB RUNNER ${traceId}] Carousel selected ${selectedAssetIds.length} specific assets: ${selectedAssetIds.join(', ')}`);
     brandAssets = await getBrandAssetsByIds(job.boardId, selectedAssetIds);
+    if (carouselWantsLogo && !brandAssets.some(asset => asset.role === 'logo')) {
+      const logoOnly = await getBrandAssetDataForGeneration(job.boardId, {
+        includeLogo: true,
+        includeAvatars: false,
+        maxBrandImages: 0,
+        maxTotal: 1,
+        prompt: combinedPrompt
+      });
+      brandAssets = [...logoOnly, ...brandAssets].slice(0, MAX_IMAGE_REFERENCES);
+    }
+    if (carouselBlockLogo) {
+      brandAssets = brandAssets.filter(asset => asset.role !== 'logo');
+    }
   } else {
     brandAssets = await getBrandAssetDataForGeneration(job.boardId, {
       includeLogo: true,
       includeAvatars: useAvatar,
       maxTotal: MAX_IMAGE_REFERENCES,
-      maxAvatars: 5
+      maxAvatars: 5,
+      prompt: combinedPrompt
     });
     console.log(`[JOB RUNNER ${traceId}] Carousel auto-selected ${brandAssets.length} brand assets`);
   }

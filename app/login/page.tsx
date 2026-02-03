@@ -43,9 +43,11 @@ export default function LoginPage() {
                     <div className="inline-block bg-black text-white px-3 py-1 text-xs font-bold uppercase mb-4 transform -rotate-2">
                         Welcome Back
                     </div>
-                    <h1 className="text-4xl md:text-5xl font-display font-black leading-none mb-2 tracking-tight">
-                        PREDI<span className="text-neo-pink">.AI</span>
-                    </h1>
+                    <Link href="/about" className="inline-block hover:opacity-80 transition-opacity">
+                        <h1 className="text-4xl md:text-5xl font-display font-black leading-none mb-2 tracking-tight">
+                            PREDI<span className="text-neo-pink">.AI</span>
+                        </h1>
+                    </Link>
                     <p className="text-gray-500 font-medium">Enter your credentials to proceed.</p>
                 </div>
 

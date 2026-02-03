@@ -110,3 +110,37 @@ It includes a long-video pipeline with storyboard approval, a Reference Kit for 
 - Showcase UI: `components/ShowcasePage.tsx`
 - Showcase data: `app/actions/showcaseActions.ts`
 - Reference Kit: `components/StoryboardReferenceKit.tsx`
+
+## Current Work / Handoff (January 31, 2026)
+Focus: improve agentic use of real brand assets (logos, UI screenshots, product images) for images + short videos.
+
+### Recent Changes (uncommitted)
+- **Short video grounding**
+  - Video generation now supports **initial frame (image-to-video)** from real assets with safe fallback (retry without frame).
+  - Stronger video guardrails to reduce spelling mistakes, morphing, and bad UI taps.
+  - Logo refs are injected when prompt implies branding; warnings when logo missing.
+  - Files: `services/videoIngredientService.ts`, `server/jobRunner.ts`, `app/api/jobs/process/route.ts`, `app/actions.ts`, `services/videoPromptUtils.ts`.
+
+- **Prompt-aware asset selection**
+  - Brand images are now scored by prompt intent (UI/demo vs packaging vs lifestyle vs product vs setting) using metadata + filename.
+  - Ensures logo is included when prompts mention logo/brand unless user says “no logo”.
+  - Works for **images + carousels** in both job runner and API processor.
+  - Files: `services/brandAssetService.ts`, `server/jobRunner.ts`, `app/api/jobs/process/route.ts`.
+
+- **Asset metadata improvements**
+  - Profile asset uploads now record `metadata.imageType` (inferred from filename or optional form input).
+  - Profile assets return `imageType` in API; asset catalog now includes `category` + `imageType` so the chat agent can select better assets.
+  - Files: `app/actions/profileLibraryActions.ts`, `app/actions/boardActions.ts`, `types.ts`.
+
+### Known To‑Dos / Next Steps
+- Add UI control to let users explicitly label brand images (UI / Product / Lifestyle / Packaging / Setting) instead of filename inference.
+- Consider auto‑tagging existing profile assets to backfill `imageType` (optional).
+- Restart job runner after build to pick up new selection logic.
+
+### Testing (January 31, 2026)
+- `npm run build` fails with “Build failed because of webpack errors” but Next doesn’t surface the specific error in this environment.
+- Attempted DB lookup for `zorovt18@gmail.com` via `psql` failed (host `helium` not resolvable; localhost connect also failed).
+
+### Notes
+- Long video pipeline is intentionally deferred for now (user wants focus on short videos).
+- Reference limit: 3 for Veo; image refs: 14 for Gemini image.

@@ -21,6 +21,25 @@ const ROLE_PRIORITY: Record<string, number> = {
   other: 10,
 };
 
+const mapProductRoleToReferenceRole = (role?: string | null): VideoReferenceRole | undefined => {
+  if (!role) return undefined;
+  switch (role) {
+    case 'ui':
+    case 'screenshot':
+    case 'mockup':
+    case 'product_shot':
+    case 'packaging':
+    case 'hero':
+    case 'in_use':
+    case 'lifestyle':
+    case 'logo':
+    case 'other':
+      return 'item';
+    default:
+      return undefined;
+  }
+};
+
 const SUPPORTED_REFERENCE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const MAX_REFERENCE_DIMENSION = 1536;
 
@@ -210,7 +229,11 @@ export async function resolveVideoIngredients(params: {
   const preferAvatar = params.preferAvatar === true;
   const promptText = (prompt || '').toLowerCase();
   const blockAvatar = /no (people|person|faces|human|avatar|model)/.test(promptText) || /product\s*only/.test(promptText);
-  const wantsLogo = /(\blogo\b|logomark|wordmark|brand mark|brandmark|watermark|logo bug|logo reveal|logo animation)/.test(promptText);
+  const blockLogo = /(no logo|without logo|logo[-\s]?free|no branding|without branding|no brand mark|no watermark)/.test(promptText);
+  const wantsLogo = !blockLogo && /(\blogo\b|logomark|wordmark|brand mark|brandmark|watermark|logo bug|logo reveal|logo animation|brand logo)/.test(promptText);
+  const wantsUI = /(ui|screen|screenshot|dashboard|app|software|saas|website|landing page|product tour|walkthrough|demo|tutorial|interface)/.test(promptText);
+  const wantsPackaging = /(packaging|unbox|unboxing|box|label|bottle|jar|container|tub|pack)/.test(promptText);
+  const wantsLifestyle = /(lifestyle|in use|usage|hands|holding|wearing|apply|pour|spray|gym|kitchen|outdoor|on the go|everyday)/.test(promptText);
   const allowAvatarInjection = preferAvatar && !blockAvatar && shouldUseAvatar(prompt || '');
   const referenceSelections = Array.isArray(params.referenceSelections) ? params.referenceSelections : [];
   const hasExplicitSelections = referenceSelections.length > 0 || (ingredientAssetIds && ingredientAssetIds.length > 0);
@@ -283,6 +306,7 @@ export async function resolveVideoIngredients(params: {
     const seen = new Set<string>();
     let logoAssetId: string | null = null;
     const ensureLogoAsset = async () => {
+      if (blockLogo) return;
       if (logoAssetId !== null) return;
       const logoAssets = await db
         .select({ id: assets.id })
@@ -292,6 +316,26 @@ export async function resolveVideoIngredients(params: {
         .limit(1);
       logoAssetId = logoAssets.length > 0 ? logoAssets[0].id : null;
     };
+    const roleBoost: Partial<Record<string, number>> = {};
+    if (wantsUI) {
+      roleBoost.ui = 350;
+      roleBoost.screenshot = 300;
+      roleBoost.mockup = 220;
+      roleBoost.hero = 150;
+    }
+    if (wantsPackaging) {
+      roleBoost.packaging = 320;
+      roleBoost.product_shot = 220;
+      roleBoost.hero = 160;
+    }
+    if (wantsLifestyle) {
+      roleBoost.in_use = 260;
+      roleBoost.lifestyle = 220;
+      roleBoost.product_shot = 140;
+    }
+    if (wantsLogo) {
+      roleBoost.logo = 400;
+    }
     const pushId = (id?: string | null) => {
       if (!id) return;
       if (seen.has(id)) return;
@@ -320,10 +364,17 @@ export async function resolveVideoIngredients(params: {
       } else {
         productIdUsed = product.id;
         const sortedAssignments = [...(product.productAssets || [])].sort((a, b) => {
-          const scoreA = (a.isPrimary ? 1000 : 0) + (ROLE_PRIORITY[a.role] || 0);
-          const scoreB = (b.isPrimary ? 1000 : 0) + (ROLE_PRIORITY[b.role] || 0);
+          const scoreA = (a.isPrimary ? 1000 : 0) + (ROLE_PRIORITY[a.role] || 0) + (roleBoost[a.role] || 0);
+          const scoreB = (b.isPrimary ? 1000 : 0) + (ROLE_PRIORITY[b.role] || 0) + (roleBoost[b.role] || 0);
           return scoreB - scoreA;
         });
+
+        for (const assignment of sortedAssignments) {
+          const mappedRole = mapProductRoleToReferenceRole(assignment.role);
+          if (mappedRole && !roleByAssetId.has(assignment.assetId)) {
+            roleByAssetId.set(assignment.assetId, mappedRole);
+          }
+        }
 
         const productAssetIds = Array.from(new Set(sortedAssignments.map(a => a.assetId)));
         if (productAssetIds.length > 0) {
@@ -375,12 +426,47 @@ export async function resolveVideoIngredients(params: {
       if (selectedAssetIds.length < maxReferenceImages) {
         const remainingSlots = maxReferenceImages - selectedAssetIds.length;
         const brandImages = await db
-          .select({ id: assets.id })
+          .select({
+            id: assets.id,
+            name: assets.name,
+            metadata: assets.metadata,
+            createdAt: assets.createdAt
+          })
           .from(assets)
           .where(and(eq(assets.boardId, boardId), eq(assets.type, 'image')))
-          .orderBy(desc(assets.createdAt))
-          .limit(Math.max(0, remainingSlots));
-        for (const image of brandImages) {
+          .orderBy(desc(assets.createdAt));
+
+        const scoreBoardImage = (row: typeof brandImages[number]) => {
+          const meta = (row.metadata as Record<string, unknown> | null) || {};
+          const imageType = typeof meta.imageType === 'string' ? meta.imageType.toLowerCase() : '';
+          const name = row.name.toLowerCase();
+          const text = `${name} ${imageType}`;
+          let score = 0;
+          if (wantsUI && /(ui|screen|screenshot|dashboard|app|saas|software|website|landing|interface)/.test(text)) {
+            score += 4;
+          }
+          if (wantsPackaging && /(packaging|box|label|bottle|jar|container|tube|bag|unbox)/.test(text)) {
+            score += 4;
+          }
+          if (wantsLifestyle && /(lifestyle|in[-\s]?use|usage|holding|wearing|outdoor|gym|kitchen|model)/.test(text)) {
+            score += 3;
+          }
+          if (wantsLogo && /(logo|brand)/.test(text)) {
+            score += 2;
+          }
+          return score;
+        };
+
+        const rankedImages = [...brandImages].sort((a, b) => {
+          const scoreA = scoreBoardImage(a);
+          const scoreB = scoreBoardImage(b);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        for (const image of rankedImages.slice(0, Math.max(0, remainingSlots))) {
           pushId(image.id);
         }
       }
@@ -395,7 +481,13 @@ export async function resolveVideoIngredients(params: {
 
     if (selectedAssetIds.length < maxReferenceImages && boardUserId) {
       const profileRows = await db
-        .select({ id: profileAssets.id, type: profileAssets.type })
+        .select({
+          id: profileAssets.id,
+          type: profileAssets.type,
+          name: profileAssets.name,
+          metadata: profileAssets.metadata,
+          createdAt: profileAssets.createdAt
+        })
         .from(profileAssets)
         .where(and(eq(profileAssets.userId, boardUserId), inArray(profileAssets.type, ['avatar', 'image', 'logo'])))
         .orderBy(desc(profileAssets.createdAt));
@@ -403,6 +495,26 @@ export async function resolveVideoIngredients(params: {
       const profileAvatars = profileRows.filter(row => row.type === 'avatar');
       const profileImages = profileRows.filter(row => row.type === 'image');
       const profileLogos = profileRows.filter(row => row.type === 'logo');
+      const scoreProfileImage = (row: typeof profileImages[number]) => {
+        const meta = (row.metadata as Record<string, unknown> | null) || {};
+        const imageType = typeof meta.imageType === 'string' ? meta.imageType.toLowerCase() : '';
+        const name = row.name.toLowerCase();
+        const text = `${name} ${imageType}`;
+        let score = 0;
+        if (wantsUI && /(ui|screen|screenshot|dashboard|app|saas|software|website|landing|interface)/.test(text)) {
+          score += 4;
+        }
+        if (wantsPackaging && /(packaging|box|label|bottle|jar|container|tube|bag|unbox)/.test(text)) {
+          score += 4;
+        }
+        if (wantsLifestyle && /(lifestyle|in[-\s]?use|usage|holding|wearing|outdoor|gym|kitchen|model)/.test(text)) {
+          score += 3;
+        }
+        if (wantsLogo && /(logo|brand)/.test(text)) {
+          score += 2;
+        }
+        return score;
+      };
 
       if (allowAvatarAuto && profileAvatars.length > 0) {
         pushId(profileAvatars[0].id);
@@ -412,12 +524,21 @@ export async function resolveVideoIngredients(params: {
         pushId(profileLogos[0].id);
       }
 
-      for (const image of profileImages) {
+      const rankedProfileImages = [...profileImages].sort((a, b) => {
+        const scoreA = scoreProfileImage(a);
+        const scoreB = scoreProfileImage(b);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      for (const image of rankedProfileImages) {
         pushId(image.id);
         if (selectedAssetIds.length >= maxReferenceImages) break;
       }
 
-      if (selectedAssetIds.length < maxReferenceImages && profileLogos.length > 0) {
+      if (selectedAssetIds.length < maxReferenceImages && profileLogos.length > 0 && !blockLogo) {
         pushId(profileLogos[0].id);
       }
     }
@@ -548,6 +669,57 @@ export async function resolveVideoIngredients(params: {
       origin: asset.origin,
       role: roleByAssetId.get(asset.id) || null
     })));
+  }
+
+  const shouldInjectLogo = wantsLogo && !blockLogo && referenceSelections.length === 0;
+  if (shouldInjectLogo && !candidateAssets.some(asset => asset.type === 'logo') && boardUserId) {
+    const boardLogo = await db
+      .select({
+        id: assets.id,
+        content: assets.content,
+        storageKey: assets.storageKey,
+        mimeType: assets.mimeType,
+        type: assets.type,
+      })
+      .from(assets)
+      .where(and(eq(assets.boardId, boardId), eq(assets.type, 'logo')))
+      .orderBy(desc(assets.createdAt))
+      .limit(1);
+
+    let logoCandidate: CandidateAsset | null = null;
+    if (boardLogo.length > 0) {
+      logoCandidate = { ...boardLogo[0], origin: 'board' };
+    } else {
+      const profileLogo = await db
+        .select({
+          id: profileAssets.id,
+          content: profileAssets.content,
+          storageKey: profileAssets.storageKey,
+          mimeType: profileAssets.mimeType,
+          type: profileAssets.type,
+        })
+        .from(profileAssets)
+        .where(and(eq(profileAssets.userId, boardUserId), eq(profileAssets.type, 'logo')))
+        .orderBy(desc(profileAssets.createdAt))
+        .limit(1);
+      if (profileLogo.length > 0) {
+        logoCandidate = { ...profileLogo[0], origin: 'profile' as const };
+      }
+    }
+
+    if (logoCandidate) {
+      const merged = [logoCandidate, ...candidateAssets];
+      const seen = new Set<string>();
+      candidateAssets = merged.filter(asset => {
+        if (seen.has(asset.id)) return false;
+        seen.add(asset.id);
+        return true;
+      }).slice(0, maxReferenceImages);
+      if (!roleByAssetId.has(logoCandidate.id)) {
+        roleByAssetId.set(logoCandidate.id, 'item');
+      }
+      logTrace(traceId, 'Injected logo into references', { logoId: logoCandidate.id });
+    }
   }
 
   const assetReferenceAssets: ReferenceAsset[] = [];

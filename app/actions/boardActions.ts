@@ -389,12 +389,19 @@ export async function getBoardDetails(boardId: string) {
         }
     });
     
-    const assetCatalog = userAssets.map(a => ({
-        id: a.id,
-        type: a.type,
-        name: a.name,
-        description: (a.metadata as any)?.description || undefined
-    }));
+    const assetCatalog = userAssets.map(a => {
+        const meta = (a.metadata as any) || {};
+        const bits = [];
+        if (meta.description) bits.push(String(meta.description));
+        if (meta.category) bits.push(`category:${String(meta.category)}`);
+        if (meta.imageType) bits.push(`type:${String(meta.imageType)}`);
+        return {
+            id: a.id,
+            type: a.type,
+            name: a.name,
+            description: bits.length > 0 ? bits.join(' | ') : undefined
+        };
+    });
     
     return {
         ...board,

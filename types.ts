@@ -299,6 +299,7 @@ export interface ProfileAsset {
   mimeType?: string | null;
   previewUrl?: string | null;
   category?: string | null;
+  imageType?: string | null;
   createdAt?: number;
 }
 
