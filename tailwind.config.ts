@@ -38,6 +38,10 @@ const config: Config = {
                 'ping-slow': 'pingSlow 2s cubic-bezier(0, 0, 0.2, 1) infinite',
                 'shimmer': 'shimmer 3s ease-in-out infinite',
                 'text-reveal': 'textReveal 1s ease-out forwards',
+                'float-gentle': 'floatGentle 4s ease-in-out infinite',
+                'bounce-soft': 'bounceSoft 2s ease-in-out infinite',
+                'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+                'wiggle-slow': 'wiggleSlow 3s ease-in-out infinite',
             },
             keyframes: {
                 float: {
@@ -79,6 +83,22 @@ const config: Config = {
                 textReveal: {
                     '0%': { opacity: '0', transform: 'translateY(20px)' },
                     '100%': { opacity: '1', transform: 'translateY(0)' },
+                },
+                floatGentle: {
+                    '0%, 100%': { transform: 'translateY(0)' },
+                    '50%': { transform: 'translateY(-6px)' },
+                },
+                bounceSoft: {
+                    '0%, 100%': { transform: 'translateY(0)' },
+                    '50%': { transform: 'translateY(-4px)' },
+                },
+                glowPulse: {
+                    '0%, 100%': { boxShadow: '0 0 20px rgba(255, 144, 232, 0.4)' },
+                    '50%': { boxShadow: '0 0 30px rgba(255, 144, 232, 0.7)' },
+                },
+                wiggleSlow: {
+                    '0%, 100%': { transform: 'rotate(-1deg)' },
+                    '50%': { transform: 'rotate(1deg)' },
                 }
             }
         },

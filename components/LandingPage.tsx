@@ -290,14 +290,14 @@ const LandingPage: React.FC<Props> = ({
       <section className="relative z-10 pt-10 md:pt-16 pb-16 md:pb-24 px-6 sm:px-8 md:px-16 lg:px-24 max-w-7xl mx-auto flex flex-col items-center text-center">
         
         <Reveal delay={100}>
-          <div className="inline-block bg-neo-lime border-2 border-black px-4 py-1.5 md:px-6 md:py-2 font-bold text-xs md:text-sm uppercase tracking-widest mb-6 md:mb-8 shadow-neo hover:rotate-2 transition-transform cursor-default">
+          <div className="inline-block bg-neo-lime border-2 border-black px-4 py-1.5 md:px-6 md:py-2 font-bold text-xs md:text-sm uppercase tracking-widest mb-6 md:mb-8 shadow-neo hover:rotate-2 transition-transform cursor-default animate-wiggle-slow">
              ⚡ BETA Now with Gemini 3 Pro
           </div>
         </Reveal>
 
         <Reveal delay={200}>
           <h1 className="font-display font-black text-[clamp(1.4rem,6.5vw,8rem)] leading-[1] mb-6 md:mb-8 text-neo-black drop-shadow-sm w-full px-2">
-            MARKETING <br/>
+            <span className="inline-block animate-float-gentle">MARKETING</span> <br/>
             <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
                <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none whitespace-nowrap" aria-hidden="true">ON AUTOPILOT.</span>
                <span 
@@ -332,7 +332,7 @@ const LandingPage: React.FC<Props> = ({
           <div className="flex flex-col md:flex-row gap-6 items-center w-full justify-center">
              <button 
                onClick={onLogin}
-               className="bg-neo-pink text-black border-4 border-black px-8 py-4 md:px-10 md:py-5 text-lg md:text-xl font-bold shadow-neo-lg hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] hover:bg-neo-cyan transition-all w-full md:w-auto transform hover:-rotate-1"
+               className="bg-neo-pink text-black border-4 border-black px-8 py-4 md:px-10 md:py-5 text-lg md:text-xl font-bold shadow-neo-lg hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] hover:bg-neo-cyan transition-all w-full md:w-auto transform hover:-rotate-1 animate-glow-pulse"
              >
                Start Creating for Free
              </button>
@@ -346,7 +346,8 @@ const LandingPage: React.FC<Props> = ({
                    ].map((user, i) => (
                      <div 
                        key={i} 
-                       className={`w-8 h-8 rounded-full border-2 border-white ${user.bg} flex items-center justify-center text-[10px] font-bold`}
+                       className={`w-8 h-8 rounded-full border-2 border-white ${user.bg} flex items-center justify-center text-[10px] font-bold animate-bounce-soft`}
+                       style={{ animationDelay: `${i * 0.2}s` }}
                      >
                        {user.text}
                      </div>
