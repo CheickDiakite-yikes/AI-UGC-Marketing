@@ -10,7 +10,7 @@ const PrivacyPage: React.FC<Props> = ({ onBack }) => {
       {/* Navbar / Back Button */}
       <div className="sticky top-0 z-50 bg-white/80 dark:bg-neo-dark/80 backdrop-blur-md border-b-4 border-black dark:border-white p-4 flex justify-between items-center transition-colors">
         <div className="flex items-center cursor-pointer" onClick={onBack}>
-           <img src="/predi-cloud-logo.png" alt="Predi" className="h-10 w-auto object-contain" />
+           <img src="/predi-cloud-logo.png" alt="Predi" className="h-[60px] md:h-[70px] w-auto object-contain -my-2" />
         </div>
         <button 
           onClick={onBack}

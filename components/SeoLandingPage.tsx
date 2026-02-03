@@ -71,7 +71,7 @@ const SeoLandingPage: React.FC<Props> = ({
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b-4 border-black">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center">
-            <img src="/predi-cloud-logo.png" alt="Predi" className="h-10 w-auto object-contain" />
+            <img src="/predi-cloud-logo.png" alt="Predi" className="h-[60px] md:h-[70px] w-auto object-contain -my-2" />
           </Link>
           <div className="hidden md:flex items-center gap-6 text-xs font-black uppercase tracking-widest">
             <Link href="/showcase" className="hover:text-neo-pink transition-colors">Showcase</Link>
