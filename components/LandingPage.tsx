@@ -269,12 +269,12 @@ const LandingPage: React.FC<Props> = ({
         />
       </div>
 
-      <nav className="sticky top-0 z-50 flex items-center justify-between p-4 md:p-6 md:px-12 max-w-7xl mx-auto bg-white/80 backdrop-blur-md border-b-2 border-transparent" style={{ borderColor: scrollProgress > 0.05 ? 'black' : 'transparent' }}>
+      <nav className="sticky top-0 z-50 flex items-center justify-between py-2 px-4 md:py-3 md:px-12 max-w-7xl mx-auto bg-white/80 backdrop-blur-md border-b-2 border-transparent" style={{ borderColor: scrollProgress > 0.05 ? 'black' : 'transparent' }}>
         <div className="flex items-center group cursor-pointer">
            <img 
              src="/predi-cloud-logo.png" 
              alt="Predi" 
-             className="h-14 md:h-16 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
+             className="h-12 md:h-14 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
            />
         </div>
         <div className="flex gap-4">
