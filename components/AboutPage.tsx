@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ShowcaseMarquee from './ShowcaseMarquee';
 
 interface Props {
   onBack: () => void;
@@ -43,7 +44,11 @@ const AboutPage: React.FC<Props> = ({ onBack }) => {
           We are building an AI-native marketing OS that helps small teams ship world-class campaigns
           with the speed of a full creative studio.
         </p>
+      </div>
 
+      <ShowcaseMarquee />
+
+      <div className="max-w-6xl mx-auto px-6 relative z-10">
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           <div className="bg-neo-yellow border-4 border-black p-6 shadow-neo transform -rotate-1">
             <p className="text-xs font-black uppercase tracking-widest text-gray-700">Why we started</p>
