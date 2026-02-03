@@ -274,7 +274,7 @@ const LandingPage: React.FC<Props> = ({
            <img 
              src="/predi-cloud-logo.png" 
              alt="Predi" 
-             className="h-10 md:h-12 w-auto object-contain group-hover:scale-110 transition-transform duration-300"
+             className="h-14 md:h-16 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
            />
         </div>
         <div className="flex gap-4">
