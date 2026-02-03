@@ -335,7 +335,7 @@ const LandingPage: React.FC<Props> = ({
                      </div>
                    ))}
                 </div>
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-600">Join 10,000+ Marketers</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-600">Join 3,500+ Marketers</p>
              </div>
           </div>
         </Reveal>
