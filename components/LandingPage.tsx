@@ -861,26 +861,58 @@ const LandingPage: React.FC<Props> = ({
         </div>
       </section>
 
-      <footer className="bg-black text-white py-12 border-t border-gray-800">
-         <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="text-center md:text-left">
-               <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                 <div className="w-6 h-6 bg-neo-yellow text-black flex items-center justify-center font-bold text-xs">P</div>
-                 <h3 className="font-display font-bold text-xl">Predi AI</h3>
+      <footer className="bg-black text-white py-12 md:py-16 border-t border-gray-800">
+         <div className="max-w-7xl mx-auto px-6 md:px-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
+               <div className="md:col-span-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 bg-neo-yellow text-black flex items-center justify-center font-bold text-sm">P</div>
+                    <h3 className="font-display font-bold text-xl">Predi AI</h3>
+                  </div>
+                  <p className="text-gray-500 text-sm mb-4">AI-powered marketing automation for modern teams.</p>
+                  <a 
+                    href="https://www.instagram.com/predi.ai" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-gray-400 hover:text-neo-pink transition-colors text-sm font-bold"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                    Instagram
+                  </a>
                </div>
-               <p className="text-gray-500 text-sm">© 2025 Predi Inc. All rights reserved.</p>
+               
+               <div>
+                  <h4 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Product</h4>
+                  <div className="flex flex-col gap-3 text-sm text-gray-400">
+                     <a href="/about" onClick={onNavigateAbout} className="hover:text-neo-lime transition-colors">About</a>
+                     <a href="/how-it-works" onClick={onNavigateHowItWorks} className="hover:text-neo-yellow transition-colors">How it works</a>
+                     <a href="/showcase" onClick={onNavigateShowcase} className="hover:text-neo-cyan transition-colors">Showcase</a>
+                  </div>
+               </div>
+               
+               <div>
+                  <h4 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Solutions</h4>
+                  <div className="flex flex-col gap-3 text-sm text-gray-400">
+                     <a href="/ai-marketing-platform" className="hover:text-neo-lime transition-colors">AI marketing platform</a>
+                     <a href="/ai-video-ads-generator" className="hover:text-neo-yellow transition-colors">AI video ads generator</a>
+                     <a href="/marketing-for-small-business" className="hover:text-neo-cyan transition-colors">Marketing for small business</a>
+                     <a href="/long-form-ai-video" className="hover:text-neo-pink transition-colors">Long-form AI video</a>
+                  </div>
+               </div>
+               
+               <div>
+                  <h4 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Legal</h4>
+                  <div className="flex flex-col gap-3 text-sm text-gray-400">
+                     <a href="/privacy" onClick={onNavigatePrivacy} className="hover:text-neo-pink transition-colors">Privacy Policy</a>
+                     <a href="/terms" onClick={onNavigateTerms} className="hover:text-neo-cyan transition-colors">Terms of Service</a>
+                  </div>
+               </div>
             </div>
-            <div className="flex flex-wrap gap-6 text-sm font-bold text-gray-400 justify-center md:justify-end">
-               <a href="/about" onClick={onNavigateAbout} className="hover:text-neo-lime transition-colors text-left">About</a>
-               <a href="/how-it-works" onClick={onNavigateHowItWorks} className="hover:text-neo-yellow transition-colors text-left">How it works</a>
-               <a href="/showcase" onClick={onNavigateShowcase} className="hover:text-neo-cyan transition-colors text-left">Showcase</a>
-               <a href="/privacy" onClick={onNavigatePrivacy} className="hover:text-neo-pink transition-colors text-left">Privacy</a>
-               <a href="/terms" onClick={onNavigateTerms} className="hover:text-neo-cyan transition-colors text-left">Terms</a>
-               <a href="/ai-marketing-platform" className="hover:text-neo-lime transition-colors text-left">AI marketing platform</a>
-               <a href="/ai-video-ads-generator" className="hover:text-neo-yellow transition-colors text-left">AI video ads generator</a>
-               <a href="/marketing-for-small-business" className="hover:text-neo-cyan transition-colors text-left">Marketing for small business</a>
-               <a href="/long-form-ai-video" className="hover:text-neo-pink transition-colors text-left">Long-form AI video</a>
-               <a href="https://twitter.com/prediai" className="hover:text-neo-yellow transition-colors">Twitter</a>
+            
+            <div className="border-t border-gray-800 mt-10 pt-6 text-center text-gray-500 text-sm">
+               © 2025 Predi Inc. All rights reserved.
             </div>
          </div>
       </footer>
