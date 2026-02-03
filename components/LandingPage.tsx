@@ -274,7 +274,7 @@ const LandingPage: React.FC<Props> = ({
            <img 
              src="/predi-cloud-logo.png" 
              alt="Predi" 
-             className="h-12 md:h-14 w-auto object-contain group-hover:scale-110 transition-transform duration-300"
+             className="h-16 md:h-20 w-auto object-contain group-hover:scale-105 transition-transform duration-300"
            />
         </div>
         <div className="flex gap-4">
@@ -888,7 +888,7 @@ const LandingPage: React.FC<Props> = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
                <div className="md:col-span-1">
                   <div className="flex items-center mb-3">
-                    <img src="/predi-cloud-logo.png" alt="Predi" className="h-12 w-auto object-contain" />
+                    <img src="/predi-cloud-logo.png" alt="Predi" className="h-16 w-auto object-contain" />
                   </div>
                   <p className="text-gray-500 text-sm mb-4">AI-powered marketing automation for modern teams.</p>
                   <a 
