@@ -312,10 +312,13 @@ const LandingPage: React.FC<Props> = ({
         </Reveal>
 
         <Reveal delay={500}>
-          <p className="font-sans text-base md:text-lg max-w-xl mx-auto mb-8 md:mb-10 px-2 text-gray-600">
-            <span className="font-bold text-neo-black">All you need is a link and a logo.</span>{' '}
-            Predi does the rest in seconds.
-          </p>
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-neo-lime/30 via-neo-cyan/20 to-neo-lime/30 px-5 py-3 rounded-full border-2 border-neo-black/10 mb-8 md:mb-10 animate-pulse-soft backdrop-blur-sm">
+            <span className="inline-block w-2 h-2 bg-neo-lime rounded-full animate-ping-slow"></span>
+            <p className="font-sans text-base md:text-lg text-gray-700">
+              <span className="font-bold text-neo-black">All you need is a link and a logo.</span>{' '}
+              Predi does the rest in seconds.
+            </p>
+          </div>
         </Reveal>
 
         <Reveal delay={600}>
