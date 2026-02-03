@@ -270,13 +270,12 @@ const LandingPage: React.FC<Props> = ({
       </div>
 
       <nav className="sticky top-0 z-50 flex items-center justify-between p-4 md:p-6 md:px-12 max-w-7xl mx-auto bg-white/80 backdrop-blur-md border-b-2 border-transparent" style={{ borderColor: scrollProgress > 0.05 ? 'black' : 'transparent' }}>
-        <div className="flex items-center gap-2 group cursor-pointer">
+        <div className="flex items-center group cursor-pointer">
            <img 
              src="/predi-cloud-logo.png" 
              alt="Predi" 
-             className="w-10 h-10 md:w-12 md:h-12 object-contain group-hover:scale-110 transition-transform duration-300"
+             className="h-10 md:h-12 w-auto object-contain group-hover:scale-110 transition-transform duration-300"
            />
-           <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight text-neo-black">Predi</h1>
         </div>
         <div className="flex gap-4">
           <button onClick={onLogin} className="hidden md:block font-bold hover:underline decoration-neo-pink underline-offset-4 decoration-2 text-neo-black">Log In</button>
@@ -888,9 +887,8 @@ const LandingPage: React.FC<Props> = ({
          <div className="max-w-7xl mx-auto px-6 md:px-12">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 md:gap-12">
                <div className="md:col-span-1">
-                  <div className="flex items-center gap-2 mb-3">
-                    <img src="/predi-cloud-logo.png" alt="Predi" className="w-8 h-8 object-contain" />
-                    <h3 className="font-display font-bold text-xl">Predi</h3>
+                  <div className="flex items-center mb-3">
+                    <img src="/predi-cloud-logo.png" alt="Predi" className="h-10 w-auto object-contain" />
                   </div>
                   <p className="text-gray-500 text-sm mb-4">AI-powered marketing automation for modern teams.</p>
                   <a 

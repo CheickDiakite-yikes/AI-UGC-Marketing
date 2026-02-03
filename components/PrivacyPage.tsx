@@ -9,9 +9,8 @@ const PrivacyPage: React.FC<Props> = ({ onBack }) => {
     <div className="w-full h-screen overflow-y-auto bg-white dark:bg-neo-dark font-sans text-neo-black dark:text-white relative overflow-x-hidden selection:bg-neo-pink selection:text-white custom-scrollbar transition-colors duration-300">
       {/* Navbar / Back Button */}
       <div className="sticky top-0 z-50 bg-white/80 dark:bg-neo-dark/80 backdrop-blur-md border-b-4 border-black dark:border-white p-4 flex justify-between items-center transition-colors">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={onBack}>
-           <img src="/predi-cloud-logo.png" alt="Predi" className="w-8 h-8 object-contain" />
-           <span className="font-display font-bold text-xl tracking-tight">Predi</span>
+        <div className="flex items-center cursor-pointer" onClick={onBack}>
+           <img src="/predi-cloud-logo.png" alt="Predi" className="h-10 w-auto object-contain" />
         </div>
         <button 
           onClick={onBack}
