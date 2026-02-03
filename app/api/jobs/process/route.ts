@@ -298,9 +298,11 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let initialFrameAttempted = false;
 
   const buildOptions = (references: typeof referenceImages, useFrame: boolean) => {
-    const options: { referenceImages?: typeof referenceImages; initialFrame?: { imageBytes?: string; mimeType?: string }; traceId: string } = { traceId };
+    const options: { referenceImages?: typeof referenceImages; initialFrame?: { imageBytes: string; mimeType: string }; traceId: string } = { traceId };
     if (references.length > 0) options.referenceImages = references;
-    if (useFrame && initialFrame) options.initialFrame = initialFrame;
+    if (useFrame && initialFrame && initialFrame.imageBytes && initialFrame.mimeType) {
+      options.initialFrame = { imageBytes: initialFrame.imageBytes, mimeType: initialFrame.mimeType };
+    }
     return options;
   };
 
