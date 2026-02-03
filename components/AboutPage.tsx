@@ -17,7 +17,9 @@ const AboutPage: React.FC<Props> = ({ onBack }) => {
       {/* Navbar / Back Button */}
       <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b-4 border-black p-4 flex justify-between items-center">
         <div className="flex items-center cursor-pointer" onClick={onBack}>
-          <img src="/predi-cloud-logo.png" alt="Predi" className="h-16 w-auto object-contain" />
+          <div className="h-12 w-24 overflow-hidden">
+            <img src="/predi-cloud-logo.png" alt="Predi" className="h-full w-full object-cover scale-[2.2]" />
+          </div>
         </div>
         <button
           onClick={onBack}
