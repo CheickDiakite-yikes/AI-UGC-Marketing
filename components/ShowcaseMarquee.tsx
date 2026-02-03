@@ -31,17 +31,10 @@ const MarqueeVideo = ({ src, isHovered }: { src: string; isHovered: boolean }) =
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !isLoaded) return;
     
-    if (isHovered && isLoaded) {
-      video.play().catch(() => null);
-    } else {
-      video.pause();
-      if (isLoaded) {
-        video.currentTime = 0;
-      }
-    }
-  }, [isHovered, isLoaded]);
+    video.play().catch(() => null);
+  }, [isLoaded]);
 
   const handleLoadedData = useCallback(() => {
     setIsLoaded(true);
@@ -64,6 +57,7 @@ const MarqueeVideo = ({ src, isHovered }: { src: string; isHovered: boolean }) =
           muted
           playsInline
           loop
+          autoPlay
           preload="auto"
           onLoadedData={handleLoadedData}
         />
