@@ -5,34 +5,59 @@ import Link from 'next/link';
 import type { ShowcaseItem } from '../types';
 import { getShowcaseItemsAction } from '../app/actions/showcaseActions';
 
-const VIDEO_POSTER =
-  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%2380F0F0'/><stop offset='100%' stop-color='%23FF90E8'/></linearGradient></defs><rect width='400' height='300' fill='url(%23g)'/><circle cx='200' cy='150' r='40' fill='%23000000' fill-opacity='0.7'/><polygon points='190,135 190,165 218,150' fill='white'/></svg>";
-
 const MarqueeVideo = ({ src, isHovered }: { src: string; isHovered: boolean }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasStartedLoading, setHasStartedLoading] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    
     if (isHovered) {
+      if (!hasStartedLoading) {
+        setHasStartedLoading(true);
+        video.load();
+      }
       video.play().catch(() => null);
     } else {
       video.pause();
-      video.currentTime = 0;
+      if (isLoaded) {
+        video.currentTime = 0;
+      }
     }
-  }, [isHovered]);
+  }, [isHovered, hasStartedLoading, isLoaded]);
+
+  const handleCanPlay = useCallback(() => {
+    setIsLoaded(true);
+  }, []);
 
   return (
-    <video
-      ref={videoRef}
-      src={src}
-      className="w-full h-full object-cover"
-      muted
-      playsInline
-      loop
-      preload="metadata"
-      poster={VIDEO_POSTER}
-    />
+    <div className="relative w-full h-full bg-gray-100">
+      {!isLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neo-cyan/30 to-neo-pink/30">
+          <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center">
+            {isHovered && hasStartedLoading ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </div>
+        </div>
+      )}
+      <video
+        ref={videoRef}
+        src={hasStartedLoading ? src : undefined}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        muted
+        playsInline
+        loop
+        preload="none"
+        onCanPlay={handleCanPlay}
+      />
+    </div>
   );
 };
 
@@ -59,7 +84,13 @@ const CarouselPreview = ({ urls, isHovered }: { urls: string[]; isHovered: boole
 
   return (
     <div className="relative w-full h-full">
-      <img src={urls[currentIndex]} alt="Carousel" className="w-full h-full object-cover" />
+      <img 
+        src={urls[currentIndex]} 
+        alt="Carousel" 
+        className="w-full h-full object-cover" 
+        loading="lazy"
+        decoding="async"
+      />
       {urls.length > 1 && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
           {urls.map((_, i) => (
@@ -177,7 +208,13 @@ const ShowcaseMarquee: React.FC = () => {
                   <MarqueeVideo src={item.previewUrl} isHovered={isHovered} />
                 )}
                 {item.type === 'image' && item.previewUrl && (
-                  <img src={item.previewUrl} alt={item.title} className="w-full h-full object-cover" />
+                  <img 
+                    src={item.previewUrl} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover" 
+                    loading="lazy"
+                    decoding="async"
+                  />
                 )}
                 {item.type === 'carousel' && item.mediaUrls.length > 0 && (
                   <CarouselPreview urls={item.mediaUrls} isHovered={isHovered} />
