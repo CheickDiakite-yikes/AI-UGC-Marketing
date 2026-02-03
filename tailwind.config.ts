@@ -36,6 +36,8 @@ const config: Config = {
                 'fade-in-up': 'fadeInUp 0.5s ease-out forwards',
                 'pulse-soft': 'pulseSoft 3s ease-in-out infinite',
                 'ping-slow': 'pingSlow 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                'shimmer': 'shimmer 3s ease-in-out infinite',
+                'text-reveal': 'textReveal 1s ease-out forwards',
             },
             keyframes: {
                 float: {
@@ -69,6 +71,14 @@ const config: Config = {
                 pingSlow: {
                     '0%': { transform: 'scale(1)', opacity: '1' },
                     '75%, 100%': { transform: 'scale(1.5)', opacity: '0' },
+                },
+                shimmer: {
+                    '0%': { backgroundPosition: '-200% center' },
+                    '100%': { backgroundPosition: '200% center' },
+                },
+                textReveal: {
+                    '0%': { opacity: '0', transform: 'translateY(20px)' },
+                    '100%': { opacity: '1', transform: 'translateY(0)' },
                 }
             }
         },

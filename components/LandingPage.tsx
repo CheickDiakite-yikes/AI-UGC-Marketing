@@ -300,7 +300,14 @@ const LandingPage: React.FC<Props> = ({
             MARKETING <br/>
             <span className="relative inline-block mt-1 md:mt-2 whitespace-nowrap">
                <span className="absolute inset-0 translate-x-[2px] translate-y-[2px] sm:translate-x-[3px] sm:translate-y-[3px] md:translate-x-[6px] md:translate-y-[6px] text-black opacity-100 select-none whitespace-nowrap" aria-hidden="true">ON AUTOPILOT.</span>
-               <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-neo-pink via-white to-neo-cyan whitespace-nowrap" style={{ WebkitTextStroke: '1px black' }}>ON AUTOPILOT.</span>
+               <span 
+                 className="relative z-10 text-transparent bg-clip-text animate-shimmer whitespace-nowrap" 
+                 style={{ 
+                   WebkitTextStroke: '1px black',
+                   backgroundImage: 'linear-gradient(90deg, #FF90E8, #80F0F0, #FF90E8, #80F0F0)',
+                   backgroundSize: '200% auto'
+                 }}
+               >ON AUTOPILOT.</span>
             </span>
           </h1>
         </Reveal>
