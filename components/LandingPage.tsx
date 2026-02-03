@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, ReactNode } from 'react';
+import ShowcaseMarquee from './ShowcaseMarquee';
 
 interface Props {
   onLogin: () => void;
@@ -410,6 +411,8 @@ const LandingPage: React.FC<Props> = ({
           </svg>
         </div>
       </section>
+
+      <ShowcaseMarquee />
 
       <div className="bg-neo-black py-4 md:py-6 overflow-hidden border-y-4 border-black rotate-1 scale-105 mb-0 relative z-20 shadow-neo-lg">
          <div className="animate-marquee whitespace-nowrap flex gap-8 md:gap-12">
