@@ -306,8 +306,15 @@ const LandingPage: React.FC<Props> = ({
         </Reveal>
 
         <Reveal delay={400}>
-          <p className="font-sans text-lg md:text-2xl max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed text-gray-900 font-medium px-2">
+          <p className="font-sans text-lg md:text-2xl max-w-2xl mx-auto mb-6 leading-relaxed text-gray-900 font-medium px-2">
             The AI-native OS that turns your brand assets and decks into high-converting UGC, viral Reels, and performance ads for TikTok, Instagram, and beyond in seconds.
+          </p>
+        </Reveal>
+
+        <Reveal delay={500}>
+          <p className="font-sans text-base md:text-lg max-w-xl mx-auto mb-8 md:mb-10 px-2 text-gray-600">
+            <span className="font-bold text-neo-black">All you need is a link and a logo.</span>{' '}
+            Predi does the rest in seconds.
           </p>
         </Reveal>
 
