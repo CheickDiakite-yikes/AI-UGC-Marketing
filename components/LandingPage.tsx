@@ -447,18 +447,21 @@ const LandingPage: React.FC<Props> = ({
 
           <StoryBlock
             step={1}
-            title="UPLOAD YOUR BRAND"
-            description="Drop your logo, pitch deck, or product photos. Our AI extracts your brand DNA instantly—colors, fonts, voice, everything. No manual setup required."
+            title="ADD YOUR BRAND"
+            description="Upload your logo and paste your website link. Our AI analyzes your site to extract your brand DNA instantly—colors, voice, audience, everything. Setup takes seconds."
             accentClass="bg-neo-pink"
             visual={
               <div className="bg-white border-4 border-black p-6 md:p-8 shadow-neo-lg">
-                <div className="flex gap-4 mb-6">
-                  <div className="w-20 h-20 bg-neo-pink/20 border-2 border-black flex items-center justify-center">
-                    <span className="text-3xl">🎨</span>
+                <div className="flex gap-4 mb-5">
+                  <div className="w-20 h-20 bg-neo-pink/20 border-2 border-dashed border-black flex flex-col items-center justify-center">
+                    <span className="text-2xl">📷</span>
+                    <span className="text-[10px] font-bold mt-1">Logo</span>
                   </div>
                   <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
-                    <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                    <div className="text-xs font-bold text-gray-500 mb-1">Website URL</div>
+                    <div className="h-10 bg-gray-100 border-2 border-black rounded flex items-center px-3">
+                      <span className="text-sm text-gray-600">https://yourbrand.com</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-2 mb-4">
