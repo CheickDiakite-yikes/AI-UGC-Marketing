@@ -132,8 +132,8 @@ const ShowcasePage: React.FC<Props> = ({ onBack }) => {
 
       <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b-4 border-black p-4 flex justify-between items-center">
         <div className="flex items-center cursor-pointer" onClick={onBack}>
-          <div className="h-12 w-24 overflow-hidden">
-            <img src="/predi-cloud-logo.png" alt="Predi" className="h-full w-full object-cover scale-[2.2]" />
+          <div className="h-14 w-28 overflow-hidden">
+            <img src="/predi-cloud-logo.png" alt="Predi" className="h-full w-full object-cover scale-[1.6]" />
           </div>
         </div>
         <button
