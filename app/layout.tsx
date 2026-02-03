@@ -32,10 +32,10 @@ const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-RFRC5MQF
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
     title: {
-        default: 'Predi AI | AI Marketing Generator & Automation OS',
+        default: 'Predi AI | Your #1 AI Chief Marketing Officer',
         template: '%s | Predi AI'
     },
-    description: 'The AI-native marketing OS that turns your brand assets into high-converting UGC, viral Reels, and performance ads for TikTok, Instagram, and beyond in seconds. Powered by Gemini 3 Pro.',
+    description: 'Your #1 AI Chief Marketing Officer. All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
     keywords: [
         'AI marketing',
         'AI content generator',
@@ -73,8 +73,8 @@ export const metadata: Metadata = {
         locale: 'en_US',
         url: siteUrl,
         siteName: 'Predi AI',
-        title: 'Predi AI | AI Marketing Generator & Automation OS',
-        description: 'The AI-native marketing OS that turns your brand assets into high-converting UGC, viral Reels, and performance ads in seconds.',
+        title: 'Predi AI | Your #1 AI Chief Marketing Officer',
+        description: 'All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
         images: [
             {
                 url: '/og-image.png',
@@ -87,8 +87,8 @@ export const metadata: Metadata = {
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Predi AI | AI Marketing Generator & Automation OS',
-        description: 'The AI-native marketing OS that turns your brand assets into high-converting UGC, viral Reels, and performance ads in seconds.',
+        title: 'Predi AI | Your #1 AI Chief Marketing Officer',
+        description: 'All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
         images: ['/og-image.png'],
         creator: '@prediai',
         site: '@prediai',
