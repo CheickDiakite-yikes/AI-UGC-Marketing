@@ -7,18 +7,33 @@ import { getShowcaseItemsAction } from '../app/actions/showcaseActions';
 
 const MarqueeVideo = ({ src, isHovered }: { src: string; isHovered: boolean }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [hasStartedLoading, setHasStartedLoading] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     
-    if (isHovered) {
-      if (!hasStartedLoading) {
-        setHasStartedLoading(true);
-        video.load();
-      }
+    if (isHovered && isLoaded) {
       video.play().catch(() => null);
     } else {
       video.pause();
@@ -26,37 +41,33 @@ const MarqueeVideo = ({ src, isHovered }: { src: string; isHovered: boolean }) =
         video.currentTime = 0;
       }
     }
-  }, [isHovered, hasStartedLoading, isLoaded]);
+  }, [isHovered, isLoaded]);
 
-  const handleCanPlay = useCallback(() => {
+  const handleLoadedData = useCallback(() => {
     setIsLoaded(true);
   }, []);
 
   return (
-    <div className="relative w-full h-full bg-gray-100">
+    <div ref={containerRef} className="relative w-full h-full bg-gray-100">
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neo-cyan/30 to-neo-pink/30">
           <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center">
-            {isHovered && hasStartedLoading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           </div>
         </div>
       )}
-      <video
-        ref={videoRef}
-        src={hasStartedLoading ? src : undefined}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-        muted
-        playsInline
-        loop
-        preload="none"
-        onCanPlay={handleCanPlay}
-      />
+      {isInView && (
+        <video
+          ref={videoRef}
+          src={src}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          muted
+          playsInline
+          loop
+          preload="auto"
+          onLoadedData={handleLoadedData}
+        />
+      )}
     </div>
   );
 };
