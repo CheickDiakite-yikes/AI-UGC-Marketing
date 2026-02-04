@@ -77,11 +77,11 @@ export const metadata: Metadata = {
         description: 'All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
         images: [
             {
-                url: '/og-image.png',
+                url: '/og-image.jpeg',
                 width: 1200,
                 height: 630,
                 alt: 'Predi AI - Marketing on Autopilot',
-                type: 'image/png',
+                type: 'image/jpeg',
             },
         ],
     },
@@ -89,7 +89,7 @@ export const metadata: Metadata = {
         card: 'summary_large_image',
         title: 'Predi AI | Your #1 AI Chief Marketing Officer',
         description: 'All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
-        images: ['/og-image.png'],
+        images: ['/og-image.jpeg'],
         creator: '@prediai',
         site: '@prediai',
     },
