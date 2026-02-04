@@ -110,7 +110,7 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
   };
 
   return (
-    <div className="w-full border-2 border-black rounded-xl bg-white/90 p-3 shadow-neo-sm">
+    <div className="w-full max-w-full border-2 border-black rounded-xl bg-white/90 p-2 sm:p-3 shadow-neo-sm overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Reference Kit</div>
@@ -137,23 +137,23 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
           const previewSrc = selectedAsset ? getAssetPreview(selectedAsset) : null;
           const isUploading = uploadingRole === slot.role;
           return (
-            <div key={slot.role} className="flex flex-row gap-2 sm:gap-3 border-2 border-black bg-white p-2 rounded-lg shadow-neo-sm items-start sm:items-center">
-              <div className="w-10 h-10 sm:w-14 sm:h-14 border-2 border-black bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+            <div key={slot.role} className="flex flex-row gap-2 border-2 border-black bg-white p-2 rounded-lg shadow-neo-sm items-start overflow-hidden">
+              <div className="w-8 h-8 sm:w-12 sm:h-12 border-2 border-black bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 rounded">
                 {previewSrc ? (
                   <img src={previewSrc} alt={selectedAsset?.name || slot.label} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-[8px] sm:text-[9px] font-bold text-gray-400 uppercase">{slot.role}</span>
+                  <span className="text-[7px] sm:text-[9px] font-bold text-gray-400 uppercase">{slot.role}</span>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-gray-500">{slot.label}</div>
-                <div className="text-[9px] sm:text-[10px] text-gray-500 hidden sm:block">{slot.hint}</div>
-                <div className="mt-1 sm:mt-2 flex flex-wrap items-center gap-1 sm:gap-2">
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-500 truncate">{slot.label}</div>
+                <div className="text-[9px] text-gray-500 hidden sm:block truncate">{slot.hint}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-1">
                   <select
                     value={selectedId}
                     onChange={(e) => updateSelections(slot.role, e.target.value)}
                     disabled={disabled}
-                    className="flex-1 min-w-0 sm:w-auto sm:flex-1 sm:min-w-[160px] border-2 border-black bg-white text-[10px] sm:text-xs font-bold px-1 sm:px-2 py-1"
+                    className="flex-1 min-w-0 max-w-full border-2 border-black bg-white text-[10px] sm:text-xs font-bold px-1 py-0.5 sm:py-1 rounded"
                   >
                     <option value="">Auto</option>
                     {imageAssets.map(asset => (
@@ -162,37 +162,43 @@ const StoryboardReferenceKit: React.FC<StoryboardReferenceKitProps> = ({
                       </option>
                     ))}
                   </select>
-                  {onUploadReference && (
-                    <button
-                      type="button"
-                      onClick={() => handleUploadClick(slot.role)}
-                      disabled={disabled || isUploading}
-                      className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest border-2 border-black px-1.5 sm:px-2 py-1 bg-neo-cyan hover:bg-neo-pink hover:text-black transition-all disabled:opacity-50 whitespace-nowrap"
-                    >
-                      {isUploading ? '...' : 'Upload'}
-                    </button>
-                  )}
-                  {selectedId ? (
-                    <button
-                      type="button"
-                      onClick={() => clearRole(slot.role)}
-                      disabled={disabled}
-                      className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest border-2 border-black px-1.5 sm:px-2 py-1 bg-white hover:bg-black hover:text-white transition-all whitespace-nowrap"
-                    >
-                      Clear
-                    </button>
-                  ) : null}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {onUploadReference && (
+                      <button
+                        type="button"
+                        onClick={() => handleUploadClick(slot.role)}
+                        disabled={disabled || isUploading}
+                        title="Upload image"
+                        aria-label="Upload image"
+                        className="text-[8px] sm:text-[10px] font-bold uppercase border-2 border-black px-1 sm:px-2 py-0.5 sm:py-1 bg-neo-cyan hover:bg-neo-pink transition-all disabled:opacity-50 rounded"
+                      >
+                        {isUploading ? '...' : '↑'}
+                      </button>
+                    )}
+                    {selectedId ? (
+                      <button
+                        type="button"
+                        onClick={() => clearRole(slot.role)}
+                        disabled={disabled}
+                        title="Clear selection"
+                        aria-label="Clear selection"
+                        className="text-[8px] sm:text-[10px] font-bold uppercase border-2 border-black px-1 sm:px-2 py-0.5 sm:py-1 bg-white hover:bg-black hover:text-white transition-all rounded"
+                      >
+                        ✕
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 {slot.role === 'avatar' && onUploadReference && (
-                  <label className="mt-1 flex flex-wrap items-center gap-1 sm:gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider sm:tracking-widest text-gray-500">
+                  <label className="mt-1 flex items-center gap-1 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-gray-500">
                     <input
                       type="checkbox"
                       checked={useAvatarIdentity}
                       onChange={(e) => setUseAvatarIdentity(e.target.checked)}
                       disabled={disabled}
-                      className="h-3 w-3 border-2 border-black accent-neo-pink"
+                      className="h-3 w-3 border-2 border-black accent-neo-pink flex-shrink-0"
                     />
-                    Use as avatar identity
+                    <span className="truncate">Save as avatar</span>
                   </label>
                 )}
               </div>

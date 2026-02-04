@@ -731,8 +731,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       )}
 
       {pinnedStoryboard && onUpdateStoryboardReferences && (
-        <div className="px-4 pb-3">
-          <div className="border-2 border-black bg-white/90 rounded-xl shadow-neo-sm">
+        <div className="px-4 pb-3 max-w-full overflow-hidden">
+          <div className="border-2 border-black bg-white/90 rounded-xl shadow-neo-sm overflow-hidden">
             <button
               type="button"
               onClick={() => setIsReferencePinnedOpen(prev => !prev)}
