@@ -90,6 +90,7 @@ export interface LongVideoStoryboardPayload {
   hook?: string;
   caption?: string;
   archetype?: string;
+  showReferenceKit?: boolean; // Only show reference kit for direct video requests, not campaign packs
 }
 
 export interface StoryboardRecord {

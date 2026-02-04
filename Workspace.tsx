@@ -1955,7 +1955,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               title,
               hook,
               caption,
-              archetype
+              archetype,
+              showReferenceKit: true
             });
 
             if (storyboard?.storyboardMessage) {

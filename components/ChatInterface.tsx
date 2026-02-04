@@ -730,7 +730,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
       )}
 
-      {pinnedStoryboard && onUpdateStoryboardReferences && (
+      {pinnedStoryboard && pinnedStoryboard.payload?.showReferenceKit && onUpdateStoryboardReferences && (
         <div className="px-4 pb-3 max-w-full overflow-hidden">
           <div className="border-2 border-black bg-white/90 rounded-xl shadow-neo-sm overflow-hidden">
             <button
