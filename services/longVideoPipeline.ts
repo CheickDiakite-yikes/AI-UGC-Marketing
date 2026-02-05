@@ -9,6 +9,7 @@ import { resolveVideoIngredients } from '@/services/videoIngredientService';
 import type { ReferenceAsset } from '@/services/videoIngredientService';
 import { generateAutoReferenceImages } from '@/services/videoReferenceService';
 import { generateVeoVideo } from '@/services/geminiService';
+import { buildSceneReferenceSelection } from '@/services/videoReferenceSelection';
 import { extractLastFrame, stitchVideoClips } from '@/services/videoStitchService';
 
 const MAX_LONG_VIDEO_SECONDS = 30;
@@ -157,6 +158,20 @@ export async function generateLongVideoAssets(params: {
     .filter(Boolean)
     .join('\n');
 
+  console.log(`[LONG-VIDEO ${traceId}] Payload summary`, {
+    aspectRatio,
+    resolution,
+    qualityMode,
+    sceneCount: normalizedScenes.length,
+    totalDurationSeconds,
+    productId: payload.productId || null,
+    referenceMode: payload.referenceMode || null,
+    referenceSelections: payload.referenceSelections || [],
+    ingredientAssetIds: payload.ingredientAssetIds || [],
+    promptPreview: payload.prompt ? payload.prompt.substring(0, 160) : '',
+    continuityPreview: payload.continuitySpec ? payload.continuitySpec.substring(0, 160) : ''
+  });
+
   const ingredientResult = await resolveVideoIngredients({
     boardId,
     productId: payload.productId,
@@ -169,7 +184,9 @@ export async function generateLongVideoAssets(params: {
   });
 
   const referenceAssets = ingredientResult.referenceAssets || [];
-  const avatarReferenceAsset = referenceAssets.find(asset => asset.type === 'avatar') || null;
+  const avatarReferenceAsset = referenceAssets.find(asset => asset.role === 'avatar')
+    || referenceAssets.find(asset => asset.type === 'avatar')
+    || null;
   const bestIngredientAsset = selectBestIngredientAsset(referenceAssets);
   console.log(`[LONG-VIDEO ${traceId}] Ingredient references`, {
     selectedAssetIds: ingredientResult.selectedAssetIds,
@@ -234,31 +251,22 @@ export async function generateLongVideoAssets(params: {
       traceId: sceneTraceId,
     });
 
-    const primaryReference = avatarReferenceAsset?.referenceImage || continuityReference || null;
-    const safeReferenceCandidates: VideoGenerationReferenceImage[] = [];
-    let usedContinuityReference = false;
-    let usedAvatarReference = false;
+    const referenceSelection = buildSceneReferenceSelection({
+      referenceAssets,
+      continuityReference,
+      carryoverReference: qualityMode ? carryoverReference : null,
+      maxReferences: 3
+    });
 
-    if (primaryReference) {
-      safeReferenceCandidates.push(primaryReference);
-      usedAvatarReference = !!avatarReferenceAsset;
-      usedContinuityReference = !avatarReferenceAsset && !!continuityReference;
-    }
-
-    if (qualityMode && carryoverReference) {
-      safeReferenceCandidates.push(carryoverReference);
-    }
-
-    const fullReferenceCandidates = [...safeReferenceCandidates];
-    if (bestIngredientAsset?.referenceImage) {
-      fullReferenceCandidates.push(bestIngredientAsset.referenceImage);
-    }
-
-    let referenceImages = clampReferenceImages(fullReferenceCandidates);
-    let safeReferenceImages = clampReferenceImages(safeReferenceCandidates);
-    const usedCarryoverReference = !!(carryoverReference && referenceImages.includes(carryoverReference));
+    let referenceImages = referenceSelection.referenceImages;
+    let safeReferenceImages = referenceSelection.safeReferenceImages;
+    let referenceLabels = referenceSelection.referenceLabels;
+    let safeReferenceLabels = referenceSelection.safeReferenceLabels;
+    const usedCarryoverReference = referenceSelection.usedCarryoverReference;
+    const usedAvatarReference = referenceSelection.usedAvatarReference;
+    const usedContinuityReference = referenceSelection.usedContinuityReference;
     const usedBestIngredient = !!(bestIngredientAsset?.referenceImage && referenceImages.includes(bestIngredientAsset.referenceImage));
-    const usedPrimaryReference = !!(primaryReference && referenceImages.includes(primaryReference));
+    const usedPrimaryReference = usedAvatarReference || usedContinuityReference;
 
     console.log(`[LONG-VIDEO ${sceneTraceId}] Reference selection`, {
       primarySource: usedAvatarReference ? 'avatar' : (usedContinuityReference ? 'continuity' : 'none'),
@@ -269,7 +277,9 @@ export async function generateLongVideoAssets(params: {
       safeReferenceCount: safeReferenceImages.length,
       avatarAssetId: avatarReferenceAsset?.id || null,
       avatarReferenceSource: avatarReferenceAsset?.source || 'asset',
-      bestIngredientAssetId: bestIngredientAsset?.id || null
+      bestIngredientAssetId: bestIngredientAsset?.id || null,
+      references: referenceLabels,
+      safeReferences: safeReferenceLabels
     });
 
     let autoReferenceUsed = usedContinuityReference;
@@ -284,6 +294,8 @@ export async function generateLongVideoAssets(params: {
       if (autoRefs.referenceImages.length > 0) {
         referenceImages = clampReferenceImages(autoRefs.referenceImages);
         safeReferenceImages = referenceImages;
+        referenceLabels = referenceImages.map(() => ({ kind: 'auto' as const }));
+        safeReferenceLabels = referenceLabels;
         autoReferenceUsed = true;
         autoReferenceCount += 1;
         console.log(`[LONG-VIDEO ${sceneTraceId}] Auto reference generated for scene`, {
@@ -299,6 +311,16 @@ export async function generateLongVideoAssets(params: {
     } else if (referenceImages.length > 0 && aspectRatio !== '16:9') {
       console.warn(`[LONG-VIDEO ${sceneTraceId}] Using references with vertical aspect ratio ${aspectRatio}`);
     }
+
+    console.log(`[LONG-VIDEO ${sceneTraceId}] Scene config`, {
+      aspectRatio,
+      resolution,
+      durationSeconds: scene.durationSeconds,
+      qualityMode,
+      useIngredients,
+      referenceCount: referenceImages.length,
+      promptPreview: compiled.prompt.substring(0, 180)
+    });
 
     const config: VeoConfig = {
       aspectRatio,
@@ -473,6 +495,22 @@ export async function generateLongVideoAssets(params: {
       caption: payload.caption || null,
       traceId,
     },
+  });
+
+  console.log(`[LONG-VIDEO ${traceId}] Final stitched video saved`, {
+    finalItemId,
+    sceneItemIds,
+    sceneCount: normalizedScenes.length,
+    totalDurationSeconds,
+    aspectRatio,
+    resolution,
+    qualityMode,
+    autoReferenceUsedCount: autoReferenceCount,
+    referenceMode: payload.referenceMode || null,
+    referenceSelections: payload.referenceSelections || [],
+    ingredientAssetIds: ingredientResult.selectedAssetIds,
+    avatarAssetId: avatarReferenceAsset?.id || null,
+    traceId
   });
 
   return {

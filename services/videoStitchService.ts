@@ -47,13 +47,121 @@ const runCommand = (command: string, args: string[], traceId?: string) => {
   });
 };
 
+const runCommandWithOutput = (command: string, args: string[], traceId?: string) => {
+  return new Promise<string>((resolve, reject) => {
+    const proc = spawn(command, args);
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('error', (err) => {
+      reject(err);
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout);
+        return;
+      }
+      const message = traceId
+        ? `[FFMPEG ${traceId}] ${stderr || `Process exited with code ${code}`}`
+        : (stderr || `Process exited with code ${code}`);
+      reject(new Error(message));
+    });
+  });
+};
+
 const createTempDir = async () => {
   return mkdtemp(join(tmpdir(), 'predi-video-'));
 };
 
+const parseFps = (rate?: string): number | null => {
+  if (!rate) return null;
+  const parts = rate.split('/');
+  if (parts.length === 2) {
+    const num = Number(parts[0]);
+    const den = Number(parts[1]);
+    if (Number.isFinite(num) && Number.isFinite(den) && den !== 0) {
+      return num / den;
+    }
+  }
+  const value = Number(rate);
+  return Number.isFinite(value) ? value : null;
+};
+
+const probeVideoInfo = async (inputPath: string, traceId?: string) => {
+  const output = await runCommandWithOutput('ffprobe', [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_entries',
+    'stream=width,height,r_frame_rate',
+    '-of',
+    'json',
+    inputPath
+  ], traceId);
+
+  const data = JSON.parse(output);
+  const stream = data?.streams?.[0];
+  const width = Number(stream?.width);
+  const height = Number(stream?.height);
+  const fps = parseFps(stream?.r_frame_rate) || null;
+
+  return {
+    width: Number.isFinite(width) ? width : null,
+    height: Number.isFinite(height) ? height : null,
+    fps
+  };
+};
+
+const normalizeClipPaths = async (
+  clipPaths: string[],
+  params: { width: number; height: number; fps: number; traceId?: string; tempDir: string }
+) => {
+  const { width, height, fps, traceId, tempDir } = params;
+  const normalizedPaths: string[] = [];
+  const evenWidth = Math.max(2, Math.floor(width / 2) * 2);
+  const evenHeight = Math.max(2, Math.floor(height / 2) * 2);
+  const scaleFilter = `scale=${evenWidth}:${evenHeight}:force_original_aspect_ratio=decrease,pad=${evenWidth}:${evenHeight}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+
+  for (let i = 0; i < clipPaths.length; i += 1) {
+    const inputPath = clipPaths[i];
+    const outputPath = join(tempDir, `normalized-${i}.mp4`);
+    const args = [
+      '-y',
+      '-i',
+      inputPath,
+      '-vf',
+      scaleFilter,
+      '-r',
+      `${fps}`,
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-preset',
+      'veryfast',
+      '-an',
+      outputPath
+    ];
+    await runCommand('ffmpeg', args, traceId);
+    normalizedPaths.push(outputPath);
+  }
+
+  return normalizedPaths;
+};
+
 export async function stitchVideoClips(
   clips: string[],
-  options?: { traceId?: string; reencode?: boolean }
+  options?: { traceId?: string; reencode?: boolean; normalize?: boolean }
 ): Promise<string> {
   if (clips.length === 0) {
     throw new Error('No clips provided for stitching');
@@ -82,6 +190,7 @@ export async function stitchVideoClips(
     try {
       await runCommand('ffmpeg', concatArgs, traceId);
     } catch (error) {
+      console.warn(`[FFMPEG ${traceId}] Direct concat failed, attempting re-encode`, error);
       if (options?.reencode === false) {
         throw error;
       }
@@ -102,7 +211,59 @@ export async function stitchVideoClips(
         '-an',
         outputPath,
       ];
-      await runCommand('ffmpeg', fallbackArgs, traceId);
+      try {
+        await runCommand('ffmpeg', fallbackArgs, traceId);
+      } catch (fallbackError) {
+        console.warn(`[FFMPEG ${traceId}] Re-encode concat failed, attempting normalized clips`, fallbackError);
+        if (options?.normalize === false) {
+          throw fallbackError;
+        }
+        let probe = { width: null as number | null, height: null as number | null, fps: null as number | null };
+        try {
+          probe = await probeVideoInfo(clipPaths[0], traceId);
+        } catch (probeError) {
+          console.warn(`[FFMPEG ${traceId}] Failed to probe clip metadata, using defaults`, probeError);
+        }
+        const targetWidth = probe.width || 1280;
+        const targetHeight = probe.height || 720;
+        const targetFps = probe.fps || 30;
+        const normalizedPaths = await normalizeClipPaths(clipPaths, {
+          width: targetWidth,
+          height: targetHeight,
+          fps: targetFps,
+          traceId,
+          tempDir
+        });
+        const normalizedListPath = join(tempDir, 'normalized-clips.txt');
+        const normalizedList = normalizedPaths
+          .map(path => `file '${path.replace(/'/g, "'\\''")}'`)
+          .join('\n');
+        await writeFile(normalizedListPath, normalizedList);
+        const normalizedConcatArgs = [
+          '-y',
+          '-f',
+          'concat',
+          '-safe',
+          '0',
+          '-i',
+          normalizedListPath,
+          '-c:v',
+          'libx264',
+          '-pix_fmt',
+          'yuv420p',
+          '-preset',
+          'veryfast',
+          '-an',
+          outputPath,
+        ];
+        await runCommand('ffmpeg', normalizedConcatArgs, traceId);
+        console.log(`[FFMPEG ${traceId}] Normalized concat succeeded`, {
+          targetWidth,
+          targetHeight,
+          targetFps,
+          clipCount: normalizedPaths.length
+        });
+      }
     }
 
     const stitchedBuffer = await readFile(outputPath);

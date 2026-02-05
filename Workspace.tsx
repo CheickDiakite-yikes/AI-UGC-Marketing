@@ -19,6 +19,7 @@ import { useToast } from './components/Toast';
 import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole, ExtractedBrandData, BrandContext, AssetCatalogEntry } from './types';
 import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { buildIdentityConstraints } from './services/identityPromptUtils';
+import { inferAspectRatioFromLongVideoPayload } from './services/videoAspectRatio';
 import { getRemainingVideos, IMAGE_CREDIT_COST, VIDEO_CREDIT_COST } from './services/usageLimits';
 import { getPlanLimits } from './services/subscriptionPlans';
 import { FunctionCall, GenerateContentResponse } from '@google/genai';
@@ -699,7 +700,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
 
     const qualityMode = typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode;
+    const inferredAspectRatio = inferAspectRatioFromLongVideoPayload(payload);
+    const aspectRatio = payload.aspectRatio || inferredAspectRatio || '16:9';
     const traceId = crypto.randomUUID();
+    console.log('[LONG-VIDEO] Queueing job', {
+      aspectRatio,
+      resolution: payload.resolution || '720p',
+      qualityMode,
+      sceneCount,
+      totalDurationSeconds,
+      promptPreview: payload.prompt ? payload.prompt.substring(0, 140) : '',
+      continuityPreview: payload.continuitySpec ? payload.continuitySpec.substring(0, 140) : '',
+      referenceMode: payload.referenceMode || null,
+      referenceSelections: payload.referenceSelections || [],
+      ingredientAssetIds: payload.ingredientAssetIds || []
+    });
+
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -710,7 +726,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           prompt: payload.prompt,
           continuitySpec: payload.continuitySpec,
           scenes,
-          aspectRatio: payload.aspectRatio || '16:9',
+          aspectRatio,
           resolution: payload.resolution || '720p',
           productId: payload.productId,
           ingredientAssetIds: payload.ingredientAssetIds,
@@ -740,7 +756,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setActiveJobs(prev => [...prev, job.id]);
     addPendingItem(job.id, 'video', {
       title: payload.title || 'Generating Long Video',
-      aspectRatio: payload.aspectRatio || '16:9',
+      aspectRatio,
       resolution: payload.resolution || '720p',
       caption: payload.caption,
       hook: payload.hook,
@@ -794,13 +810,26 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       }
     }
 
+    const inferredAspectRatio = inferAspectRatioFromLongVideoPayload(payload);
+    const aspectRatio = payload.aspectRatio || inferredAspectRatio || '16:9';
     const normalizedPayload: LongVideoStoryboardPayload = {
       ...payload,
-      aspectRatio: payload.aspectRatio || '16:9',
+      aspectRatio,
       resolution,
       qualityMode: typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode,
       scenes
     };
+    console.log('[STORYBOARD] Normalized long-video payload', {
+      aspectRatio,
+      resolution,
+      qualityMode: normalizedPayload.qualityMode,
+      sceneCount: scenes.length,
+      promptPreview: payload.prompt ? payload.prompt.substring(0, 140) : '',
+      continuityPreview: payload.continuitySpec ? payload.continuitySpec.substring(0, 140) : '',
+      referenceMode: payload.referenceMode || null,
+      referenceSelections: payload.referenceSelections || [],
+      ingredientAssetIds: payload.ingredientAssetIds || []
+    });
     const messageId = crypto.randomUUID();
     const storyboardId = crypto.randomUUID();
     const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds, resolutionNote || undefined);

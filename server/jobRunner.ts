@@ -4,6 +4,7 @@ import { compileVisualPromptWithIdentity } from '../services/identityPromptServi
 import { getBrandAssetDataForGeneration, getBrandAssetsByIds } from '../services/brandAssetService';
 import { shouldUseAvatar } from '../services/identityPromptUtils';
 import { resolveVideoIngredients } from '../services/videoIngredientService';
+import type { ReferenceAsset } from '../services/videoIngredientService';
 import { applyVideoDurationGuardrails } from '../services/videoPromptUtils';
 import { generateAutoReferenceImages } from '../services/videoReferenceService';
 import { uploadGeneratedItem } from '../services/objectStorageService';
@@ -337,6 +338,7 @@ async function processVideoJob(job: Job): Promise<JobResult> {
   let productIdUsed: string | undefined;
   let autoReferenceUsed = false;
   let avatarReferenceImages = [];
+  let referenceAssets: ReferenceAsset[] = [];
   let initialFrame: { imageBytes: string; mimeType: string } | null = null;
   let initialFrameAssetId: string | undefined;
   let initialFrameRole: string | undefined;
@@ -357,8 +359,9 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     referenceImages = ingredientResult.referenceImages;
     selectedIngredientIds = ingredientResult.selectedAssetIds;
     productIdUsed = ingredientResult.productIdUsed;
-    avatarReferenceImages = (ingredientResult.referenceAssets || [])
-      .filter(asset => asset.type === 'avatar')
+    referenceAssets = ingredientResult.referenceAssets || [];
+    avatarReferenceImages = referenceAssets
+      .filter(asset => asset.type === 'avatar' || asset.role === 'avatar')
       .map(asset => asset.referenceImage);
     initialFrame = ingredientResult.initialFrame || null;
     initialFrameAssetId = ingredientResult.initialFrameAssetId;
@@ -403,6 +406,28 @@ async function processVideoJob(job: Job): Promise<JobResult> {
     basePrompt: promptWithGuardrails,
     productId: productIdUsed || productId || null,
     traceId
+  });
+
+  console.log(`[JOB RUNNER ${traceId}] Video config`, {
+    aspectRatio: config.aspectRatio,
+    resolution: config.resolution,
+    durationSeconds: config.durationSeconds,
+    qualityMode,
+    useIngredients,
+    referenceCount: referenceImages.length,
+    referenceAssets: referenceAssets.map(asset => ({
+      id: asset.id,
+      type: asset.type,
+      role: asset.role || null,
+      origin: asset.origin || null,
+      source: asset.source || null
+    })),
+    initialFrameAssetId: initialFrameAssetId || null,
+    initialFrameRole: initialFrameRole || null,
+    initialFrameOrigin: initialFrameOrigin || null,
+    initialFrameSource: initialFrameSource || null,
+    autoReferenceUsed,
+    promptPreview: compiled.prompt.substring(0, 180)
   });
 
   let videoResult: string;
@@ -460,6 +485,22 @@ async function processVideoJob(job: Job): Promise<JobResult> {
       referenceImagesUsed = [];
     }
   }
+
+  console.log(`[JOB RUNNER ${traceId}] Video generation complete`, {
+    referenceImagesUsed: referenceImagesUsed.length,
+    initialFrameUsed,
+    initialFrameAttempted,
+    ingredientFallback: !!ingredientFailure,
+    ingredientError: ingredientFailure || null,
+    referenceAssets: referenceAssets.map(asset => ({
+      id: asset.id,
+      type: asset.type,
+      role: asset.role || null,
+      origin: asset.origin || null,
+      source: asset.source || null
+    })),
+    promptPreview: compiled.prompt.substring(0, 120)
+  });
   
   const itemId = crypto.randomUUID();
   let storageKey: string | null = null;
