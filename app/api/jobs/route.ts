@@ -22,10 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
     if (type === 'generate_long_video') {
-      const scenes = Array.isArray(payload?.scenes) ? payload.scenes : [];
-      if (scenes.length < 2) {
-        return NextResponse.json({ error: 'Long videos require at least 2 scenes' }, { status: 400 });
-      }
+      return NextResponse.json({
+        error: 'Long video generation has been retired.',
+        code: 'FEATURE_DISABLED'
+      }, { status: 410 });
     }
 
     const board = await db.query.boards.findFirst({
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (type === 'generate_image' || type === 'generate_video' || type === 'generate_long_video' || type === 'generate_carousel') {
+    if (type === 'generate_image' || type === 'generate_video' || type === 'generate_carousel') {
       const user = await db.query.users.findFirst({
         where: eq(users.id, session.userId as string),
         columns: {
@@ -60,9 +60,7 @@ export async function POST(request: NextRequest) {
       const credits = user.creditBalance || 0;
       const remainingImages = getRemainingImages(user.imagesGenerated, imageLimit, credits);
       const remainingVideos = getRemainingVideos(user.videosGenerated, videoLimit, credits);
-      const requestedScenes = type === 'generate_long_video' && Array.isArray(payload?.scenes)
-        ? payload.scenes.length
-        : 1;
+      const requestedVideos = 1;
 
       if (type === 'generate_image' && remainingImages <= 0) {
         return NextResponse.json({
@@ -74,7 +72,7 @@ export async function POST(request: NextRequest) {
         }, { status: 402 });
       }
 
-      if ((type === 'generate_video' || type === 'generate_long_video') && remainingVideos < requestedScenes) {
+      if (type === 'generate_video' && remainingVideos < requestedVideos) {
         const code = videoLimit <= 0 && remainingVideos <= 0 ? 'PLAN_REQUIRED' : 'QUOTA_EXCEEDED';
         const errorMessage = code === 'PLAN_REQUIRED'
           ? 'Video generation requires credits or a subscription.'
@@ -85,7 +83,7 @@ export async function POST(request: NextRequest) {
           limit: videoLimit,
           used: user.videosGenerated,
           remaining: remainingVideos,
-          required: requestedScenes
+          required: requestedVideos
         }, { status: 402 });
       }
 
@@ -105,16 +103,12 @@ export async function POST(request: NextRequest) {
 
     const job = await createJob(boardId, session.userId as string, type, payload);
     const traceId = typeof payload?.traceId === 'string' ? payload.traceId : undefined;
-    const sceneCount = type === 'generate_long_video' && Array.isArray(payload?.scenes)
-      ? payload.scenes.length
-      : undefined;
     console.log('[API JOB CREATE]', {
       jobId: job.id,
       type,
       boardId,
       userId: session.userId,
-      traceId,
-      sceneCount,
+      traceId
     });
 
     return NextResponse.json({

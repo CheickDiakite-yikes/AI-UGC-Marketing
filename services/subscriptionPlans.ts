@@ -26,7 +26,6 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     features: [
       `${IMAGE_LIMIT} image generations`,
       'Video generation with credits',
-      'Long-form video with credits',
       'Core brand context builder',
       'Community support',
     ],
@@ -43,7 +42,6 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     features: [
       '50 image generations',
       `3 videos (avg ${VIDEO_AVG_SECONDS}s)`,
-      'Long-form video generation (15-30s)',
       'Quality Mode video generation (reference frames)',
       'Campaign packs + carousels',
       'Priority queue',
@@ -60,7 +58,6 @@ export const PLAN_CATALOG: Record<PlanTier, PlanDefinition> = {
     features: [
       '150 image generations',
       `10 videos (avg ${VIDEO_AVG_SECONDS}s)`,
-      'Long-form video generation (15-30s)',
       'Quality Mode video generation (reference frames)',
       'Advanced brand consistency checks',
       'Faster turnaround',
