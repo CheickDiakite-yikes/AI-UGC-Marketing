@@ -16,13 +16,11 @@ import BoardListModal from './components/BoardListModal';
 import CameraModal from './components/CameraModal';
 import LightboxModal from './components/LightboxModal';
 import { useToast } from './components/Toast';
-import { ProjectAsset, CanvasItem, ChatMessage, AspectRatio, ImageSize, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, LongVideoSceneInput, LongVideoStoryboardPayload, StoryboardRecord, StoryboardStatus, VideoReferenceSelection, VideoReferenceMode, VideoReferenceRole, ExtractedBrandData, BrandContext, AssetCatalogEntry } from './types';
-import { chatWithMarketingAgent, generateMarketingImage, generateVeoVideo, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
-import { buildIdentityConstraints } from './services/identityPromptUtils';
-import { inferAspectRatioFromLongVideoPayload } from './services/videoAspectRatio';
+import { ProjectAsset, CanvasItem, ChatMessage, BrandIdentity, AvatarIdentity, Board, UsageStats, Product, ProductAsset, OnboardingState, ProfileImportSelection, VideoReferenceSelection, VideoReferenceMode, ExtractedBrandData, BrandContext, AssetCatalogEntry } from './types';
+import { chatWithMarketingAgent, analyzeBrandLogo, analyzeAvatarImage, discoverTrends, researchWithGoogleSearch, validateCopyConsistency } from './services/geminiService';
 import { getRemainingVideos, IMAGE_CREDIT_COST, VIDEO_CREDIT_COST } from './services/usageLimits';
 import { getPlanLimits } from './services/subscriptionPlans';
-import { FunctionCall, GenerateContentResponse } from '@google/genai';
+import { FunctionCall } from '@google/genai';
 import {
   getBoards,
   createBoard,
@@ -47,11 +45,7 @@ import {
   dismissOnboardingAction,
   completeOnboardingAction,
   submitWebsiteOnboardingAction,
-  analyzeWebsiteAction,
-  createStoryboardAction,
-  updateStoryboardStatusAction,
-  updateStoryboardPayloadAction,
-  generateAvatarAssetAction
+  analyzeWebsiteAction
 } from './app/actions/boardActions';
 import { getSubscriptionStateAction, createCheckoutSessionAction, createCreditsCheckoutSessionAction } from './app/actions/subscriptionActions';
 import { toggleFavoriteAction } from './app/actions/favoriteActions';
@@ -250,6 +244,34 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }
   }, []);
 
+  const mapBoardDetailsToState = useCallback((b: any): Board => ({
+    id: b.id,
+    name: b.name,
+    items: (b.generatedItems || []).map((gi: any) => ({
+      id: gi.id,
+      type: gi.type,
+      content: gi.content,
+      carouselUrls: gi.carouselUrls,
+      title: gi.title,
+      description: gi.description,
+      meta: gi.metadata,
+      x: gi.x,
+      y: gi.y,
+      isFavorite: gi.isFavorite
+    })),
+    assets: (b.assets || []) as ProjectAsset[],
+    messages: (b.messages || []) as ChatMessage[],
+    brandIdentity: (b as any).brandIdentity as BrandIdentity | null,
+    avatarIdentity: (b as any).avatarIdentity as AvatarIdentity | null,
+    products: (b.products || []).map((p: any) => ({
+      ...p,
+      assets: p.productAssets as ProductAsset[]
+    })),
+    brandContext: (b as any).brandContext as BrandContext | null,
+    assetCatalog: ((b as any).assetCatalog || []) as AssetCatalogEntry[],
+    createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
+  }), []);
+
   // Fetch active board details
   React.useEffect(() => {
     if (!activeBoardId) return;
@@ -257,74 +279,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     setActiveJobs([]);
     getBoardDetails(activeBoardId).then(b => {
       if (b) {
-        const storyboards = Array.isArray((b as any).storyboards)
-          ? (b as any).storyboards.map((storyboard: any) => ({
-            ...storyboard,
-            status: storyboard.status as StoryboardStatus,
-            payload: storyboard.payload as LongVideoStoryboardPayload,
-          }))
-          : [];
-        const storyboardMessageMap = new Map<string, StoryboardRecord>(
-          storyboards
-            .filter((storyboard: StoryboardRecord) => storyboard.messageId)
-            .map((storyboard: StoryboardRecord) => [storyboard.messageId as string, storyboard])
-        );
-        const mappedMessages = (b.messages as ChatMessage[]).map((msg) => {
-          const storyboard: StoryboardRecord | undefined = storyboardMessageMap.get(msg.id);
-          if (!storyboard) return msg;
-          return {
-            ...msg,
-            storyboardId: storyboard.id,
-            storyboardStatus: storyboard.status
-          };
-        });
-        const fallbackStoryboardMessages = storyboards
-          .filter((storyboard: StoryboardRecord) => !storyboard.messageId || !storyboardMessageMap.has(storyboard.messageId))
-          .map((storyboard: StoryboardRecord) => ({
-            id: storyboard.messageId || storyboard.id,
-            role: 'model' as const,
-            text: buildStoryboardMessage(storyboard.payload, storyboard.totalDurationSeconds),
-            storyboardId: storyboard.id,
-            storyboardStatus: storyboard.status
-          }));
-        // Map DB structure to Frontend structure
-        const mappedBoard: Board = {
-          id: b.id,
-          name: b.name,
-          items: (b.generatedItems || []).map((gi: any) => ({
-            id: gi.id,
-            type: gi.type,
-            content: gi.content,
-            carouselUrls: gi.carouselUrls,
-            title: gi.title,
-            description: gi.description,
-            meta: gi.metadata,
-            x: gi.x,
-            y: gi.y,
-            isFavorite: gi.isFavorite
-          })),
-          assets: (b.assets || []) as ProjectAsset[],
-          messages: [...mappedMessages, ...fallbackStoryboardMessages],
-          storyboards,
-          brandIdentity: (b as any).brandIdentity as BrandIdentity | null,
-          avatarIdentity: (b as any).avatarIdentity as AvatarIdentity | null,
-          products: (b.products || []).map((p: any) => ({
-            ...p,
-            assets: p.productAssets as ProductAsset[]
-          })),
-          brandContext: (b as any).brandContext as BrandContext | null,
-          assetCatalog: ((b as any).assetCatalog || []) as AssetCatalogEntry[],
-          createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
-        };
-        setActiveBoard(mappedBoard);
-        setPendingStoryboards(storyboards.filter((storyboard: StoryboardRecord) =>
-          storyboard.status === 'pending' || storyboard.status === 'processing'
-        ));
+        setActiveBoard(mapBoardDetailsToState(b));
       }
     }).finally(() => {
       refreshOnboardingState();
     });
-  }, [activeBoardId, refreshOnboardingState]);
+  }, [activeBoardId, mapBoardDetailsToState, refreshOnboardingState]);
 
   const updateActiveBoard = (updater: (board: Board) => Board) => {
     if (activeBoard) setActiveBoard(updater(activeBoard));
@@ -333,8 +293,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>("");
   const [selectedItem, setSelectedItem] = useState<CanvasItem | null>(null);
-  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
-  const [isAvatarGenerating, setIsAvatarGenerating] = useState(false);
 
   const [isAnalyzingLogo, setIsAnalyzingLogo] = useState(false);
   const [pendingLogoAsset, setPendingLogoAsset] = useState<ProjectAsset | null>(null);
@@ -347,7 +305,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   const [showNewBoardModal, setShowNewBoardModal] = useState(false);
   const [showBoardListModal, setShowBoardListModal] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string | null; email: string | null; avatarUrl: string | null } | null>(null);
   const mobileProfileDropdownRef = useRef<HTMLDivElement>(null);
@@ -389,19 +346,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
 
   const [activeJobs, setActiveJobs] = useState<string[]>([]);
   const [pendingItems, setPendingItems] = useState<CanvasItem[]>([]);
-  const [pendingStoryboards, setPendingStoryboards] = useState<StoryboardRecord[]>([]);
-  const [chatDraft, setChatDraft] = useState<{ id: string; text: string } | null>(null);
-
-  const getStoryboardTotals = (scenes: LongVideoSceneInput[]) => {
-    const sceneCount = scenes.length;
-    const totalDurationSeconds = scenes.reduce((sum, scene) => {
-      const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
-      return sum + duration;
-    }, 0);
-    return { sceneCount, totalDurationSeconds };
-  };
-
-  const referenceRoleSet = new Set<VideoReferenceRole>(['avatar', 'item', 'setting']);
   const referenceModeSet = new Set<VideoReferenceMode>(['manual', 'hybrid', 'auto']);
 
   const parseReferenceSelections = (value: unknown): VideoReferenceSelection[] | undefined => {
@@ -409,7 +353,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     const selections = value
       .map((entry: any) => {
         const assetId = typeof entry?.assetId === 'string' ? entry.assetId : null;
-        const role = typeof entry?.role === 'string' && referenceRoleSet.has(entry.role) ? entry.role : undefined;
+        const role = typeof entry?.role === 'string' ? entry.role : undefined;
         if (!assetId) return null;
         return { assetId, role } as VideoReferenceSelection;
       })
@@ -422,123 +366,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     return referenceModeSet.has(value as VideoReferenceMode) ? (value as VideoReferenceMode) : undefined;
   };
 
-  const buildStoryboardMessage = (payload: LongVideoStoryboardPayload, totalDurationSeconds: number, note?: string) => {
-    const scenes = payload.scenes || [];
-    const lines: string[] = [];
-    const sceneCount = scenes.length;
-    lines.push(`🧭 Storyboard ready for approval (${sceneCount} scene${sceneCount === 1 ? '' : 's'}, ${totalDurationSeconds}s).`);
-    if (note) lines.push(`**Note:** ${note}`);
-    if (payload.title) lines.push(`**Title:** ${payload.title}`);
-    if (payload.hook) lines.push(`**Hook:** ${payload.hook}`);
-    if (payload.caption) lines.push(`**Caption:** ${payload.caption}`);
-    if (payload.continuitySpec) lines.push(`**Continuity:** ${payload.continuitySpec}`);
-    lines.push('');
-    scenes.forEach((scene, index) => {
-      const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
-      lines.push(`**Scene ${index + 1} (${duration}s):** ${scene.prompt}`);
-      const detailParts: string[] = [];
-      if (scene.camera) detailParts.push(`Camera: ${scene.camera}`);
-      if (scene.action) detailParts.push(`Action: ${scene.action}`);
-      if (scene.transition) detailParts.push(`Transition: ${scene.transition}`);
-      if (detailParts.length > 0) {
-        lines.push(detailParts.join(' | '));
-      }
-      lines.push('');
-    });
-    lines.push('Approve to start rendering, or reply with edits.');
-    return lines.join('\n');
-  };
-
-  const buildStoryboardEditDraft = (payload: LongVideoStoryboardPayload) => {
-    const lines: string[] = [];
-    lines.push('Please revise this long-video storyboard:');
-    if (payload.prompt) lines.push(`Brief: ${payload.prompt}`);
-    if (payload.continuitySpec) lines.push(`Continuity: ${payload.continuitySpec}`);
-    if (payload.aspectRatio) lines.push(`Aspect ratio: ${payload.aspectRatio}`);
-    if (payload.title) lines.push(`Title: ${payload.title}`);
-    lines.push('');
-    const scenes = payload.scenes || [];
-    scenes.forEach((scene, index) => {
-      const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
-      lines.push(`Scene ${index + 1} (${duration}s): ${scene.prompt}`);
-      if (scene.camera) lines.push(`Camera: ${scene.camera}`);
-      if (scene.action) lines.push(`Action: ${scene.action}`);
-      if (scene.transition) lines.push(`Transition: ${scene.transition}`);
-      lines.push('');
-    });
-    lines.push('Keep total duration <= 30s. Update any lines and send.');
-    return lines.join('\n');
-  };
-
   const loadBoardDetails = useCallback(async (boardId: string, options?: { skipOnboarding?: boolean }) => {
     const b = await getBoardDetails(boardId);
     if (b) {
-      const storyboards = Array.isArray((b as any).storyboards)
-        ? (b as any).storyboards.map((storyboard: any) => ({
-          ...storyboard,
-          status: storyboard.status as StoryboardStatus,
-          payload: storyboard.payload as LongVideoStoryboardPayload,
-        }))
-        : [];
-      const storyboardMessageMap = new Map<string, StoryboardRecord>(
-        storyboards
-          .filter((storyboard: StoryboardRecord) => storyboard.messageId)
-          .map((storyboard: StoryboardRecord) => [storyboard.messageId as string, storyboard])
-      );
-      const mappedMessages = (b.messages as ChatMessage[]).map((msg) => {
-        const storyboard: StoryboardRecord | undefined = storyboardMessageMap.get(msg.id);
-        if (!storyboard) return msg;
-        return {
-          ...msg,
-          storyboardId: storyboard.id,
-          storyboardStatus: storyboard.status
-        };
-      });
-      const fallbackStoryboardMessages = storyboards
-        .filter((storyboard: StoryboardRecord) => !storyboard.messageId || !storyboardMessageMap.has(storyboard.messageId))
-        .map((storyboard: StoryboardRecord) => ({
-          id: storyboard.messageId || storyboard.id,
-          role: 'model' as const,
-          text: buildStoryboardMessage(storyboard.payload, storyboard.totalDurationSeconds),
-          storyboardId: storyboard.id,
-          storyboardStatus: storyboard.status
-        }));
-      const mappedBoard: Board = {
-        ...b,
-        items: b.generatedItems.map((gi: any) => ({
-          id: gi.id,
-          type: gi.type,
-          content: gi.content,
-          carouselUrls: gi.carouselUrls,
-          title: gi.title,
-          description: gi.description,
-          meta: gi.metadata,
-          x: gi.x,
-          y: gi.y,
-          isFavorite: gi.isFavorite
-        })),
-        assets: b.assets as ProjectAsset[],
-        messages: [...mappedMessages, ...fallbackStoryboardMessages],
-        storyboards,
-        brandIdentity: b.brandIdentity as BrandIdentity | null,
-        avatarIdentity: b.avatarIdentity as AvatarIdentity | null,
-        products: (b.products || []).map((p: any) => ({
-          ...p,
-          assets: p.productAssets as ProductAsset[]
-        })),
-        brandContext: (b as any).brandContext as BrandContext | null,
-        assetCatalog: ((b as any).assetCatalog || []) as AssetCatalogEntry[],
-        createdAt: b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
-      };
-      setActiveBoard(mappedBoard);
-      setPendingStoryboards(storyboards.filter((storyboard: StoryboardRecord) =>
-        storyboard.status === 'pending' || storyboard.status === 'processing'
-      ));
+      setActiveBoard(mapBoardDetailsToState(b));
     }
     if (!options?.skipOnboarding) {
       await refreshOnboardingState();
     }
-  }, [refreshOnboardingState]);
+  }, [mapBoardDetailsToState, refreshOnboardingState]);
 
   // Trigger the job processor API to process pending jobs (works with Autoscale)
   const triggerJobProcessing = useCallback(async () => {
@@ -635,293 +471,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   }, []);
 
   useEffect(() => {
-    if (!activeBoardId) return;
-    setPendingStoryboards(prev => prev.filter(storyboard => storyboard.boardId === activeBoardId));
-  }, [activeBoardId]);
-
-  
-
-  const updateStoryboardStatus = (storyboardId: string, status: ChatMessage['storyboardStatus']) => {
-    updateActiveBoard(b => ({
-      ...b,
-      messages: b.messages.map(msg => (
-        msg.storyboardId === storyboardId ? { ...msg, storyboardStatus: status } : msg
-      ))
-    }));
-    setPendingStoryboards(prev => {
-      const updated = prev.map(storyboard => (
-        storyboard.id === storyboardId ? { ...storyboard, status: status as StoryboardStatus } : storyboard
-      ));
-      return updated.filter(storyboard => storyboard.status === 'pending' || storyboard.status === 'processing');
-    });
-  };
-
-  const queueLongVideoJob = async (payload: LongVideoStoryboardPayload) => {
-    if (!activeBoardId) {
-      return { ok: false, message: 'No active board.' };
-    }
-
-    const scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
-    const { sceneCount, totalDurationSeconds } = getStoryboardTotals(scenes);
-
-    if (sceneCount < 2) {
-      showError('Long videos require at least 2 scenes.');
-      return { ok: false, message: 'Long videos require at least 2 scenes.' };
-    }
-    if (sceneCount > 5) {
-      showError('Long videos support up to 5 scenes.');
-      return { ok: false, message: 'Long videos support up to 5 scenes.' };
-    }
-    if (totalDurationSeconds > 30) {
-      showError('Total duration exceeds 30 seconds. Reduce scene count or durations.');
-      return { ok: false, message: 'Total duration exceeds 30 seconds.' };
-    }
-    if (isVideoLocked) {
-      showError('Video generation requires credits or a subscription.');
-      openPaywall('video_locked');
-      return { ok: false, message: 'Video generation requires credits or a subscription.' };
-    }
-
-    const pendingVideoCount = pendingItems
-      .filter(item => item.type === 'video')
-      .reduce((sum, item) => sum + (typeof item.meta?.sceneCount === 'number' ? item.meta.sceneCount : 1), 0);
-    const remainingVideos = getRemainingVideosWithPending(
-      usage.videosGenerated,
-      pendingVideoCount,
-      planLimits.videoLimit,
-      usage.creditBalance
-    );
-
-    if (remainingVideos < sceneCount) {
-      const message = `Video quota too low for ${sceneCount} scenes. ${remainingVideos} available.`;
-      showError(message);
-      openPaywall('video_limit');
-      return { ok: false, message };
-    }
-
-    const qualityMode = typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode;
-    const inferredAspectRatio = inferAspectRatioFromLongVideoPayload(payload);
-    const aspectRatio = payload.aspectRatio || inferredAspectRatio || '16:9';
-    const traceId = crypto.randomUUID();
-    console.log('[LONG-VIDEO] Queueing job', {
-      aspectRatio,
-      resolution: payload.resolution || '720p',
-      qualityMode,
-      sceneCount,
-      totalDurationSeconds,
-      promptPreview: payload.prompt ? payload.prompt.substring(0, 140) : '',
-      continuityPreview: payload.continuitySpec ? payload.continuitySpec.substring(0, 140) : '',
-      referenceMode: payload.referenceMode || null,
-      referenceSelections: payload.referenceSelections || [],
-      ingredientAssetIds: payload.ingredientAssetIds || []
-    });
-
-    const res = await fetch('/api/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        boardId: activeBoardId,
-        type: 'generate_long_video',
-        payload: {
-          prompt: payload.prompt,
-          continuitySpec: payload.continuitySpec,
-          scenes,
-          aspectRatio,
-          resolution: payload.resolution || '720p',
-          productId: payload.productId,
-          ingredientAssetIds: payload.ingredientAssetIds,
-          referenceSelections: payload.referenceSelections,
-          referenceMode: payload.referenceMode,
-          qualityMode,
-          title: payload.title,
-          hook: payload.hook,
-          caption: payload.caption,
-          archetype: payload.archetype,
-          traceId,
-        }
-      })
-    });
-    const job = await res.json().catch(() => null);
-    if (!res.ok || !job?.id) {
-      const message = job?.error || 'Long video generation request failed.';
-      if (job?.code === 'QUOTA_EXCEEDED') {
-        openPaywall('video_limit');
-      } else if (job?.code === 'PLAN_REQUIRED') {
-        openPaywall('video_locked');
-      }
-      showError(message);
-      return { ok: false, message };
-    }
-
-    setActiveJobs(prev => [...prev, job.id]);
-    addPendingItem(job.id, 'video', {
-      title: payload.title || 'Generating Long Video',
-      aspectRatio,
-      resolution: payload.resolution || '720p',
-      caption: payload.caption,
-      hook: payload.hook,
-      archetype: payload.archetype,
-      sceneCount,
-      totalDurationSeconds,
-      isLongVideo: true,
-      queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
-    });
-    pollJobStatus(job.id, async () => {
-      await loadBoardDetails(activeBoardId, { skipOnboarding: true });
-      getUserUsageAction().then(setUsage);
-    });
-
-    const progressMessage = `🎬 Long video generation in progress (${sceneCount} scenes, ${totalDurationSeconds}s). A Long Video card will appear in your board while it renders.`;
-    return { ok: true, message: progressMessage, jobId: job.id, sceneCount, totalDurationSeconds };
-  };
-
-  const proposeStoryboard = (payload: LongVideoStoryboardPayload) => {
-    if (!activeBoardId) return null;
-    const scenes = Array.isArray(payload.scenes) ? payload.scenes : [];
-    if (scenes.length < 2) {
-      showError('Long videos require at least 2 scenes.');
-      return null;
-    }
-    if (scenes.length > 5) {
-      showError('Long videos support up to 5 scenes.');
-      return null;
-    }
-    if (!payload.continuitySpec || !payload.continuitySpec.trim()) {
-      showError('Long videos require a continuity spec.');
-      return null;
-    }
-
-    const { totalDurationSeconds } = getStoryboardTotals(scenes);
-    if (totalDurationSeconds > 30) {
-      showError('Total duration exceeds 30 seconds. Reduce scene count or durations.');
-      return null;
-    }
-
-    let resolution = payload.resolution || '720p';
-    let resolutionNote = '';
-    if (resolution === '1080p') {
-      const needsEightSeconds = scenes.some(scene => {
-        const duration = typeof scene.durationSeconds === 'number' ? scene.durationSeconds : 8;
-        return duration !== 8;
-      });
-      if (needsEightSeconds) {
-        resolution = '720p';
-        resolutionNote = 'Resolution adjusted to 720p because 1080p requires 8s per scene.';
-      }
-    }
-
-    const inferredAspectRatio = inferAspectRatioFromLongVideoPayload(payload);
-    const aspectRatio = payload.aspectRatio || inferredAspectRatio || '16:9';
-    const normalizedPayload: LongVideoStoryboardPayload = {
-      ...payload,
-      aspectRatio,
-      resolution,
-      qualityMode: typeof payload.qualityMode === 'boolean' ? payload.qualityMode : videoQualityMode,
-      scenes
-    };
-    console.log('[STORYBOARD] Normalized long-video payload', {
-      aspectRatio,
-      resolution,
-      qualityMode: normalizedPayload.qualityMode,
-      sceneCount: scenes.length,
-      promptPreview: payload.prompt ? payload.prompt.substring(0, 140) : '',
-      continuityPreview: payload.continuitySpec ? payload.continuitySpec.substring(0, 140) : '',
-      referenceMode: payload.referenceMode || null,
-      referenceSelections: payload.referenceSelections || [],
-      ingredientAssetIds: payload.ingredientAssetIds || []
-    });
-    const messageId = crypto.randomUUID();
-    const storyboardId = crypto.randomUUID();
-    const messageText = buildStoryboardMessage(normalizedPayload, totalDurationSeconds, resolutionNote || undefined);
-    const storyboardMessage: ChatMessage = {
-      id: messageId,
-      role: 'model',
-      text: messageText,
-      storyboardId,
-      storyboardStatus: 'pending'
-    };
-    const storyboard: StoryboardRecord = {
-      id: storyboardId,
-      boardId: activeBoardId,
-      messageId,
-      status: 'pending',
-      payload: normalizedPayload,
-      totalDurationSeconds,
-      createdAt: Date.now()
-    };
-
-    setPendingStoryboards(prev => [...prev, storyboard]);
-    return { storyboard, storyboardMessage };
-  };
-
-  const appendModelMessage = async (message: ChatMessage) => {
-    if (!activeBoardId) return;
-    await saveMessageAction(activeBoardId, 'model', message.text, message.id, message.groundingLinks);
-    updateActiveBoard(b => ({
-      ...b,
-      messages: [...b.messages, message]
-    }));
-  };
-
-  const executeStoryboardAction = async (storyboardId: string, action: 'approve' | 'cancel') => {
-    const storyboard = pendingStoryboards.find(sb => sb.id === storyboardId);
-    if (!storyboard) return;
-
-    if (action === 'cancel') {
-      updateStoryboardStatus(storyboardId, 'cancelled');
-      try {
-        await updateStoryboardStatusAction(storyboardId, 'cancelled');
-      } catch (error) {
-        console.warn('[STORYBOARD] Failed to update status', error);
-      }
-      setPendingStoryboards(prev => prev.filter(sb => sb.id !== storyboardId));
-      await appendModelMessage({
-        id: crypto.randomUUID(),
-        role: 'model',
-        text: 'Storyboard cancelled.'
-      });
-      return;
-    }
-
-    updateStoryboardStatus(storyboardId, 'processing');
-    try {
-      await updateStoryboardStatusAction(storyboardId, 'processing');
-    } catch (error) {
-      console.warn('[STORYBOARD] Failed to update status', error);
-    }
-    const result = await queueLongVideoJob(storyboard.payload);
-    if (!result.ok) {
-      updateStoryboardStatus(storyboardId, 'pending');
-      try {
-        await updateStoryboardStatusAction(storyboardId, 'pending');
-      } catch (error) {
-        console.warn('[STORYBOARD] Failed to update status', error);
-      }
-      return;
-    }
-
-    updateStoryboardStatus(storyboardId, 'approved');
-    try {
-      await updateStoryboardStatusAction(storyboardId, 'approved');
-    } catch (error) {
-      console.warn('[STORYBOARD] Failed to update status', error);
-    }
-    setPendingStoryboards(prev => prev.filter(sb => sb.id !== storyboardId));
-    await appendModelMessage({
-      id: crypto.randomUUID(),
-      role: 'model',
-      text: result.message || 'Long video generation in progress.',
-      jobId: result.jobId,
-      jobType: 'generate_long_video',
-      jobStatus: 'queued',
-      jobMeta: {
-        sceneCount: result.sceneCount,
-        totalDurationSeconds: result.totalDurationSeconds
-      }
-    });
-  };
-
-  useEffect(() => {
     if (activeBoardId) {
       fetch(`/api/jobs?boardId=${activeBoardId}`, { cache: 'no-store' })
         .then(res => res.json())
@@ -930,21 +479,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           if (pendingJobs.length > 0) {
             setActiveJobs(pendingJobs.map((j: any) => j.id));
             pendingJobs.forEach((job: any) => {
-              const itemType = job.type === 'generate_video' || job.type === 'generate_long_video' ? 'video' : 'image';
-              const sceneCount = job.type === 'generate_long_video' && Array.isArray(job.payload?.scenes)
-                ? job.payload.scenes.length
-                : undefined;
-              const totalDurationSeconds = job.type === 'generate_long_video' && Array.isArray(job.payload?.scenes)
-                ? job.payload.scenes.reduce((sum: number, scene: any) => {
-                  const duration = typeof scene?.durationSeconds === 'number' ? scene.durationSeconds : 8;
-                  return sum + duration;
-                }, 0)
-                : undefined;
+              const itemType = job.type === 'generate_video'
+                ? 'video'
+                : job.type === 'generate_carousel'
+                  ? 'carousel'
+                  : 'image';
               addPendingItem(job.id, itemType, {
-                title: itemType === 'video' ? 'Generating Video' : 'Generating Image',
-                sceneCount,
-                totalDurationSeconds,
-                isLongVideo: job.type === 'generate_long_video',
+                title: itemType === 'video'
+                  ? 'Generating Video'
+                  : itemType === 'carousel'
+                    ? 'Generating Carousel'
+                    : 'Generating Image',
                 queuedAt: job?.createdAt ? new Date(job.createdAt).getTime() : Date.now()
               });
             });
@@ -1073,42 +618,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   const handleSaveIdentity = async (identity: BrandIdentity) => {
     if (!activeBoardId) return;
     await saveBrandIdentityAction(activeBoardId, identity);
-    // Refresh board to get updated state
     const updated = await getBoardDetails(activeBoardId);
     if (updated) {
-      // Simple re-fetch mapping (duplicated code, should refactor but fine for now)
-      const mappedBoard: Board = {
-        ...updated,
-        items: updated.generatedItems.map((gi: any) => ({
-          id: gi.id,
-          type: gi.type,
-          content: gi.content,
-          carouselUrls: gi.carouselUrls,
-          title: gi.title,
-          description: gi.description,
-          meta: gi.metadata,
-          x: gi.x,
-          y: gi.y,
-          isFavorite: gi.isFavorite
-        })),
-        assets: updated.assets as ProjectAsset[],
-        messages: updated.messages as ChatMessage[],
-        storyboards: Array.isArray((updated as any).storyboards)
-          ? (updated as any).storyboards.map((sb: any) => ({
-              ...sb,
-              status: sb.status as StoryboardStatus,
-              payload: sb.payload as LongVideoStoryboardPayload,
-            }))
-          : [],
-        brandIdentity: updated.brandIdentity as BrandIdentity | null,
-        avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
-        products: (updated.products || []).map((p: any) => ({
-          ...p,
-          assets: p.productAssets as ProductAsset[]
-        })),
-        createdAt: updated.createdAt ? new Date(updated.createdAt).getTime() : Date.now()
-      };
-      setActiveBoard(mappedBoard);
+      setActiveBoard(mapBoardDetailsToState(updated));
     }
     refreshOnboardingState();
     setShowBrandModal(false);
@@ -1137,41 +649,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     await saveAvatarIdentityAction(activeBoardId, identity);
     setShowAvatarModal(false);
     setPendingAvatarAssets([]);
-    // Reload
     const updated = await getBoardDetails(activeBoardId);
     if (updated) {
-      const mappedBoard: Board = {
-        ...updated,
-        items: updated.generatedItems.map((gi: any) => ({
-          id: gi.id,
-          type: gi.type,
-          content: gi.content,
-          carouselUrls: gi.carouselUrls,
-          title: gi.title,
-          description: gi.description,
-          meta: gi.metadata,
-          x: gi.x,
-          y: gi.y,
-          isFavorite: gi.isFavorite
-        })),
-        assets: updated.assets as ProjectAsset[],
-        messages: updated.messages as ChatMessage[],
-        storyboards: Array.isArray((updated as any).storyboards)
-          ? (updated as any).storyboards.map((sb: any) => ({
-              ...sb,
-              status: sb.status as StoryboardStatus,
-              payload: sb.payload as LongVideoStoryboardPayload,
-            }))
-          : [],
-        brandIdentity: updated.brandIdentity as BrandIdentity | null,
-        avatarIdentity: updated.avatarIdentity as AvatarIdentity | null,
-        products: (updated.products || []).map((p: any) => ({
-          ...p,
-          assets: p.productAssets as ProductAsset[]
-        })),
-        createdAt: updated.createdAt ? new Date(updated.createdAt).getTime() : Date.now()
-      };
-      setActiveBoard(mappedBoard);
+      setActiveBoard(mapBoardDetailsToState(updated));
     }
     refreshOnboardingState();
   };
@@ -1466,148 +946,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     });
   };
 
-  const handleUploadAvatarFiles = async (files: File[]) => {
-    if (!activeBoardId || files.length === 0 || isAvatarUploading) return;
-    const traceId = crypto.randomUUID();
-    setIsAvatarUploading(true);
-    console.log(`[CHAT-AVATAR ${traceId}] Uploading avatar files`, {
-      boardId: activeBoardId,
-      count: files.length,
-      names: files.map(file => file.name)
-    });
-    try {
-      for (const file of files) {
-        if (!file.type.startsWith('image/')) {
-          console.warn(`[CHAT-AVATAR ${traceId}] Skipping non-image file`, {
-            name: file.name,
-            type: file.type
-          });
-          showError(`Unsupported avatar file type: ${file.name}`);
-          continue;
-        }
-        const base64 = await readFileAsBase64(file);
-        const newAsset: ProjectAsset = {
-          id: Date.now().toString(),
-          type: 'avatar',
-          name: file.name || 'Chat Avatar',
-          content: base64,
-          mimeType: file.type,
-        };
-        await handleAddAsset(newAsset);
-      }
-      console.log(`[CHAT-AVATAR ${traceId}] Avatar upload complete`);
-      showSuccess('Avatar uploaded. Review and save the identity.');
-    } catch (error) {
-      console.error(`[CHAT-AVATAR ${traceId}] Avatar upload failed`, error);
-      showError(`Avatar upload failed. Trace ${traceId}`);
-    } finally {
-      setIsAvatarUploading(false);
-    }
-  };
-
-  const handleUploadStoryboardReference = async (
-    file: File,
-    role: VideoReferenceRole,
-    options?: { applyAvatarIdentity?: boolean }
-  ) => {
-    if (!activeBoardId || !file) return null;
-    if (!file.type.startsWith('image/')) {
-      showError('Reference files must be images.');
-      return null;
-    }
-    const traceId = crypto.randomUUID();
-    console.log(`[REFERENCE ${traceId}] Uploading reference`, {
-      boardId: activeBoardId,
-      role,
-      name: file.name
-    });
-    try {
-      const base64 = await readFileAsBase64(file);
-      const roleLabel = role === 'avatar' ? 'Avatar' : role === 'item' ? 'Item' : 'Setting';
-      const assetName = file.name || `${roleLabel} Reference`;
-      const saved = await saveAsset(activeBoardId, {
-        id: Date.now().toString(),
-        type: 'image',
-        name: assetName,
-        content: base64,
-        mimeType: file.type
-      });
-      const assetWithId: ProjectAsset = {
-        id: saved.id,
-        type: saved.type as ProjectAsset['type'],
-        name: saved.name || assetName,
-        content: saved.content || base64,
-        storageKey: saved.storageKey,
-        mimeType: saved.mimeType || file.type,
-        status: saved.status as 'digesting' | 'ready'
-      };
-      updateActiveBoard(b => ({ ...b, assets: [...b.assets, assetWithId] }));
-      if (options?.applyAvatarIdentity && role === 'avatar') {
-        const avatarTraceId = crypto.randomUUID();
-        console.log(`[REFERENCE ${avatarTraceId}] Calibrating avatar identity from reference`, {
-          boardId: activeBoardId,
-          assetId: saved.id
-        });
-        try {
-          const identity = await analyzeAvatarImage([base64]);
-          await saveAvatarIdentityAction(activeBoardId, identity);
-          updateActiveBoard(b => ({ ...b, avatarIdentity: identity }));
-          showSuccess('Avatar identity updated from reference.');
-        } catch (error) {
-          console.error(`[REFERENCE ${avatarTraceId}] Avatar calibration failed`, error);
-          showError(`Avatar calibration failed. Trace ${avatarTraceId}`);
-        }
-      }
-      showSuccess(`${roleLabel} reference uploaded.`);
-      return saved.id;
-    } catch (error) {
-      console.error(`[REFERENCE ${traceId}] Upload failed`, error);
-      showError(`Reference upload failed. Trace ${traceId}`);
-      return null;
-    }
-  };
-
-  const handleCreateAiAvatar = async (description: string) => {
-    if (!activeBoardId || isAvatarGenerating) return;
-    const trimmed = description.trim();
-    if (!trimmed) {
-      showError('Add a short description for the avatar.');
-      return;
-    }
-    const traceId = crypto.randomUUID();
-    setIsAvatarGenerating(true);
-    console.log(`[AI-AVATAR ${traceId}] Generating avatar`, {
-      boardId: activeBoardId,
-      description: trimmed
-    });
-    try {
-      const result = await generateAvatarAssetAction(activeBoardId, trimmed);
-      if (!result.success || !result.asset || !result.identity) {
-        if (result.code === 'QUOTA_EXCEEDED') {
-          openPaywall('image_limit');
-          showError('Image quota reached. Upgrade or add credits to generate an avatar.');
-          return;
-        }
-        const message = result.error || 'AI avatar generation failed.';
-        showError(`${message}${result.traceId ? ` (Trace ${result.traceId})` : ''}`);
-        return;
-      }
-      console.log(`[AI-AVATAR ${result.traceId}] Avatar asset saved`, { assetId: result.asset.id });
-      updateActiveBoard((b) => ({ ...b, assets: [...b.assets, result.asset as ProjectAsset] }));
-      setPendingAvatarAssets(result.identity.referenceImages || []);
-      setPendingScannedAvatar(result.identity);
-      setShowAvatarModal(true);
-      refreshOnboardingState();
-      getUserUsageAction().then(setUsage);
-      showSuccess('AI avatar generated. Review and save the identity.');
-    } catch (error) {
-      console.error(`[AI-AVATAR ${traceId}] Avatar generation failed`, error);
-      showError(`AI avatar generation failed. Trace ${traceId}`);
-    } finally {
-      setIsAvatarGenerating(false);
-    }
-  };
-
   const handleUploadProductImages = async (files: File[]) => {
     if (!activeBoardId) return [];
     const uploadedAssets: ProjectAsset[] = [];
@@ -1678,81 +1016,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     }));
   };
 
-  const handleStoryboardAction = async (storyboardId: string, action: 'approve' | 'cancel') => {
-    await executeStoryboardAction(storyboardId, action);
-  };
-
-  const handleStoryboardEdit = (storyboardId: string) => {
-    const storyboard = pendingStoryboards.find(sb => sb.id === storyboardId);
-    if (!storyboard) return;
-    const draftText = buildStoryboardEditDraft(storyboard.payload);
-    setChatDraft({ id: crypto.randomUUID(), text: draftText });
-  };
-
-  const handleStoryboardReferenceUpdate = async (
-    storyboardId: string,
-    selections: VideoReferenceSelection[],
-    mode: VideoReferenceMode
-  ) => {
-    const storyboard = pendingStoryboards.find(sb => sb.id === storyboardId)
-      || activeBoard?.storyboards?.find(sb => sb.id === storyboardId);
-    if (!storyboard) return;
-
-    const cleanedSelections = selections.filter(selection => selection.assetId);
-    const nextPayload: LongVideoStoryboardPayload = {
-      ...storyboard.payload,
-      referenceSelections: cleanedSelections.length > 0 ? cleanedSelections : undefined,
-      referenceMode: mode
-    };
-
-    const traceId = crypto.randomUUID();
-    console.log(`[STORYBOARD ${traceId}] Reference kit updated`, {
-      storyboardId,
-      referenceMode: mode,
-      referenceCount: cleanedSelections.length
-    });
-    setPendingStoryboards(prev => prev.map(sb => sb.id === storyboardId ? { ...sb, payload: nextPayload } : sb));
-    updateActiveBoard(b => {
-      if (!b.storyboards) return b;
-      const updatedStoryboards = b.storyboards.map(sb => sb.id === storyboardId ? { ...sb, payload: nextPayload } : sb);
-      return { ...b, storyboards: updatedStoryboards };
-    });
-
-    try {
-      await updateStoryboardPayloadAction(storyboardId, nextPayload);
-    } catch (error) {
-      console.warn(`[STORYBOARD ${traceId}] Failed to update references`, error);
-      showError(`Failed to save reference kit settings. Trace ${traceId}`);
-    }
-  };
-
   const handleSendMessage = async (text: string) => {
     if (!activeBoard || !activeBoardId) return;
-
-    const trimmedText = text.trim();
-    const normalizedText = trimmedText.toLowerCase();
-    const isShortCommand = trimmedText.length <= 40;
-    const wantsApproval = isShortCommand && /(approve|approved|go ahead|proceed|ship it)/.test(normalizedText);
-    const wantsCancel = isShortCommand && /(cancel|stop|never mind|nevermind)/.test(normalizedText);
 
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', text };
     updateActiveBoard(b => ({ ...b, messages: [...b.messages, userMsg] }));
     await saveMessageAction(activeBoardId, 'user', text, userMsg.id);
-    setChatDraft(null);
-
-    const pendingForBoard = pendingStoryboards.filter(storyboard => storyboard.boardId === activeBoardId);
-    if (pendingForBoard.length > 0 && (wantsApproval || wantsCancel)) {
-      if (pendingForBoard.length > 1) {
-        await appendModelMessage({
-          id: crypto.randomUUID(),
-          role: 'model',
-          text: 'Multiple storyboards are pending. Please approve or cancel using the buttons on the storyboard you want.'
-        });
-        return;
-      }
-      await executeStoryboardAction(pendingForBoard[0].id, wantsApproval ? 'approve' : 'cancel');
-      return;
-    }
 
     setIsProcessing(true);
     setProcessingStatus("Reasoning with Context...");
@@ -1786,10 +1055,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       let groundingLinks: ChatMessage['groundingLinks'] | undefined;
       let isResearchResult = false;
       const packQueue: any[] = [];
-      const storyboardMessages: ChatMessage[] = [];
-      const storyboardQueue: StoryboardRecord[] = [];
-      const hasAvatarIdentity = Boolean(activeBoard.avatarIdentity) || activeBoard.assets.some(asset => asset.type === 'avatar');
-      let needsAvatarPrompt = false;
 
       for (const part of modelParts) {
         if (part.functionCall) {
@@ -1948,52 +1213,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             }
           }
           if (fc.name === 'generate_long_video') {
-            const scenes = Array.isArray(fc.args['scenes']) ? fc.args['scenes'] : [];
-            const ingredientAssetIds = Array.isArray(fc.args['ingredientAssetIds']) ? fc.args['ingredientAssetIds'] : undefined;
-            const referenceSelections = parseReferenceSelections(fc.args['referenceSelections']);
-            const referenceMode = parseReferenceMode(fc.args['referenceMode']);
-            const productId = typeof fc.args['productId'] === 'string' ? fc.args['productId'] : undefined;
-            const title = typeof fc.args['title'] === 'string' ? fc.args['title'] : undefined;
-            const hook = typeof fc.args['hook'] === 'string' ? fc.args['hook'] : undefined;
-            const caption = typeof fc.args['caption'] === 'string' ? fc.args['caption'] : undefined;
-            const continuitySpec = typeof fc.args['continuitySpec'] === 'string' ? fc.args['continuitySpec'] : undefined;
-            const prompt = typeof fc.args['prompt'] === 'string' ? fc.args['prompt'] : undefined;
-            const qualityMode = typeof fc.args['qualityMode'] === 'boolean' ? fc.args['qualityMode'] : videoQualityMode;
-            const archetype = typeof fc.args['archetype'] === 'string' ? fc.args['archetype'] : undefined;
-            if (isVideoLocked) {
-              showError('Long video generation requires credits or a subscription.');
-              openPaywall('video_locked');
-              continue;
-            }
-            if (!hasAvatarIdentity) {
-              needsAvatarPrompt = true;
-              console.log('[LONG-VIDEO] No avatar detected; prompting for avatar consistency.');
-            }
-
-            const storyboard = proposeStoryboard({
-              prompt,
-              continuitySpec,
-              scenes,
-              aspectRatio: (fc.args['aspectRatio'] as string) || '16:9',
-              resolution: (fc.args['resolution'] as string) || '720p',
-              productId,
-              ingredientAssetIds,
-              referenceSelections,
-              referenceMode,
-              qualityMode,
-              title,
-              hook,
-              caption,
-              archetype,
-              showReferenceKit: true
-            });
-
-            if (storyboard?.storyboardMessage) {
-              storyboardMessages.push(storyboard.storyboardMessage);
-              storyboardQueue.push(storyboard.storyboard);
-            } else {
-              responseText = responseText || '⚠️ Unable to prepare a long video storyboard. Please refine the scenes or continuity details.';
-            }
+            const retiredMessage = 'Long video generation has been retired. I can still create short videos, images, and carousels.';
+            responseText = responseText ? `${responseText}\n\n${retiredMessage}` : retiredMessage;
+            continue;
           }
           if (fc.name === 'generate_campaign_pack') packQueue.push(fc.args);
           
@@ -2029,7 +1251,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         let backgroundCount = 0;
         let immediateCount = 0;
         let queuedCount = 0;
-        let storyboardCount = 0;
         let skippedCount = 0;
         const skippedReasons: string[] = [];
 
@@ -2204,21 +1425,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
               jobs.forEach((job) => {
                 setActiveJobs(prev => [...prev, job.id]);
                 const jobPayload = job.payload || {};
-                addPendingItem(job.id, job.type === 'generate_video' || job.type === 'generate_long_video' ? 'video' : job.type === 'generate_carousel' ? 'carousel' : 'image', {
+                addPendingItem(job.id, job.type === 'generate_video' ? 'video' : job.type === 'generate_carousel' ? 'carousel' : 'image', {
                   title: jobPayload.title,
                   aspectRatio: jobPayload.aspectRatio,
                   resolution: jobPayload.resolution,
                   caption: jobPayload.caption,
                   hook: jobPayload.hook,
                   archetype: jobPayload.archetype,
-                  sceneCount: job.type === 'generate_long_video' && Array.isArray(jobPayload.scenes) ? jobPayload.scenes.length : undefined,
-                  totalDurationSeconds: job.type === 'generate_long_video' && Array.isArray(jobPayload.scenes)
-                    ? jobPayload.scenes.reduce((sum: number, scene: any) => {
-                      const duration = typeof scene?.durationSeconds === 'number' ? scene.durationSeconds : 8;
-                      return sum + duration;
-                    }, 0)
-                    : undefined,
-                  isLongVideo: job.type === 'generate_long_video',
                   queuedAt: Date.now()
                 });
                 pollJobStatus(job.id, async () => {
@@ -2264,28 +1477,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
             }
             setProcessingStatus(`Queuing ${item.title}...`);
             if (item.type === 'long_video') {
-              const storyboard = proposeStoryboard({
-                prompt: item.visual_prompt,
-                continuitySpec: item.continuitySpec,
-                scenes: Array.isArray(item.scenes) ? item.scenes : [],
-                aspectRatio: item.aspectRatio || '16:9',
-                resolution: '720p',
-                title: item.title,
-                caption: item.caption,
-                hook: item.hook,
-                archetype: item.archetype,
-                productId: item.productId,
-                ingredientAssetIds: item.ingredientAssetIds,
-                qualityMode: typeof item.qualityMode === 'boolean' ? item.qualityMode : videoQualityMode
-              });
-              if (storyboard?.storyboardMessage) {
-                storyboardMessages.push(storyboard.storyboardMessage);
-                storyboardCount++;
-                storyboardQueue.push(storyboard.storyboard);
-              } else {
-                skippedCount++;
-                skippedReasons.push('Unable to prepare long video storyboard.');
-              }
+              skippedCount++;
+              skippedReasons.push('Long video generation has been retired.');
               continue;
             }
             if (item.type === 'carousel') {
@@ -2458,18 +1651,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         } else if (skippedCount > 0) {
           responseText = `⚠️ No items generated. ${skippedCount} item${skippedCount > 1 ? 's were' : ' was'} skipped due to quota.`;
         }
-        if (storyboardCount > 0) {
-          const storyboardLine = `${storyboardCount} long video storyboard${storyboardCount > 1 ? 's are' : ' is'} ready for approval.`;
-          responseText = responseText ? `${responseText} ${storyboardLine}` : `🧭 ${storyboardLine}`;
-        }
         if (skippedReasons.length > 0) {
           skippedReasons.slice(0, 2).forEach((reason) => showToast(reason, 'info'));
         }
-      }
-
-      if (needsAvatarPrompt) {
-        const avatarPrompt = 'Want tighter character consistency? Upload an avatar photo or use Create AI Avatar below.';
-        responseText = responseText ? `${responseText}\n\n${avatarPrompt}` : avatarPrompt;
       }
 
       const modelMessages: ChatMessage[] = [];
@@ -2481,9 +1665,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
           ...(groundingLinks ? { groundingLinks } : {}),
           ...(isResearchResult ? { isResearchResult: true } : {})
         });
-      }
-      if (storyboardMessages.length > 0) {
-        modelMessages.push(...storyboardMessages);
       }
       if (modelMessages.length === 0) {
         let fallbackMessage = '';
@@ -2506,46 +1687,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         });
       }
 
-      const storyboardLookup = new Map(storyboardQueue.map(storyboard => [storyboard.id, storyboard]));
       for (const message of modelMessages) {
         await saveMessageAction(activeBoardId, 'model', message.text, message.id, message.groundingLinks);
-        if (message.storyboardId) {
-          const storyboard = storyboardLookup.get(message.storyboardId);
-          if (storyboard) {
-            try {
-              await createStoryboardAction(activeBoardId, {
-                id: storyboard.id,
-                messageId: message.id,
-                payload: storyboard.payload,
-                status: storyboard.status,
-                totalDurationSeconds: storyboard.totalDurationSeconds
-              });
-            } catch (error) {
-              console.warn('[STORYBOARD] Failed to persist storyboard', error);
-              showError('Failed to save storyboard. Please try again.');
-            }
-          }
-        }
-      }
-
-      if (storyboardQueue.length > 0) {
-        setPendingStoryboards(prev => {
-          const merged = new Map(prev.map(sb => [sb.id, sb]));
-          storyboardQueue.forEach(sb => merged.set(sb.id, sb));
-          return Array.from(merged.values()).filter(sb => sb.status === 'pending' || sb.status === 'processing');
-        });
       }
 
       updateActiveBoard(b => {
-        const existingStoryboards = b.storyboards || [];
-        const mergedStoryboards = storyboardQueue.length > 0
-          ? Array.from(new Map([...existingStoryboards, ...storyboardQueue].map(sb => [sb.id, sb])).values())
-          : existingStoryboards;
         return {
           ...b,
           items: [...newItems, ...b.items],
-          messages: [...b.messages, ...modelMessages],
-          storyboards: mergedStoryboards
+          messages: [...b.messages, ...modelMessages]
         };
       });
       refreshOnboardingState();
@@ -2625,14 +1775,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
       
       const job = await res.json();
       setActiveJobs(prev => [...prev, job.id]);
-      const pendingType = failedJob.type === 'generate_video' || failedJob.type === 'generate_long_video'
+      const pendingType = failedJob.type === 'generate_video'
         ? 'video'
         : failedJob.type === 'generate_carousel'
           ? 'carousel'
           : 'image';
       addPendingItem(job.id, pendingType, {
         ...failedJob.payload,
-        isLongVideo: failedJob.type === 'generate_long_video',
         slideCount: failedJob.type === 'generate_carousel' && Array.isArray((failedJob.payload as any)?.slides)
           ? (failedJob.payload as any).slides.length
           : undefined,
@@ -2697,8 +1846,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
   if (!activeBoard) return <WorkspaceSkeleton />;
 
   const editingProduct = activeBoard.products?.find(p => p.id === editingProductId) || null;
-  const hasAvatar = Boolean(activeBoard.avatarIdentity) || activeBoard.assets.some(asset => asset.type === 'avatar');
-  const avatarBusy = isAvatarUploading || isAvatarGenerating;
 
   return (
     <div className="flex flex-col md:flex-row min-h-[100dvh] md:h-screen w-full font-sans text-neo-black relative md:overflow-hidden bg-gray-50">
@@ -2845,24 +1992,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
         messages={activeBoard.messages}
         onSendMessage={handleSendMessage}
         onDismissResearch={handleDismissResearch}
-        onStoryboardAction={handleStoryboardAction}
-        onStoryboardEdit={handleStoryboardEdit}
-        onUpdateStoryboardReferences={handleStoryboardReferenceUpdate}
-        onUploadStoryboardReference={handleUploadStoryboardReference}
-        draftMessage={chatDraft}
         isProcessing={isProcessing}
         processingStatus={processingStatus}
-        hasAssets={activeBoard.assets.length > 0}
-        assets={activeBoard.assets}
-        storyboards={activeBoard.storyboards || pendingStoryboards}
         pendingItems={pendingItems}
-        hasAvatar={hasAvatar}
-        avatarBusy={avatarBusy}
         videoQualityMode={videoQualityMode}
         onToggleVideoQuality={() => setVideoQualityMode(prev => !prev)}
         ahaPackAvailable={ahaPackAvailable}
-        onUploadAvatar={handleUploadAvatarFiles}
-        onCreateAvatar={handleCreateAiAvatar}
       />
       
       {activeJobs.length > 0 && (

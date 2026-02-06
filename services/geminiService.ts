@@ -76,56 +76,6 @@ const generateVideoTool: FunctionDeclaration = {
   }
 };
 
-const generateLongVideoTool: FunctionDeclaration = {
-  name: "generate_long_video",
-  description: "Propose a long-form marketing video storyboard (15-30s) by stitching 2-5 scenes (each 4/6/8s). Generation begins after user approval.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      prompt: { type: Type.STRING, description: "High-level brief for the full video." },
-      continuitySpec: { type: Type.STRING, description: "Character + wardrobe + prop + lighting consistency rules." },
-      aspectRatio: { type: Type.STRING, description: "Target aspect ratio: '16:9' or '9:16'." },
-      resolution: { type: Type.STRING, description: "Target resolution: '720p' or '1080p'." },
-      productId: { type: Type.STRING, description: "Optional product ID to use for ingredient-based generation." },
-      ingredientAssetIds: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional list of up to 3 asset IDs from the BRAND ASSET LIBRARY to use as reference images (ingredients). These can be product shots, avatars, logos, or generic setting/background images." },
-      referenceSelections: {
-        type: Type.ARRAY,
-        description: "Optional ordered reference slots for Veo (max 3). Use roles: avatar, item, setting (setting can be generic backgrounds/mood references).",
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            assetId: { type: Type.STRING },
-            role: { type: Type.STRING }
-          },
-          required: ["assetId"]
-        }
-      },
-      referenceMode: { type: Type.STRING, description: "Reference mode: manual (only selections), hybrid (fill missing), auto (AI chooses)." },
-      qualityMode: { type: Type.BOOLEAN, description: "Prefer higher-fidelity video generation with extra reference anchoring." },
-      title: { type: Type.STRING, description: "Short title for the asset card." },
-      hook: { type: Type.STRING, description: "Hook strategy line (1 sentence max)." },
-      caption: { type: Type.STRING, description: "Social caption for the asset." },
-      scenes: {
-        type: Type.ARRAY,
-        description: "2-5 scenes, each max 8s. Total duration must be 30s or less.",
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            prompt: { type: Type.STRING, description: "Scene-specific visual prompt. Prefer a structured JSON scene spec (character, environment, camera, action) for continuity." },
-            durationSeconds: { type: Type.NUMBER, description: "Scene length (4, 6, or 8 seconds)." },
-            title: { type: Type.STRING, description: "Optional scene title." },
-            camera: { type: Type.STRING, description: "Camera movement or angle." },
-            action: { type: Type.STRING, description: "Primary action or motion." },
-            transition: { type: Type.STRING, description: "Transition note to next scene (optional)." }
-          },
-          required: ["prompt"]
-        }
-      }
-    },
-    required: ["scenes", "continuitySpec"]
-  }
-};
-
 const generateCampaignPackTool: FunctionDeclaration = {
   name: "generate_campaign_pack",
   description: "Generate a structured campaign pack containing 5-10 pre-designed items.",
@@ -138,7 +88,7 @@ const generateCampaignPackTool: FunctionDeclaration = {
         items: {
           type: Type.OBJECT,
           properties: {
-          type: { type: Type.STRING, enum: ["image", "video", "long_video", "carousel"] },
+          type: { type: Type.STRING, enum: ["image", "video", "carousel"] },
           title: { type: Type.STRING },
           archetype: { type: Type.STRING },
           hook: { type: Type.STRING },
@@ -558,7 +508,7 @@ export const chatWithMarketingAgent = async (
     ════════════════════════════════════════════════════════════════════════════
     
     When calling generate_image, select specific assets by ID using brandAssetIds.
-    When calling generate_video or generate_long_video, select up to 3 assets by ID using ingredientAssetIds and (when roles are clear) referenceSelections with roles avatar/item/setting.
+    When calling generate_video, select up to 3 assets by ID using ingredientAssetIds and (when roles are clear) referenceSelections with roles avatar/item/setting.
     Choose the most relevant assets for each visual - don't include everything, just what's needed.
     
     Available Assets:
@@ -589,14 +539,8 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     - After calling generate_image or generate_video, provide the hook strategy and caption in your text response
 
     VIDEO GENERATION GUIDELINES:
+    - Long video generation is retired. Do not call generate_long_video and do not include long_video items in campaign packs.
     - Use generate_video for cinematic UGC-style videos, viral shorts, or Reels content
-    - Use generate_long_video for 15-30s requests that require multiple scenes stitched together
-    - For long videos, draft a storyboard first and wait for explicit user approval before generation
-    - Do not claim the long video is generating until the user approves the storyboard
-    - If the user asks for a long-form video with a short prompt (e.g., "viral GRWM TikTok"), infer reasonable defaults:
-      - Aspect ratio: 9:16 for TikTok/Reels; 16:9 otherwise
-      - Scenes: 3-4 scenes, 6s each (total 18-24s) unless a duration is requested
-      - Continuity: same person, outfit, location, lighting, and props across scenes
     - Only ask follow-up questions if critical info is missing (no product context, compliance risk, or unclear platform)
     - For "UGC Viral Pack" requests, include AT LEAST 2-3 videos in the campaign pack alongside images
     - Video prompts should describe: scene, action, movement, camera angle, mood
@@ -614,14 +558,7 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     - If the request is generic or lifestyle (no specific product), use a setting reference (generic background/mood image) instead of forcing a product shot
     - If a logo appears in the video, include a logo asset reference (ingredientAssetIds) to keep it accurate and avoid stylized redraws
     - Set qualityMode: true for UGC/influencer videos, close-up hands, product interactions, or when the user asks for the best realism
-    - For generate_long_video, provide 2-5 scenes, each 4/6/8 seconds, total 30s or less
-    - For generate_long_video, include continuitySpec covering character, wardrobe, props, lighting, and camera style
-    - continuitySpec should read like a character bible with explicit, unchanging traits (hair, skin tone, facial features, body type, outfit, accessories, phone model)
-    - When possible, write scene prompts as structured JSON; copy the same character object across scenes and only change actions or location
-    - If using JSON, include scene_number, duration_seconds, and aspect_ratio for clarity
-    - If you include a long video inside a campaign pack, set type: "long_video" and include scenes + continuitySpec
-    - Long videos in packs will still require storyboard approval before generation
-    - Use 1080p only when every scene is 8 seconds; otherwise stick to 720p
+    - Use 1080p only when quality benefits are required and prompts are stable; otherwise stick to 720p for speed
   `;
 
   const model = "gemini-3-pro-preview";
@@ -631,7 +568,7 @@ ${assetCatalog.length > 50 ? `\n    ... and ${assetCatalog.length - 50} more ass
     { role: "user", parts: [{ text: newMessage }] }
   ];
 
-  const tools = [{ functionDeclarations: [generateImageTool, generateVideoTool, generateLongVideoTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
+  const tools = [{ functionDeclarations: [generateImageTool, generateVideoTool, generateCampaignPackTool, generateAvatarTool, trendDiscoveryTool, webResearchTool] }];
 
   const response: any = await generateContentServer(model, contents, {
     systemInstruction,

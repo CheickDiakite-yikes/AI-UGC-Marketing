@@ -59,8 +59,8 @@ const HowItWorksPage: React.FC<Props> = ({ onBack }) => {
                 tag: 'Step 03',
               },
               {
-                title: 'Ship long video',
-                body: 'Approve a storyboard, then render multi-scene video with continuity guardrails.',
+                title: 'Ship creative',
+                body: 'Review generated assets, pick winners, and publish with brand consistency.',
                 tag: 'Step 04',
               },
             ].map((step) => (
@@ -88,8 +88,8 @@ const HowItWorksPage: React.FC<Props> = ({ onBack }) => {
                 </p>
               </div>
               <div className="bg-white border-2 border-black p-4 shadow-neo-sm">
-                <div className="text-xs font-black uppercase tracking-widest text-gray-500">Long video</div>
-                <p className="mt-2">Long videos charge one video slot per scene (4/6/8s each).</p>
+                <div className="text-xs font-black uppercase tracking-widest text-gray-500">Carousels</div>
+                <p className="mt-2">Carousel slides consume image generations based on slide count.</p>
               </div>
             </div>
             <p className="mt-4 text-xs font-bold uppercase tracking-widest text-gray-600">
@@ -146,7 +146,7 @@ const HowItWorksPage: React.FC<Props> = ({ onBack }) => {
           <h2 className="font-display font-black text-3xl md:text-4xl">Ready to ship?</h2>
           <p className="mt-3 text-sm md:text-base text-gray-300 max-w-2xl">
             Start with a brand scan, add your product, and let the agent propose a campaign. You can
-            approve a long-video storyboard before anything renders.
+            review suggestions, generate assets, and publish fast.
           </p>
           <button
             onClick={onBack}
