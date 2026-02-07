@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import TermsPageRoute from '@/components/TermsPageRoute';
+import { DEFAULT_SOCIAL_IMAGE, getCanonicalUrl } from '@/app/seoConfig';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app';
-const canonicalUrl = `${siteUrl}/terms`;
+const canonicalUrl = getCanonicalUrl('/terms');
 
 export const metadata: Metadata = {
   title: 'Terms of Service',
@@ -19,11 +19,11 @@ export const metadata: Metadata = {
       'Review the Predi AI terms of service for AI-powered marketing generation and usage policies.',
     images: [
       {
-        url: '/og-image.png',
+        url: DEFAULT_SOCIAL_IMAGE,
         width: 1200,
         height: 630,
         alt: 'Predi AI Terms of Service',
-        type: 'image/png',
+        type: 'image/jpeg',
       },
     ],
   },
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     title: 'Predi AI Terms of Service',
     description:
       'Review the Predi AI terms of service for AI-powered marketing generation and usage policies.',
-    images: ['/og-image.png'],
+    images: [DEFAULT_SOCIAL_IMAGE],
   },
 };
 

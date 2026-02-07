@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import SeoLandingPage from '@/components/SeoLandingPage';
 import SeoJsonLd from '@/components/SeoJsonLd';
+import { DEFAULT_SOCIAL_IMAGE, getCanonicalUrl } from '@/app/seoConfig';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app';
-const canonicalUrl = `${siteUrl}/ai-video-ads-generator`;
+const canonicalUrl = getCanonicalUrl('/ai-video-ads-generator');
 
 const stats = [
   { label: 'Video-ready in', value: 'Minutes per scene' },
@@ -127,11 +127,11 @@ export const metadata: Metadata = {
       'Generate video ads for TikTok, Instagram, and paid social with reference-driven continuity.',
     images: [
       {
-        url: '/og-image.png',
+        url: DEFAULT_SOCIAL_IMAGE,
         width: 1200,
         height: 630,
         alt: 'AI Video Ads Generator - Predi AI',
-        type: 'image/png',
+        type: 'image/jpeg',
       },
     ],
   },
@@ -140,7 +140,7 @@ export const metadata: Metadata = {
     title: 'AI Video Ads Generator - Predi AI',
     description:
       'Generate video ads for TikTok, Instagram, and paid social with reference-driven continuity.',
-    images: ['/og-image.png'],
+    images: [DEFAULT_SOCIAL_IMAGE],
   },
 };
 
@@ -168,7 +168,7 @@ export default function AiVideoAdsGeneratorPage() {
         relatedLinks={[
           { label: 'How it works', href: '/how-it-works' },
           { label: 'AI marketing platform', href: '/ai-marketing-platform' },
-          { label: 'Long-form AI video', href: '/long-form-ai-video' },
+          { label: 'Marketing for small business', href: '/marketing-for-small-business' },
         ]}
       />
       <SeoJsonLd data={jsonLd} />

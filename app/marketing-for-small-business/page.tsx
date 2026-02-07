@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import SeoLandingPage from '@/components/SeoLandingPage';
 import SeoJsonLd from '@/components/SeoJsonLd';
+import { DEFAULT_SOCIAL_IMAGE, getCanonicalUrl } from '@/app/seoConfig';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app';
-const canonicalUrl = `${siteUrl}/marketing-for-small-business`;
+const canonicalUrl = getCanonicalUrl('/marketing-for-small-business');
 
 const stats = [
   { label: 'Team size', value: 'Built for 1 to 5 people' },
@@ -126,11 +126,11 @@ export const metadata: Metadata = {
       'Launch campaigns fast without a full team. Predi AI keeps your marketing on brand and on budget.',
     images: [
       {
-        url: '/og-image.png',
+        url: DEFAULT_SOCIAL_IMAGE,
         width: 1200,
         height: 630,
         alt: 'Marketing for Small Business - Predi AI',
-        type: 'image/png',
+        type: 'image/jpeg',
       },
     ],
   },
@@ -139,7 +139,7 @@ export const metadata: Metadata = {
     title: 'Marketing for Small Business - Predi AI',
     description:
       'Launch campaigns fast without a full team. Predi AI keeps your marketing on brand and on budget.',
-    images: ['/og-image.png'],
+    images: [DEFAULT_SOCIAL_IMAGE],
   },
 };
 

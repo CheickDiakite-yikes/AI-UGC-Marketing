@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import Workspace from './Workspace';
 import LandingPage from './components/LandingPage';
@@ -10,11 +12,16 @@ import AuthModal from './components/AuthModal';
 import { ToastProvider } from './components/Toast';
 import { getSession } from './app/actions/authActions';
 
-type ViewState = 'loading' | 'landing' | 'app' | 'privacy' | 'terms' | 'about' | 'how' | 'showcase';
+type ViewState = 'landing' | 'app' | 'privacy' | 'terms' | 'about' | 'how' | 'showcase';
 type AuthModalMode = 'login' | 'signup' | null;
+type AppInitialView = 'landing' | 'app';
 
-const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewState>('loading');
+interface AppProps {
+  initialView?: AppInitialView;
+}
+
+const App: React.FC<AppProps> = ({ initialView = 'landing' }) => {
+  const [currentView, setCurrentView] = useState<ViewState>(initialView);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>(null);
 
   useEffect(() => {
@@ -27,7 +34,7 @@ const App: React.FC = () => {
     }).catch(() => {
       setCurrentView('landing');
     });
-  }, []);
+  }, [initialView]);
 
   const handleAuthSuccess = () => {
     setAuthModalMode(null);
@@ -45,17 +52,6 @@ const App: React.FC = () => {
       setAuthModalMode('login');
     }
   };
-
-  if (currentView === 'loading') {
-    return (
-      <div className="flex h-screen items-center justify-center bg-neo-lime">
-        <div className="text-center">
-          <div className="text-4xl font-black animate-pulse">PREDI AI</div>
-          <div className="mt-2 text-lg">Initializing...</div>
-        </div>
-      </div>
-    );
-  }
 
   if (currentView === 'app') {
     return <Workspace onExitApp={() => setCurrentView('landing')} />;
@@ -102,10 +98,10 @@ const App: React.FC = () => {
   );
 };
 
-const AppWithProviders: React.FC = () => {
+const AppWithProviders: React.FC<AppProps> = ({ initialView = 'landing' }) => {
   return (
     <ToastProvider>
-      <App />
+      <App initialView={initialView} />
     </ToastProvider>
   );
 };

@@ -919,7 +919,7 @@ const LandingPage: React.FC<Props> = ({
                      <a href="/ai-marketing-platform" className="hover:text-neo-lime transition-colors">AI marketing platform</a>
                      <a href="/ai-video-ads-generator" className="hover:text-neo-yellow transition-colors">AI video ads generator</a>
                      <a href="/marketing-for-small-business" className="hover:text-neo-cyan transition-colors">Marketing for small business</a>
-                     <a href="/long-form-ai-video" className="hover:text-neo-pink transition-colors">Long-form AI video</a>
+                     <a href="/showcase" className="hover:text-neo-pink transition-colors">Customer showcase</a>
                   </div>
                </div>
                
