@@ -4,6 +4,11 @@ import { getUserProfile } from '@/app/actions/userActions';
 import { getCalendarDashboardData } from '@/app/actions/calendarActions';
 import { getFavoritesByBoardAction } from '@/app/actions/favoriteActions';
 import DashboardCalendar from '@/components/DashboardCalendar';
+import { createPerfTimer } from '@/services/performanceLogger';
+
+const DASHBOARD_BOARD_ITEM_LIMIT = 80;
+const DASHBOARD_CALENDAR_ITEM_LIMIT = 180;
+const DASHBOARD_FAVORITES_LIMIT = 120;
 
 const getInitials = (name?: string | null, email?: string | null) => {
   const safeName = name?.trim();
@@ -19,13 +24,24 @@ const getInitials = (name?: string | null, email?: string | null) => {
 };
 
 export default async function ProfileDashboardPage() {
+  const timer = createPerfTimer('ProfileDashboardPage');
   const profile = await getUserProfile();
   if (!profile) {
     redirect('/login');
   }
 
-  const calendarData = await getCalendarDashboardData();
-  const favoritesByBoard = await getFavoritesByBoardAction();
+  const [calendarData, favoritesByBoard] = await Promise.all([
+    getCalendarDashboardData({
+      boardItemLimit: DASHBOARD_BOARD_ITEM_LIMIT,
+      calendarItemLimit: DASHBOARD_CALENDAR_ITEM_LIMIT,
+    }),
+    getFavoritesByBoardAction({ limit: DASHBOARD_FAVORITES_LIMIT }),
+  ]);
+  timer.done({
+    boardCount: calendarData.boards.length,
+    scheduledItems: calendarData.calendarItems.length,
+    favoriteBoards: favoritesByBoard.length,
+  });
   const initials = getInitials(profile.name, profile.email);
   
   const favoriteItems = favoritesByBoard.flatMap(board => board.items.map(item => ({

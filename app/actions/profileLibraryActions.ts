@@ -8,8 +8,22 @@ import { profileAssets, profileProductAssets, profileProducts, users } from '@/d
 import { getSession } from './authActions';
 import { uploadProfileAsset, deleteAsset as deleteFromStorage } from '@/services/objectStorageService';
 import { ProfileLibrary, ProfileAsset, ProfileProduct } from '@/types';
+import { createPerfTimer } from '@/services/performanceLogger';
 
 const ALLOWED_ASSET_TYPES = new Set(['logo', 'image', 'avatar', 'pdf', 'text', 'link']);
+const MAX_LIBRARY_LIMIT = 500;
+
+type ProfileLibraryOptions = {
+  assetLimit?: number;
+  productLimit?: number;
+};
+
+const normalizeOptionalLimit = (value: number | undefined) => {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return Math.max(1, Math.min(MAX_LIBRARY_LIMIT, Math.floor(value as number)));
+};
 
 function buildPreviewUrl(storageKey?: string | null) {
   if (!storageKey) return null;
@@ -22,11 +36,20 @@ async function readFileAsBase64(file: File) {
   return buffer.toString('base64');
 }
 
-export async function getProfileLibrary(): Promise<ProfileLibrary | null> {
+export async function getProfileLibrary(
+  options: ProfileLibraryOptions = {},
+): Promise<ProfileLibrary | null> {
   const session = await getSession();
   if (!session || !session.userId) {
     return null;
   }
+
+  const assetLimit = normalizeOptionalLimit(options.assetLimit);
+  const productLimit = normalizeOptionalLimit(options.productLimit);
+  const timer = createPerfTimer('getProfileLibrary', {
+    assetLimit,
+    productLimit,
+  });
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, session.userId as string),
@@ -36,17 +59,40 @@ export async function getProfileLibrary(): Promise<ProfileLibrary | null> {
     },
   });
 
-  const assetsRows = await db.query.profileAssets.findMany({
-    where: eq(profileAssets.userId, session.userId as string),
-    orderBy: [desc(profileAssets.createdAt)],
+  const assetsRows = assetLimit
+    ? await db.query.profileAssets.findMany({
+        where: eq(profileAssets.userId, session.userId as string),
+        orderBy: [desc(profileAssets.createdAt)],
+        limit: assetLimit + 1,
+      })
+    : await db.query.profileAssets.findMany({
+        where: eq(profileAssets.userId, session.userId as string),
+        orderBy: [desc(profileAssets.createdAt)],
+      });
+
+  const productRows = productLimit
+    ? await db.query.profileProducts.findMany({
+        where: eq(profileProducts.userId, session.userId as string),
+        orderBy: [desc(profileProducts.createdAt)],
+        limit: productLimit + 1,
+      })
+    : await db.query.profileProducts.findMany({
+        where: eq(profileProducts.userId, session.userId as string),
+        orderBy: [desc(profileProducts.createdAt)],
+      });
+
+  const hasMoreAssets = Boolean(assetLimit && assetsRows.length > assetLimit);
+  const hasMoreProducts = Boolean(productLimit && productRows.length > productLimit);
+  const visibleAssetRows = hasMoreAssets && assetLimit ? assetsRows.slice(0, assetLimit) : assetsRows;
+  const visibleProductRows = hasMoreProducts && productLimit ? productRows.slice(0, productLimit) : productRows;
+  timer.mark('base_queries_complete', {
+    assets: visibleAssetRows.length,
+    products: visibleProductRows.length,
+    hasMoreAssets,
+    hasMoreProducts,
   });
 
-  const productRows = await db.query.profileProducts.findMany({
-    where: eq(profileProducts.userId, session.userId as string),
-    orderBy: [desc(profileProducts.createdAt)],
-  });
-
-  const productIds = productRows.map(row => row.id);
+  const productIds = visibleProductRows.map(row => row.id);
   const productAssetRows = productIds.length > 0 ? await db.select({
     id: profileProductAssets.id,
     profileProductId: profileProductAssets.profileProductId,
@@ -62,8 +108,9 @@ export async function getProfileLibrary(): Promise<ProfileLibrary | null> {
     .from(profileProductAssets)
     .innerJoin(profileAssets, eq(profileProductAssets.profileAssetId, profileAssets.id))
     .where(inArray(profileProductAssets.profileProductId, productIds)) : [];
+  timer.mark('product_assets_query_complete', { linkedProductAssets: productAssetRows.length });
 
-  const assets: ProfileAsset[] = assetsRows.map(asset => ({
+  const assets: ProfileAsset[] = visibleAssetRows.map(asset => ({
     id: asset.id,
     type: asset.type,
     name: asset.name,
@@ -74,7 +121,7 @@ export async function getProfileLibrary(): Promise<ProfileLibrary | null> {
     createdAt: asset.createdAt ? new Date(asset.createdAt).getTime() : undefined,
   }));
 
-  const products: ProfileProduct[] = productRows.map(product => ({
+  const products: ProfileProduct[] = visibleProductRows.map(product => ({
     id: product.id,
     name: product.name,
     description: product.description,
@@ -91,14 +138,22 @@ export async function getProfileLibrary(): Promise<ProfileLibrary | null> {
       })),
   }));
 
-  return {
+  const result: ProfileLibrary = {
     profile: {
       websiteUrl: user?.websiteUrl ?? null,
       overview: user?.overview ?? null,
     },
     assets,
     products,
+    meta: {
+      hasMoreAssets,
+      hasMoreProducts,
+      assetLimit,
+      productLimit,
+    },
   };
+  timer.done({ assets: assets.length, products: products.length });
+  return result;
 }
 
 export async function uploadProfileAssetAction(formData: FormData) {

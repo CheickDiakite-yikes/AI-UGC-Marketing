@@ -328,6 +328,12 @@ export interface ProfileLibrary {
   };
   assets: ProfileAsset[];
   products: ProfileProduct[];
+  meta?: {
+    hasMoreAssets?: boolean;
+    hasMoreProducts?: boolean;
+    assetLimit?: number | null;
+    productLimit?: number | null;
+  };
 }
 
 export interface ProfileImportSelection {
