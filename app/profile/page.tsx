@@ -5,6 +5,7 @@ import { logout } from '@/app/actions/authActions';
 import { getUserProfile, updateUserPassword, updateUserProfile } from '@/app/actions/userActions';
 import { getSubscriptionStateAction } from '@/app/actions/subscriptionActions';
 import BillingControls from '@/components/BillingControls';
+import { createPerfTimer } from '@/services/performanceLogger';
 
 type ProfilePageProps = {
   searchParams?: Promise<{
@@ -67,15 +68,21 @@ const getInitials = (name?: string | null, email?: string | null) => {
 };
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
+  const timer = createPerfTimer('ProfilePage');
   const profile = await getUserProfile();
   if (!profile) {
     redirect('/login');
   }
 
-  const onboardingState = await getOnboardingStateAction();
-  const subscriptionState = await getSubscriptionStateAction();
-
-  const searchParamsData = searchParams ? await searchParams : undefined;
+  const [onboardingState, subscriptionState, searchParamsData] = await Promise.all([
+    getOnboardingStateAction(),
+    getSubscriptionStateAction(),
+    searchParams ? searchParams : Promise.resolve(undefined),
+  ]);
+  timer.done({
+    onboardingComplete: onboardingState.completed,
+    subscriptionTier: subscriptionState.planTier,
+  });
   const banner = getBanner(searchParamsData);
   const initials = getInitials(profile.name, profile.email);
 

@@ -5,6 +5,7 @@ import { and, eq, desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { boards, favorites, generatedItems } from '@/db/schema';
 import { getSession } from './authActions';
+import { createPerfTimer } from '@/services/performanceLogger';
 
 type FavoriteItemSummary = {
   id: string;
@@ -17,6 +18,20 @@ type FavoriteBoardGroup = {
   boardId: string;
   boardName: string;
   items: FavoriteItemSummary[];
+};
+
+type FavoriteQueryOptions = {
+  limit?: number;
+};
+
+const DEFAULT_FAVORITES_LIMIT = 120;
+const MAX_FAVORITES_LIMIT = 500;
+
+const normalizeLimit = (value: number | undefined, fallback: number) => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(1, Math.min(MAX_FAVORITES_LIMIT, Math.floor(value as number)));
 };
 
 function resolveStorageUrl(storageKey?: string | null) {
@@ -86,14 +101,17 @@ export async function toggleFavoriteAction(itemId: string) {
   return { success: true, isFavorite: true };
 }
 
-export async function getFavoritesByBoardAction(): Promise<FavoriteBoardGroup[]> {
+export async function getFavoritesByBoardAction(
+  options: FavoriteQueryOptions = {},
+): Promise<FavoriteBoardGroup[]> {
   const session = await getSession();
   if (!session || !session.userId) {
     return [];
   }
 
+  const limit = normalizeLimit(options.limit, DEFAULT_FAVORITES_LIMIT);
+  const timer = createPerfTimer('getFavoritesByBoardAction', { limit });
   const rows = await db.select({
-    favoriteId: favorites.id,
     boardId: boards.id,
     boardName: boards.name,
     itemId: generatedItems.id,
@@ -107,7 +125,9 @@ export async function getFavoritesByBoardAction(): Promise<FavoriteBoardGroup[]>
     .innerJoin(generatedItems, eq(favorites.generatedItemId, generatedItems.id))
     .innerJoin(boards, eq(generatedItems.boardId, boards.id))
     .where(eq(favorites.userId, session.userId as string))
-    .orderBy(desc(favorites.createdAt));
+    .orderBy(desc(favorites.createdAt))
+    .limit(limit);
+  timer.mark('query_complete', { rowCount: rows.length });
 
   const grouped = new Map<string, FavoriteBoardGroup>();
 
@@ -138,5 +158,10 @@ export async function getFavoritesByBoardAction(): Promise<FavoriteBoardGroup[]>
     });
   }
 
-  return Array.from(grouped.values());
+  const result = Array.from(grouped.values());
+  timer.done({
+    boardCount: result.length,
+    itemCount: result.reduce((total, group) => total + group.items.length, 0),
+  });
+  return result;
 }

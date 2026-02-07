@@ -5,6 +5,7 @@ import { and, eq, desc, gte, lt, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { boards, generatedItems, calendarItems } from '@/db/schema';
 import { getSession } from './authActions';
+import { createPerfTimer } from '@/services/performanceLogger';
 
 type CalendarBoardItem = {
   id: string;
@@ -35,6 +36,22 @@ type CalendarEntry = {
 type CalendarDashboardData = {
   boards: CalendarBoard[];
   calendarItems: CalendarEntry[];
+};
+
+type CalendarDashboardOptions = {
+  boardItemLimit?: number;
+  calendarItemLimit?: number;
+};
+
+const DEFAULT_BOARD_ITEM_LIMIT = 80;
+const DEFAULT_CALENDAR_ITEM_LIMIT = 180;
+const MAX_DASHBOARD_LIMIT = 500;
+
+const normalizeLimit = (value: number | undefined, fallback: number) => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(1, Math.min(MAX_DASHBOARD_LIMIT, Math.floor(value as number)));
 };
 
 const resolveStorageUrl = (storageKey?: string | null) => {
@@ -196,20 +213,69 @@ const hydrateCalendarEntriesByIds = async (ids: string[]) => {
   }) satisfies CalendarEntry);
 };
 
-export async function getCalendarDashboardData(): Promise<CalendarDashboardData> {
+export async function getCalendarDashboardData(
+  options: CalendarDashboardOptions = {},
+): Promise<CalendarDashboardData> {
   const session = await getSession();
   if (!session || !session.userId) {
     return { boards: [], calendarItems: [] };
   }
 
-  const boardRows = await db.query.boards.findMany({
-    where: eq(boards.userId, session.userId as string),
-    orderBy: (board, { desc }) => [desc(board.updatedAt)],
-    with: {
-      generatedItems: {
-        orderBy: (items, { desc }) => [desc(items.createdAt)],
+  const boardItemLimit = normalizeLimit(options.boardItemLimit, DEFAULT_BOARD_ITEM_LIMIT);
+  const calendarItemLimit = normalizeLimit(options.calendarItemLimit, DEFAULT_CALENDAR_ITEM_LIMIT);
+  const timer = createPerfTimer('getCalendarDashboardData', {
+    boardItemLimit,
+    calendarItemLimit,
+  });
+
+  const [boardRows, calendarRows] = await Promise.all([
+    db.query.boards.findMany({
+      where: eq(boards.userId, session.userId as string),
+      columns: {
+        id: true,
+        name: true,
       },
-    },
+      orderBy: (board, { desc }) => [desc(board.updatedAt)],
+      with: {
+        generatedItems: {
+          columns: {
+            id: true,
+            title: true,
+            type: true,
+            content: true,
+            storageKey: true,
+            carouselUrls: true,
+            createdAt: true,
+          },
+          orderBy: (items, { desc }) => [desc(items.createdAt)],
+          limit: boardItemLimit,
+        },
+      },
+    }),
+    db
+      .select({
+        calendarId: calendarItems.id,
+        boardId: calendarItems.boardId,
+        boardName: boards.name,
+        itemId: generatedItems.id,
+        itemTitle: generatedItems.title,
+        itemType: generatedItems.type,
+        itemContent: generatedItems.content,
+        itemStorageKey: generatedItems.storageKey,
+        itemCarouselUrls: generatedItems.carouselUrls,
+        scheduledFor: calendarItems.scheduledFor,
+        note: calendarItems.note,
+      })
+      .from(calendarItems)
+      .innerJoin(boards, eq(calendarItems.boardId, boards.id))
+      .innerJoin(generatedItems, eq(calendarItems.itemId, generatedItems.id))
+      .where(eq(calendarItems.userId, session.userId as string))
+      .orderBy(desc(calendarItems.scheduledFor))
+      .limit(calendarItemLimit),
+  ]);
+  timer.mark('queries_complete', {
+    boards: boardRows.length,
+    calendarItems: calendarRows.length,
   });
 
   const boardsData: CalendarBoard[] = boardRows.map(board => ({
@@ -225,26 +291,6 @@ export async function getCalendarDashboardData(): Promise<CalendarDashboardData>
         createdAt: item.createdAt.toISOString(),
       })),
   }));
-
-  const calendarRows = await db
-    .select({
-      calendarId: calendarItems.id,
-      boardId: calendarItems.boardId,
-      boardName: boards.name,
-      itemId: generatedItems.id,
-      itemTitle: generatedItems.title,
-      itemType: generatedItems.type,
-      itemContent: generatedItems.content,
-      itemStorageKey: generatedItems.storageKey,
-      itemCarouselUrls: generatedItems.carouselUrls,
-      scheduledFor: calendarItems.scheduledFor,
-      note: calendarItems.note,
-    })
-    .from(calendarItems)
-    .innerJoin(boards, eq(calendarItems.boardId, boards.id))
-    .innerJoin(generatedItems, eq(calendarItems.itemId, generatedItems.id))
-    .where(eq(calendarItems.userId, session.userId as string))
-    .orderBy(desc(calendarItems.scheduledFor));
 
   const calendarData: CalendarEntry[] = calendarRows.map(row => ({
     id: row.calendarId,
@@ -263,6 +309,10 @@ export async function getCalendarDashboardData(): Promise<CalendarDashboardData>
     note: row.note ?? null,
   }));
 
+  timer.done({
+    renderedBoardItems: boardsData.reduce((total, board) => total + board.items.length, 0),
+    renderedCalendarItems: calendarData.length,
+  });
   return { boards: boardsData, calendarItems: calendarData };
 }
 

@@ -16,6 +16,7 @@ import { Type } from '@google/genai';
 import { generateMarketingImage, analyzeAvatarImage } from '@/services/geminiService';
 import { getPlanLimits } from '@/services/subscriptionPlans';
 import { getRemainingImages } from '@/services/usageLimits';
+import { createPerfTimer } from '@/services/performanceLogger';
 
 // Helper to map DB board to Board type
 // Note directly returning DB objects, might need mapping if types differ slightly
@@ -881,41 +882,60 @@ export async function getOnboardingStateAction() {
         };
     }
 
-    const user = await db.query.users.findFirst({
-        where: eq(users.id, session.userId as string),
-        columns: { onboardingCompleted: true, onboardingDismissedAt: true, websiteUrl: true }
-    });
-
-    const userBoards = await db.query.boards.findMany({
-        where: eq(boards.userId, session.userId as string),
-        columns: { id: true }
-    });
+    const timer = createPerfTimer('getOnboardingStateAction');
+    const [user, userBoards] = await Promise.all([
+        db.query.users.findFirst({
+            where: eq(users.id, session.userId as string),
+            columns: { onboardingCompleted: true, onboardingDismissedAt: true, websiteUrl: true }
+        }),
+        db.query.boards.findMany({
+            where: eq(boards.userId, session.userId as string),
+            columns: { id: true }
+        }),
+    ]);
+    timer.mark('core_queries_complete', { boardCount: userBoards.length });
 
     const boardIds = userBoards.map(board => board.id);
-    const assetTypes = boardIds.length > 0
-        ? await db.select({ type: assets.type }).from(assets).where(inArray(assets.boardId, boardIds))
-        : [];
-    const assetTypeSet = new Set(assetTypes.map(asset => asset.type));
-
-    const hasWebsiteLink = Boolean(user?.websiteUrl);
-    const hasLogo = assetTypeSet.has('logo');
-    const hasAvatar = assetTypeSet.has('avatar');
-    const hasSources = assetTypeSet.has('pdf') || assetTypeSet.has('text');
-
-    const hasProduct = boardIds.length > 0
-        ? (await db.select({ id: products.id }).from(products).where(inArray(products.boardId, boardIds)).limit(1)).length > 0
-        : false;
-
-    const hasGeneratedItem = boardIds.length > 0
-        ? (await db.select({ id: generatedItems.id }).from(generatedItems).where(inArray(generatedItems.boardId, boardIds)).limit(1)).length > 0
-        : false;
-
-    const hasGenerationJob = (await db.select({ id: jobs.id }).from(jobs).where(
+    const [logoRows, avatarRows, sourceRows, productRows, generatedRows] = boardIds.length > 0
+        ? await Promise.all([
+            db.select({ id: assets.id })
+                .from(assets)
+                .where(and(inArray(assets.boardId, boardIds), eq(assets.type, 'logo')))
+                .limit(1),
+            db.select({ id: assets.id })
+                .from(assets)
+                .where(and(inArray(assets.boardId, boardIds), eq(assets.type, 'avatar')))
+                .limit(1),
+            db.select({ id: assets.id })
+                .from(assets)
+                .where(and(inArray(assets.boardId, boardIds), inArray(assets.type, ['pdf', 'text'])))
+                .limit(1),
+            db.select({ id: products.id }).from(products).where(inArray(products.boardId, boardIds)).limit(1),
+            db.select({ id: generatedItems.id }).from(generatedItems).where(inArray(generatedItems.boardId, boardIds)).limit(1),
+        ])
+        : [[], [], [], [], []];
+    const jobRows = await db.select({ id: jobs.id }).from(jobs).where(
         and(
             eq(jobs.userId, session.userId as string),
             inArray(jobs.type, ['generate_image', 'generate_video', 'generate_carousel'])
         )
-    ).limit(1)).length > 0;
+    ).limit(1);
+    timer.mark('signal_queries_complete', {
+        hasLogo: logoRows.length > 0,
+        hasAvatar: avatarRows.length > 0,
+        hasSources: sourceRows.length > 0,
+        hasProduct: productRows.length > 0,
+        hasGeneratedItem: generatedRows.length > 0,
+        hasGenerationJob: jobRows.length > 0,
+    });
+
+    const hasWebsiteLink = Boolean(user?.websiteUrl);
+    const hasLogo = logoRows.length > 0;
+    const hasAvatar = avatarRows.length > 0;
+    const hasSources = sourceRows.length > 0;
+    const hasProduct = productRows.length > 0;
+    const hasGeneratedItem = generatedRows.length > 0;
+    const hasGenerationJob = jobRows.length > 0;
 
     const hasCampaign = hasGeneratedItem || hasGenerationJob;
     const hasMultipleBoards = userBoards.length > 1;
@@ -930,7 +950,7 @@ export async function getOnboardingStateAction() {
         completed = true;
     }
 
-    return {
+    const result = {
         completed,
         dismissed: Boolean(user?.onboardingDismissedAt) && !completed,
         required: {
@@ -945,6 +965,8 @@ export async function getOnboardingStateAction() {
             multipleBoards: hasMultipleBoards
         }
     };
+    timer.done({ completed: result.completed, dismissed: result.dismissed });
+    return result;
 }
 
 export async function dismissOnboardingAction(): Promise<void> {

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getUserProfile, updateProfileBasics, updateBrandContext, addBrandColor, removeBrandColor, addBrandFont, removeBrandFont, addBrandFeel, removeBrandFeel, addSocialLink, removeSocialLink, updateBrandLogo } from '@/app/actions/userActions';
 import { getProfileLibrary, uploadProfileAssetAction, deleteProfileAssetAction, createProfileProductAction, deleteProfileProductAction, addProfileProductAssetAction } from '@/app/actions/profileLibraryActions';
+import { createPerfTimer } from '@/services/performanceLogger';
 
 const getInitials = (name?: string | null, email?: string | null) => {
   const safeName = name?.trim();
@@ -36,6 +37,9 @@ const PRODUCT_ASSET_ROLES = [
   { value: 'ui', label: 'UI' },
   { value: 'other', label: 'Other' },
 ];
+
+const COMPANY_ASSET_LIMIT = 150;
+const COMPANY_PRODUCT_LIMIT = 60;
 
 type CompanyPageProps = {
   searchParams?: Promise<{
@@ -96,13 +100,22 @@ const getBanner = (searchParamsData?: { updated?: string; error?: string }): Ban
 };
 
 export default async function CompanyPage({ searchParams }: CompanyPageProps) {
+  const timer = createPerfTimer('CompanyPage');
   const profile = await getUserProfile();
   if (!profile) {
     redirect('/login');
   }
 
-  const library = await getProfileLibrary();
-  const searchParamsData = searchParams ? await searchParams : undefined;
+  const [library, searchParamsData] = await Promise.all([
+    getProfileLibrary({ assetLimit: COMPANY_ASSET_LIMIT, productLimit: COMPANY_PRODUCT_LIMIT }),
+    searchParams ? searchParams : Promise.resolve(undefined),
+  ]);
+  timer.done({
+    assets: library?.assets.length ?? 0,
+    products: library?.products.length ?? 0,
+    hasMoreAssets: library?.meta?.hasMoreAssets ?? false,
+    hasMoreProducts: library?.meta?.hasMoreProducts ?? false,
+  });
   const banner = getBanner(searchParamsData);
   const initials = getInitials(profile.name, profile.email);
   const assets = library?.assets ?? [];
@@ -145,6 +158,12 @@ export default async function CompanyPage({ searchParams }: CompanyPageProps) {
             }`}
           >
             {banner.message}
+          </div>
+        )}
+
+        {(library?.meta?.hasMoreAssets || library?.meta?.hasMoreProducts) && (
+          <div className="border-2 border-black bg-neo-cyan px-4 py-3 text-xs font-bold uppercase tracking-widest">
+            Showing the most recent library items first for faster load.
           </div>
         )}
 
