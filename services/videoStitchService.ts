@@ -21,9 +21,14 @@ const parseDataUrl = (dataUrl: string) => {
 const toDataUrl = (buffer: Buffer, mimeType: string) =>
   `data:${mimeType};base64,${buffer.toString('base64')}`;
 
+const ALLOWED_COMMANDS = new Set(['ffmpeg', 'ffprobe']);
+
 const runCommand = (command: string, args: string[], traceId?: string) => {
+  if (!ALLOWED_COMMANDS.has(command)) {
+    return Promise.reject(new Error(`Disallowed command: ${command}`));
+  }
   return new Promise<void>((resolve, reject) => {
-    const proc = spawn(command, args);
+    const proc = spawn(command, args, { shell: false });
     let stderr = '';
 
     proc.stderr.on('data', (data) => {
@@ -48,8 +53,11 @@ const runCommand = (command: string, args: string[], traceId?: string) => {
 };
 
 const runCommandWithOutput = (command: string, args: string[], traceId?: string) => {
+  if (!ALLOWED_COMMANDS.has(command)) {
+    return Promise.reject(new Error(`Disallowed command: ${command}`));
+  }
   return new Promise<string>((resolve, reject) => {
-    const proc = spawn(command, args);
+    const proc = spawn(command, args, { shell: false });
     let stdout = '';
     let stderr = '';
 
