@@ -43,7 +43,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/ui": "^1.0.0",
+    "@vitest/ui": "^4.0.18",
     "autoprefixer": "^10.4.19",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.8",
@@ -51,12 +51,14 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.0.0",
-    "vitest": "^1.6.0"
+    "vitest": "^4.0.18"
   },
   "optionalDependencies": {
     "tsx": "^4.21.0"
   },
   "overrides": {
-    "fast-xml-parser": "^5.3.6"
+    "fast-xml-parser": "^5.3.6",
+    "minimatch": "^10.2.1",
+    "esbuild": "^0.25.0"
   }
 }
