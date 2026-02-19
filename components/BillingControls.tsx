@@ -70,7 +70,11 @@ const BillingControls: React.FC<BillingControlsProps> = ({ planTier, creditBalan
       try {
         const result = await createCheckoutSessionAction(tier);
         if (result?.url) {
-          window.location.href = result.url;
+          if (typeof (window as any).gtagSendEvent === 'function') {
+            (window as any).gtagSendEvent(result.url);
+          } else {
+            window.location.href = result.url;
+          }
         } else {
           setError('Unable to start checkout. Try again shortly.');
         }

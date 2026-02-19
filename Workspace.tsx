@@ -152,7 +152,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     try {
       const result = await createCheckoutSessionAction(tier);
       if (result?.url && typeof window !== 'undefined') {
-        window.location.href = result.url;
+        if (typeof (window as any).gtagSendEvent === 'function') {
+          (window as any).gtagSendEvent(result.url);
+        } else {
+          window.location.href = result.url;
+        }
         return;
       }
       showError('Checkout link unavailable. Please try again.');
@@ -168,7 +172,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ onExitApp }) => {
     try {
       const result = await createCreditsCheckoutSessionAction(credits);
       if (result?.url && typeof window !== 'undefined') {
-        window.location.href = result.url;
+        if (typeof (window as any).gtagSendEvent === 'function') {
+          (window as any).gtagSendEvent(result.url);
+        } else {
+          window.location.href = result.url;
+        }
         return;
       }
       showError('Checkout link unavailable. Please try again.');
