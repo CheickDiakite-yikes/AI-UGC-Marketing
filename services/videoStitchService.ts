@@ -21,14 +21,9 @@ const parseDataUrl = (dataUrl: string) => {
 const toDataUrl = (buffer: Buffer, mimeType: string) =>
   `data:${mimeType};base64,${buffer.toString('base64')}`;
 
-const ALLOWED_COMMANDS = new Set(['ffmpeg', 'ffprobe']);
-
-const runCommand = (command: string, args: string[], traceId?: string) => {
-  if (!ALLOWED_COMMANDS.has(command)) {
-    return Promise.reject(new Error(`Disallowed command: ${command}`));
-  }
+const runFfmpeg = (args: string[], traceId?: string) => {
   return new Promise<void>((resolve, reject) => {
-    const proc = spawn(command, args, { shell: false });
+    const proc = spawn('ffmpeg', args, { shell: false });
     let stderr = '';
 
     proc.stderr.on('data', (data) => {
@@ -52,12 +47,9 @@ const runCommand = (command: string, args: string[], traceId?: string) => {
   });
 };
 
-const runCommandWithOutput = (command: string, args: string[], traceId?: string) => {
-  if (!ALLOWED_COMMANDS.has(command)) {
-    return Promise.reject(new Error(`Disallowed command: ${command}`));
-  }
+const runFfprobe = (args: string[], traceId?: string) => {
   return new Promise<string>((resolve, reject) => {
-    const proc = spawn(command, args, { shell: false });
+    const proc = spawn('ffprobe', args, { shell: false });
     let stdout = '';
     let stderr = '';
 
@@ -79,7 +71,7 @@ const runCommandWithOutput = (command: string, args: string[], traceId?: string)
         return;
       }
       const message = traceId
-        ? `[FFMPEG ${traceId}] ${stderr || `Process exited with code ${code}`}`
+        ? `[FFPROBE ${traceId}] ${stderr || `Process exited with code ${code}`}`
         : (stderr || `Process exited with code ${code}`);
       reject(new Error(message));
     });
@@ -105,7 +97,7 @@ const parseFps = (rate?: string): number | null => {
 };
 
 const probeVideoInfo = async (inputPath: string, traceId?: string) => {
-  const output = await runCommandWithOutput('ffprobe', [
+  const output = await runFfprobe([
     '-v',
     'error',
     '-select_streams',
@@ -160,7 +152,7 @@ const normalizeClipPaths = async (
       '-an',
       outputPath
     ];
-    await runCommand('ffmpeg', args, traceId);
+    await runFfmpeg(args, traceId);
     normalizedPaths.push(outputPath);
   }
 
@@ -196,7 +188,7 @@ export async function stitchVideoClips(
     const concatArgs = ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', outputPath];
 
     try {
-      await runCommand('ffmpeg', concatArgs, traceId);
+      await runFfmpeg(concatArgs, traceId);
     } catch (error) {
       console.warn(`[FFMPEG ${traceId}] Direct concat failed, attempting re-encode`, error);
       if (options?.reencode === false) {
@@ -220,7 +212,7 @@ export async function stitchVideoClips(
         outputPath,
       ];
       try {
-        await runCommand('ffmpeg', fallbackArgs, traceId);
+        await runFfmpeg(fallbackArgs, traceId);
       } catch (fallbackError) {
         console.warn(`[FFMPEG ${traceId}] Re-encode concat failed, attempting normalized clips`, fallbackError);
         if (options?.normalize === false) {
@@ -264,7 +256,7 @@ export async function stitchVideoClips(
           '-an',
           outputPath,
         ];
-        await runCommand('ffmpeg', normalizedConcatArgs, traceId);
+        await runFfmpeg(normalizedConcatArgs, traceId);
         console.log(`[FFMPEG ${traceId}] Normalized concat succeeded`, {
           targetWidth,
           targetHeight,
@@ -307,7 +299,7 @@ export async function extractLastFrame(
       outputPath,
     ];
 
-    await runCommand('ffmpeg', args, traceId);
+    await runFfmpeg(args, traceId);
 
     const frameBuffer = await readFile(outputPath);
     return { base64: frameBuffer.toString('base64'), mimeType: 'image/png' };
