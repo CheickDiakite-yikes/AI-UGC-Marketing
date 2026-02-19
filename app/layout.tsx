@@ -27,7 +27,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
 const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'c6ippGeHmi8FWQsc-ClDfZ-ZZnks_pLQWB9EKIu6BrA'
 const bingVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
 const yandexVerification = process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION
-const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-RFRC5MQFSL'
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-TMSL44G015'
 
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
