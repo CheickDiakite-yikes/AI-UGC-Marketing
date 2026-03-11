@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import SeoLandingPage from '@/components/SeoLandingPage';
 import SeoJsonLd from '@/components/SeoJsonLd';
+import { DEFAULT_SOCIAL_IMAGE, getCanonicalUrl } from '@/app/seoConfig';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app';
-const canonicalUrl = `${siteUrl}/ai-marketing-platform`;
+const canonicalUrl = getCanonicalUrl('/ai-marketing-platform');
 
 const stats = [
   { label: 'Campaign kickoff', value: 'Minutes, not weeks' },
@@ -127,11 +127,11 @@ export const metadata: Metadata = {
       'Plan campaigns, lock brand consistency, and generate multi-channel assets with Predi AI.',
     images: [
       {
-        url: '/og-image.png',
+        url: DEFAULT_SOCIAL_IMAGE,
         width: 1200,
         height: 630,
         alt: 'AI Marketing Platform - Predi AI',
-        type: 'image/png',
+        type: 'image/jpeg',
       },
     ],
   },
@@ -140,7 +140,7 @@ export const metadata: Metadata = {
     title: 'AI Marketing Platform - Predi AI',
     description:
       'Plan campaigns, lock brand consistency, and generate multi-channel assets with Predi AI.',
-    images: ['/og-image.png'],
+    images: [DEFAULT_SOCIAL_IMAGE],
   },
 };
 

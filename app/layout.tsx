@@ -3,6 +3,7 @@ import Script from 'next/script'
 import { Space_Grotesk, Syne } from 'next/font/google'
 import './globals.css'
 import ToastProvider from '@/components/Toast'
+import { DEFAULT_SOCIAL_IMAGE, SITE_URL } from '@/app/seoConfig'
 
 export const viewport: Viewport = {
     width: 'device-width',
@@ -23,7 +24,7 @@ const syne = Syne({
     display: 'swap',
 })
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
+const siteUrl = SITE_URL
 const googleVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || 'c6ippGeHmi8FWQsc-ClDfZ-ZZnks_pLQWB9EKIu6BrA'
 const bingVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
 const yandexVerification = process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION
@@ -77,7 +78,7 @@ export const metadata: Metadata = {
         description: 'All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
         images: [
             {
-                url: '/og-image.jpeg',
+                url: DEFAULT_SOCIAL_IMAGE,
                 width: 1200,
                 height: 630,
                 alt: 'Predi AI - Marketing on Autopilot',
@@ -89,7 +90,7 @@ export const metadata: Metadata = {
         card: 'summary_large_image',
         title: 'Predi AI | Your #1 AI Chief Marketing Officer',
         description: 'All you need is a link and a logo. Predi does the rest in seconds. From empty marketing calendar to high-converting on-brand campaigns created by your AI Agent.',
-        images: ['/og-image.jpeg'],
+        images: [DEFAULT_SOCIAL_IMAGE],
         creator: '@prediai',
         site: '@prediai',
     },
@@ -131,13 +132,6 @@ export default function RootLayout({
             priceCurrency: 'USD',
             availability: 'https://schema.org/InStock',
         },
-        aggregateRating: {
-            '@type': 'AggregateRating',
-            ratingValue: '4.9',
-            ratingCount: '10000',
-            bestRating: '5',
-            worstRating: '1',
-        },
         featureList: [
             'AI-powered UGC generation',
             'Viral Reels creation',
@@ -148,7 +142,7 @@ export default function RootLayout({
             'AI video generation with Veo 3.1',
             'Gemini 3 Pro integration'
         ],
-        screenshot: `${siteUrl}/og-image.png`,
+        screenshot: `${siteUrl}${DEFAULT_SOCIAL_IMAGE}`,
         softwareVersion: '2.0',
         author: {
             '@type': 'Organization',
@@ -176,45 +170,6 @@ export default function RootLayout({
         },
     }
 
-    const faqJsonLd = {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: [
-            {
-                '@type': 'Question',
-                name: 'What is Predi AI?',
-                acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Predi AI is an AI-native marketing OS that automatically generates high-converting UGC, viral Reels, and performance ads for platforms like TikTok and Instagram using advanced AI models like Gemini 3 Pro and Veo 3.1.'
-                }
-            },
-            {
-                '@type': 'Question',
-                name: 'How does Predi AI create marketing content?',
-                acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Predi AI uses your brand assets, company information, and campaign briefs to automatically generate optimized marketing content including images, videos, carousels, and ad copy tailored for each platform.'
-                }
-            },
-            {
-                '@type': 'Question',
-                name: 'What platforms does Predi AI support?',
-                acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Predi AI generates content optimized for TikTok, Instagram Reels, Facebook, YouTube Shorts, and other major social media and advertising platforms.'
-                }
-            },
-            {
-                '@type': 'Question',
-                name: 'Is Predi AI free to use?',
-                acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: 'Yes, Predi AI offers a free tier that allows you to start creating AI-powered marketing content immediately. Premium features are available for power users.'
-                }
-            }
-        ]
-    }
-
     return (
         <html lang="en">
             <head>
@@ -229,10 +184,6 @@ export default function RootLayout({
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
-                />
-                <script
-                    type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
                 />
             </head>
             <body className={`${spaceGrotesk.variable} ${syne.variable} font-sans`}>

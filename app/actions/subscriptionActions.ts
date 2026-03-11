@@ -7,8 +7,9 @@ import { getSession } from './authActions';
 import type { PlanTier } from '@/types';
 import { getStripe } from '@/services/stripe';
 import { getCreditsPriceId, getPlanPriceId } from '@/services/stripePricing';
+import { SITE_URL } from '@/app/seoConfig';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app';
+const siteUrl = SITE_URL;
 
 const getOrCreateStripeCustomerId = async (userId: string) => {
   const user = await db.query.users.findFirst({

@@ -1,66 +1,62 @@
 import { MetadataRoute } from 'next'
+import { getCanonicalUrl } from '@/app/seoConfig'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app'
-    const currentDate = new Date()
+    const currentDate = process.env.NEXT_PUBLIC_SITEMAP_LASTMOD
+        ? new Date(process.env.NEXT_PUBLIC_SITEMAP_LASTMOD)
+        : new Date('2026-02-07T00:00:00.000Z')
     
     return [
         {
-            url: siteUrl,
+            url: getCanonicalUrl('/'),
             lastModified: currentDate,
             changeFrequency: 'daily',
             priority: 1,
         },
         {
-            url: `${siteUrl}/ai-marketing-platform`,
+            url: getCanonicalUrl('/ai-marketing-platform'),
             lastModified: currentDate,
             changeFrequency: 'weekly',
             priority: 0.9,
         },
         {
-            url: `${siteUrl}/ai-video-ads-generator`,
+            url: getCanonicalUrl('/ai-video-ads-generator'),
             lastModified: currentDate,
             changeFrequency: 'weekly',
             priority: 0.85,
         },
         {
-            url: `${siteUrl}/marketing-for-small-business`,
+            url: getCanonicalUrl('/marketing-for-small-business'),
             lastModified: currentDate,
             changeFrequency: 'weekly',
             priority: 0.85,
         },
         {
-            url: `${siteUrl}/long-form-ai-video`,
-            lastModified: currentDate,
-            changeFrequency: 'weekly',
-            priority: 0.85,
-        },
-        {
-            url: `${siteUrl}/showcase`,
+            url: getCanonicalUrl('/showcase'),
             lastModified: currentDate,
             changeFrequency: 'weekly',
             priority: 0.8,
         },
         {
-            url: `${siteUrl}/how-it-works`,
+            url: getCanonicalUrl('/how-it-works'),
             lastModified: currentDate,
             changeFrequency: 'monthly',
             priority: 0.7,
         },
         {
-            url: `${siteUrl}/about`,
+            url: getCanonicalUrl('/about'),
             lastModified: currentDate,
             changeFrequency: 'monthly',
             priority: 0.6,
         },
         {
-            url: `${siteUrl}/privacy`,
+            url: getCanonicalUrl('/privacy'),
             lastModified: currentDate,
             changeFrequency: 'monthly',
             priority: 0.4,
         },
         {
-            url: `${siteUrl}/terms`,
+            url: getCanonicalUrl('/terms'),
             lastModified: currentDate,
             changeFrequency: 'monthly',
             priority: 0.4,

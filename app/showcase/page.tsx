@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import ShowcasePageRoute from '@/components/ShowcasePageRoute';
+import { DEFAULT_SOCIAL_IMAGE, getCanonicalUrl } from '@/app/seoConfig';
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://prediai.replit.app';
-const canonicalUrl = `${siteUrl}/showcase`;
+const canonicalUrl = getCanonicalUrl('/showcase');
 
 export const metadata: Metadata = {
   title: 'Showcase',
@@ -19,11 +19,11 @@ export const metadata: Metadata = {
       'Explore campaign-ready videos, images, and carousels created with Predi AI and curated by real teams.',
     images: [
       {
-        url: '/og-image.png',
+        url: DEFAULT_SOCIAL_IMAGE,
         width: 1200,
         height: 630,
         alt: 'Predi AI Showcase',
-        type: 'image/png',
+        type: 'image/jpeg',
       },
     ],
   },
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     title: 'Predi AI Showcase',
     description:
       'Explore campaign-ready videos, images, and carousels created with Predi AI and curated by real teams.',
-    images: ['/og-image.png'],
+    images: [DEFAULT_SOCIAL_IMAGE],
   },
 };
 
